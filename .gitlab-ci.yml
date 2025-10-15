@@ -1,0 +1,47 @@
+stages: [build]
+
+variables:
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  GHCR_HOST: ghcr.io
+
+build_with_kaniko:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: ["/busybox/sh", "-c"]
+  script: |
+    set -eu
+
+    : "${GHCR_USERNAME:?Set GHCR_USERNAME to your GitHub username}"
+    : "${GHCR_TOKEN:?Set GHCR_TOKEN (GitHub PAT with write:packages)}"
+
+    GHCR_NAMESPACE="$GHCR_USERNAME"
+
+    mkdir -p /kaniko/.docker
+    printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}\n' \
+      "$GHCR_HOST" "$GHCR_USERNAME" "$GHCR_TOKEN" > /kaniko/.docker/config.json
+
+    echo "Scanning services/* for Dockerfile(s)…"
+    found=0
+    for d in $(find services -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null || true); do
+      [ -f "$d/Dockerfile" ] || { echo "Skipping $(basename "$d"): no Dockerfile"; continue; }
+      svc="$(basename "$d")"
+      img="$(echo "$svc" | tr '[:upper:]' '[:lower:]')"
+      dest_base="$GHCR_HOST/$GHCR_NAMESPACE/$img"
+      echo "Building $svc -> $dest_base:$IMAGE_TAG"
+      /kaniko/executor \
+        --context "$CI_PROJECT_DIR/$d" \
+        --dockerfile "$CI_PROJECT_DIR/$d/Dockerfile" \
+        --destination "$dest_base:$IMAGE_TAG" \
+        --destination "$dest_base:latest" \
+        --cache \
+        --cache-repo "$GHCR_HOST/$GHCR_NAMESPACE/cache"
+      found=1
+    done
+
+    # <-- changed
+    if [ "$found" -eq 0 ]; then
+      echo "No services to build"
+    fi
+
+    echo "✅ Build job finished"
