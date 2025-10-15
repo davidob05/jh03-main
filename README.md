@@ -91,3 +91,10 @@ For open source projects, say how it is licensed.
 
 ## Project status
 If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+
+
+## Team Edit to README, not from the original file
+Did not want to delete the above as it contains useful information. 
+
+## Summary of changes
+The feature introduced in this branch is the Docker only workflow. Right now it is a skeleton with nothing really going on but the idea is that when code is added Docker handles the building of the code itself. The Docker image had to be pushed to my personal (David's) git container registry. If we need to use any services (APIs and such), let me know, I can integrate it. To run what we build we have 2 options, I can give you access on your personal github account to use our app without having to install anything or you can install docker on your own machine and build it yourself. To add actual code to the repo, you guys only need to really worry about root/services/app/app/src (src isn't created yet but it won't let me without a file in there). That's where the majority of the code should go. I am working on adding an automated test running side to this so bear with me!
