@@ -1,10 +1,18 @@
 # syntax=docker/dockerfile:1.7
-FROM alpine:3.20
+FROM node:20-alpine
 
 
-# Create non-root user and workdir
+# Create non-root user
 RUN addgroup -S app && adduser -S app -G app
-USER app
+
+# OS packages for React tooling, Postgres clients, and native module builds
+RUN apk add --no-cache \
+        bash \
+        postgresql-client \
+        python3 \
+        make \
+        g++
+
 WORKDIR /app
 
 
@@ -13,11 +21,14 @@ COPY --chown=app:app entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 
-# Place your app code under /app when ready (COPY directives come later)
-# Example (later):
-# COPY --chown=app:app app/ /app/
-# EXPOSE 3000
+# Bring in the app skeleton (src, bin, etc.)
+COPY --chown=app:app app/ /app/
 
+# Ensure helper scripts are executable if present
+RUN if [ -d /app/bin ]; then chmod +x /app/bin/* 2>/dev/null || true; fi
+
+
+USER app
 
 ENTRYPOINT ["/entrypoint.sh"]
 # Default stays idle until you add code or override CMD in compose

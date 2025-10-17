@@ -1,4 +1,4 @@
-stages: [build]
+stages: [build, test]
 
 variables:
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
@@ -45,3 +45,13 @@ build_with_kaniko:
     fi
 
     echo "✅ Build job finished"
+
+test_app:
+  stage: test
+  needs: ["build_with_kaniko"]
+  image: node:20-alpine
+  script: |
+    set -eu
+    cd services/app/app
+    npm ci
+    npm test
