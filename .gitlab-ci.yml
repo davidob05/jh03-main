@@ -46,12 +46,23 @@ build_with_kaniko:
 
     echo "✅ Build job finished"
 
-test_app:
+.test_job_template:
   stage: test
-  needs: ["build_with_kaniko"]
   image: node:20-alpine
-  script: |
-    set -eu
-    cd services/app/app
-    npm ci
-    npm test
+  script:
+    - set -eu
+    - cd "$SERVICE_PATH"
+    - if [ -f package-lock.json ]; then npm ci; else npm install; fi
+    - npm test
+
+test_frontend:
+  extends: .test_job_template
+  needs: ["build_with_kaniko"]
+  variables:
+    SERVICE_PATH: services/frontend/app
+
+test_backend:
+  extends: .test_job_template
+  needs: ["build_with_kaniko"]
+  variables:
+    SERVICE_PATH: services/backend/app
