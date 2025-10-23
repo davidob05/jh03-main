@@ -1,2 +1,28 @@
-version: '3.9'
-services: {}
+services:
+  frontend:
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    build:
+      context: ../../services/frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://backend:4000
+    volumes:
+      - ../../services/frontend/app:/app
+      - ../../.docker/node_modules/frontend:/app/node_modules
+    depends_on:
+      - backend
+
+  backend:
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    build:
+      context: ../../services/backend
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+    volumes:
+      - ../../services/backend/app:/app
+      - ../../.docker/node_modules/backend:/app/node_modules

@@ -1,6 +1,8 @@
 # env & secrets
 .env
 .env.* 
+ops/compose/.env
+.docker/
 acme.json
 
 # Python

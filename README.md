@@ -97,30 +97,40 @@ If you have run out of energy or time for your project, put a note at the top of
 Did not want to delete the above as it contains useful information. 
 
 ## Summary of changes
-I have made a pretty good start to the docker container, ready to accept React or PostgreSQL (no database is made but will work on integrating that)!
+The project now runs as two Docker services: one for the React front end and one for the Node/Express API.
 
-To use the codebase here are the steps:
+To work with the codebase:
 
-1. 
-Clone/pull, move to the relevant branch.
+1. Clone the repo and switch to the desired branch.
+2. Start both containers with `make up` (builds images and launches dev services defined in `ops/compose/docker-compose.dev.yml`).
+3. Frontend code lives in `services/frontend/app/src`; frontend tests stay under `services/frontend/app/tests/frontend`.
+4. Backend API code lives in `services/backend/app/src`; backend tests now belong in `services/backend/app/tests`.
+5. Dev servers run inside their containers. Use `docker compose -f ops/compose/docker-compose.dev.yml logs -f frontend` (or `backend`) to view output.
+6. Before pushing, run project tests inside the appropriate container (for example `docker compose -f ops/compose/docker-compose.dev.yml exec frontend npm test` or `... exec backend npm test`).
+7. Commit and push your changes. CI will build the images on GitLab so the team stays in sync.
 
-2. 
-navigate to root/services/app/app, run npm install to recreate node_modules from the tracked package-lock.json. This has all the JS dependincies you need, run this every time as these may change! The beauty of Docker is that it doesn't care about what you've got installed on your machine, every dependency is ran from the Docker image so don't worry about clashes.
+## Development workflow
 
-3. 
-Put frontend code under services/app/app/src/frontend and backend code under services/app/app/src/backend.
+### 1. First-time setup or post-clone refresh
 
-4. 
-Put frontend tests under services/app/app/tests/frontend and backend tests under services/app/app/tests/
+- From the repository root, run `./prepare-environment`.
+- The script writes your UID/GID to `ops/compose/.env`, prepares writable host folders under `.docker/node_modules`, rebuilds both images, launches the dev stack, installs dependencies, and runs the frontend/backend test suites inside their containers.
 
-5. 
- Launch the dev server with "npm run start" in your CLI from services/app/app and make changes if necessary.
+### 2. Ongoing development cycle
 
-6. 
-Before you push run "npm test". This is to make sure everything is healthy locally before pushing.
+- Use `./refresh-environment` whenever you want to stop running containers, rebuild, start fresh, reinstall dependencies, and execute both test suites.
+- Follow logs with `docker compose -f ops/compose/docker-compose.dev.yml logs -f`.
 
-7. 
-Commit and push your changes. Gitlab will run all the tests to make sure everything works out well.
+### 3. Adding new services
 
-8. 
-Finally, you can make a merge request! When approved, Gitlab will push a new docker image to the remote repo so you can see exactly what stage our group is at in our development of our project.
+- Update `ops/scripts/dev-refresh.sh` to include the new service name in `SERVICE_LIST`.
+- Ensure the compose file mounts any service-specific `node_modules` into `.docker/node_modules/<service>` and that the service image runs as the `${HOST_UID}:${HOST_GID}` user.
+
+### 4. Continuous integration
+
+- GitLab CI builds every service image with Kaniko and runs `test_frontend` and `test_backend`. Make sure each service has an up-to-date `package-lock.json` so that `npm ci` remains deterministic in CI.
+
+### 5. Troubleshooting
+
+- If `prepare-environment` complains about Docker, verify that Docker Desktop/Engine is running and that the Compose v2 plugin is available.
+- To regenerate lockfiles, run `npm install` inside the host directory (not the container), commit the resulting `package-lock.json`, then re-run `./refresh-environment`.

@@ -5,10 +5,9 @@ FROM node:20-alpine
 # Create non-root user
 RUN addgroup -S app && adduser -S app -G app
 
-# OS packages for React tooling, Postgres clients, and native module builds
+# OS packages for React tooling and native module builds
 RUN apk add --no-cache \
         bash \
-        postgresql-client \
         python3 \
         make \
         g++
