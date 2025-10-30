@@ -1,8 +1,8 @@
-export default function App() {
-  return (
-    <main>
-      <h1>Welcome to the jh03 React app scaffold</h1>
-      <p>Replace this component with your real UI.</p>
-    </main>
-  );
+import React from "react";
+import { Routes } from "./Routes";
+
+const App: React.FC= () => {
+  return <Routes />;
 }
+
+export default App;
