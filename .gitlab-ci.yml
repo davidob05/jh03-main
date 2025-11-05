@@ -67,8 +67,21 @@ test_backend:
   variables:
     SERVICE_PATH: services/backend/app
 
+.django_test_template:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - set -eu
+    - cd "$SERVICE_PATH"
+    - python -m venv .venv
+    - . .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install --no-input -r requirements.txt
+    - python manage.py migrate --noinput
+    - python manage.py test
+
 test_django:
-  extends: .test_job_template
+  extends: .django_test_template
   needs: ["build_with_kaniko"]
   variables:
-    SERVICE_PATH: services/django/
+    SERVICE_PATH: services/django/lithium

@@ -23,6 +23,37 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=4000
+      - DJANGO_BASE_URL=http://django:8000
     volumes:
       - ../../services/backend/app:/app
       - ../../.docker/node_modules/backend:/app/node_modules
+    depends_on:
+      - django
+
+  django:
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    build:
+      context: ../../services/django/lithium
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=django_project.settings
+    volumes:
+      - ../../services/django/lithium:/app
+      - django_venv:/app/.venv
+    command:
+      - bash
+      - -lc
+      - >-
+        if [ ! -f /app/.venv/bin/activate ]; then
+          python -m venv /app/.venv;
+        fi &&
+        source /app/.venv/bin/activate &&
+        pip install --no-input --upgrade pip &&
+        pip install --no-input -r requirements.txt &&
+        python manage.py migrate &&
+        python manage.py runserver 0.0.0.0:8000
+
+volumes:
+  django_venv:
