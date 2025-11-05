@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:20-alpine
+FROM ghcr.io/library/node:20-alpine
 
 
 # Create non-root user
