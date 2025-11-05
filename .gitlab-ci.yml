@@ -66,3 +66,9 @@ test_backend:
   needs: ["build_with_kaniko"]
   variables:
     SERVICE_PATH: services/backend/app
+
+test_django:
+  extends: .test_job_template
+  needs: ["build_with_kaniko"]
+  variables:
+    SERVICE_PATH: services/django/lithium
