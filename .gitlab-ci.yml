@@ -66,3 +66,23 @@ test_backend:
   needs: ["build_with_kaniko"]
   variables:
     SERVICE_PATH: services/backend/app
+    POSTGRES_DB: appdb
+    POSTGRES_USER: appuser
+    POSTGRES_PASSWORD: apppassword
+    DATABASE_URL: postgres://appuser:apppassword@postgres:5432/appdb
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+  before_script:
+    - set -eu
+    - apk add --no-cache postgresql-client
+    - cd "$SERVICE_PATH"
+    - if [ -f package-lock.json ]; then npm ci; else npm install; fi
+    - |
+      until psql "$DATABASE_URL" -c "select 1" >/dev/null 2>&1; do
+        echo "Waiting for Postgres…"
+        sleep 2
+      done
+    - psql "$DATABASE_URL" -f src/init_db.spsql
+  script:
+    - npm test

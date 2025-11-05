@@ -1,4 +1,16 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=appdb
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=apppassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   frontend:
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     build:
@@ -23,6 +35,12 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=4000
+      - DATABASE_URL=postgres://appuser:apppassword@postgres:5432/appdb
     volumes:
       - ../../services/backend/app:/app
       - ../../.docker/node_modules/backend:/app/node_modules
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
