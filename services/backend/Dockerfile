@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM ghcr.io/library/node:20-alpine
+FROM public.ecr.aws/docker/library/node:20-alpine
 
 # Create non-root user
 RUN addgroup -S app && adduser -S app -G app

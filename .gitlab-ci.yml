@@ -48,7 +48,8 @@ build_with_kaniko:
 
 .test_job_template:
   stage: test
-  image: ghcr.io/library/node:20-alpine
+  # Use the Amazon ECR Public mirror of the official Node images (reliable from GitLab runners)
+  image: public.ecr.aws/docker/library/node:20-alpine
   script:
     - set -eu
     - cd "$SERVICE_PATH"
@@ -69,7 +70,8 @@ test_backend:
 
 .django_test_template:
   stage: test
-  image: ghcr.io/library/python:3.12-slim
+  # Mirror of the official Python image hosted on Amazon ECR Public
+  image: public.ecr.aws/docker/library/python:3.12-slim
   script:
     - set -eu
     - cd "$SERVICE_PATH"
