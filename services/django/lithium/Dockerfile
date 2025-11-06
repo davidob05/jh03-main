@@ -19,6 +19,16 @@ COPY --from=builder --chown=app:app /app /app
 
 WORKDIR /app
 
+# System packages required for building Python wheels at runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+       gcc \
+       libffi-dev \
+       libpq-dev \
+       python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
