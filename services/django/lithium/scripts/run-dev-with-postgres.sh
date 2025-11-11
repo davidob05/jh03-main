@@ -73,7 +73,8 @@ if [ ! -d /app/.venv ]; then
 fi
 
 run_as_dev bash -lc '. /app/.venv/bin/activate && pip install --no-input --upgrade pip && pip install --no-input -r requirements.txt'
-run_as_dev bash -lc '. /app/.venv/bin/activate && python manage.py migrate'
+run_as_dev bash -lc '. /app/.venv/bin/activate && python manage.py makemigrations --noinput'
+run_as_dev bash -lc '. /app/.venv/bin/activate && python manage.py migrate --noinput'
 
 run_as_dev bash -lc '. /app/.venv/bin/activate && python manage.py runserver 0.0.0.0:8000' &
 RUNSERVER_PID=$!

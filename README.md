@@ -97,7 +97,7 @@ If you have run out of energy or time for your project, put a note at the top of
 Did not want to delete the above as it contains useful information. 
 
 ## Summary of changes
-The project now runs as two Docker services: one for the React front end and one for the Django API. Django now bootstraps its own local PostgreSQL instance inside the same container (data files live under `services/django/lithium/.postgres-data`, which is ignored from git).
+The project now runs as two Docker services: one for the React front end and one for the Django API. Django now bootstraps its own local PostgreSQL instance inside the same container (data files live under `services/django/lithium/.postgres-data`, which is ignored from git) and automatically runs `makemigrations` + `migrate` every time the container starts so model changes immediately reach the database.
 
 To work with the codebase:
 
@@ -124,6 +124,10 @@ To work with the codebase:
 ### Resetting the embedded database
 
 - Run `make reset-django-db` to stop the Django container, delete `services/django/lithium/.postgres-data`, and restart it with a brand-new PostgreSQL cluster. All application data will be lost, so only run this when you intentionally want a clean slate.
+
+### Running migrations
+
+- Run `make migrate` to execute `manage.py makemigrations` and `manage.py migrate` inside the Django container. This is handy when you want to generate/inspect migration files without restarting the entire stack (the `make up` path already runs them automatically on startup).
 
 ### 3. Adding new services
 
