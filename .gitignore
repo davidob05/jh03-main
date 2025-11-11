@@ -38,6 +38,9 @@ services/django/lithium/timetabling_system/migrations/*
 *.tsbuildinfo
 coverage/
 .nyc_output/
+services/django/lithium/.postgres-data/
+services/django/lithium/.cache/
+services/django/lithium/.local/
 
 # OS / editors
 .DS_Store
