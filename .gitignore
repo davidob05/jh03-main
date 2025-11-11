@@ -19,6 +19,7 @@ npm-debug.log*
 yarn-error.log*
 dist/
 build/
+services/django/lithium/.postgres-data/
 
 # OS / editors
 .DS_Store

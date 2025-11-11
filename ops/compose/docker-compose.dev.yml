@@ -15,12 +15,8 @@ services:
       - django
 
   django:
-    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     build:
       context: ../../services/django/lithium
-    depends_on:
-      postgres:
-        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
@@ -28,43 +24,19 @@ services:
       - DJANGO_SETTINGS_MODULE=django_project.settings
       - DJANGO_DB_NAME=exam_db
       - DJANGO_DB_USER=postgres
-      - DJANGO_DB_PASSWORD=mysecretpassword
-      - DJANGO_DB_HOST=postgres
+      - DJANGO_DB_PASSWORD=
+      - DJANGO_DB_HOST=127.0.0.1
       - DJANGO_DB_PORT=5432
+      - DJANGO_POSTGRES_DATA=/app/.postgres-data
+      - HOST_UID=${HOST_UID:-1000}
+      - HOST_GID=${HOST_GID:-1000}
     volumes:
       - ../../services/django/lithium:/app
       - django_venv:/app/.venv
     command:
       - bash
       - -lc
-      - >-
-        if [ ! -f /app/.venv/bin/activate ]; then
-          python -m venv /app/.venv &&
-          source /app/.venv/bin/activate &&
-          pip install --no-input --upgrade pip &&
-          pip install --no-input -r requirements.txt;
-        else
-          source /app/.venv/bin/activate;
-        fi &&
-        python manage.py migrate &&
-        python manage.py runserver 0.0.0.0:8000
-
-  postgres:
-    image: public.ecr.aws/docker/library/postgres:16-alpine
-    environment:
-      - POSTGRES_DB=exam_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=mysecretpassword
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - ./scripts/run-dev-with-postgres.sh
 
 volumes:
   django_venv:
-  postgres_data:
