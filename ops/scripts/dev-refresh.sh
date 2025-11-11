@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/ops/compose/docker-compose.dev.yml"
-SERVICE_LIST=("backend" "frontend" "django")
+SERVICE_LIST=("frontend" "django")
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker is required but not installed or not on PATH" >&2
@@ -42,7 +42,7 @@ for service in "${SERVICE_LIST[@]}"; do
   fi
 
   case "$service" in
-    backend|frontend)
+    frontend)
       echo ">>> ($service) Installing dependencies"
       run_compose exec -T "$service" sh -lc 'if [ -f package-lock.json ]; then npm ci; else npm install; fi'
 

@@ -62,12 +62,6 @@ test_frontend:
   variables:
     SERVICE_PATH: services/frontend/app
 
-test_backend:
-  extends: .test_job_template
-  needs: ["build_with_kaniko"]
-  variables:
-    SERVICE_PATH: services/backend/app
-
 .django_test_template:
   stage: test
   # Mirror of the official Python image hosted on Amazon ECR Public
