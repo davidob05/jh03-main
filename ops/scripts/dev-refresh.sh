@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/ops/compose/docker-compose.dev.yml"
-SERVICE_LIST=("backend" "frontend")
+SERVICE_LIST=("backend" "frontend" "django")
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker is required but not installed or not on PATH" >&2
@@ -41,11 +41,28 @@ for service in "${SERVICE_LIST[@]}"; do
     continue
   fi
 
-  echo ">>> ($service) Installing dependencies"
-  run_compose exec -T "$service" sh -lc 'if [ -f package-lock.json ]; then npm ci; else npm install; fi'
+  case "$service" in
+    backend|frontend)
+      echo ">>> ($service) Installing dependencies"
+      run_compose exec -T "$service" sh -lc 'if [ -f package-lock.json ]; then npm ci; else npm install; fi'
 
-  echo ">>> ($service) Running test suite"
-  run_compose exec -T "$service" sh -lc "npm test"
+      echo ">>> ($service) Running test suite"
+      run_compose exec -T "$service" sh -lc "npm test"
+      ;;
+    django)
+      echo ">>> ($service) Syncing Python dependencies"
+      run_compose exec -T "$service" sh -lc 'if command -v uv >/dev/null 2>&1; then uv sync --frozen || uv sync; elif [ -f requirements.txt ]; then pip install -r requirements.txt; fi'
+
+      echo ">>> ($service) Applying database migrations"
+      run_compose exec -T "$service" sh -lc 'if command -v uv >/dev/null 2>&1; then uv run python manage.py migrate; else python manage.py migrate; fi'
+
+      echo ">>> ($service) Running test suite"
+      run_compose exec -T "$service" sh -lc 'if command -v uv >/dev/null 2>&1; then uv run python manage.py test; else python manage.py test; fi'
+      ;;
+    *)
+      echo ">>> ($service) No refresh commands configured"
+      ;;
+  esac
 done
 
 echo "All services refreshed and tests executed. Follow logs with:"
