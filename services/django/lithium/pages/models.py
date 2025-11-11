@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.postgres.fields import ArrayField
 
 
 # ---------- ENUM TYPES ----------
@@ -45,11 +44,7 @@ class Venue(models.Model):
         choices=VenueType.choices
     )
     is_accessible = models.BooleanField(default=True)
-    qualifications = ArrayField(
-        models.CharField(max_length=255),
-        blank=True,
-        null=True
-    )
+    qualifications = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return self.venue_name
@@ -88,11 +83,7 @@ class Provisions(models.Model):
     provision_id = models.AutoField(primary_key=True)
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
-    provisions = ArrayField(
-        models.CharField(max_length=30, choices=ProvisionType.choices),
-        blank=True,
-        null=True
-    )
+    provisions = models.JSONField(default=list, blank=True)
     notes = models.CharField(max_length=200, blank=True, null=True)
 
     def __str__(self):
