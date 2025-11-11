@@ -48,7 +48,8 @@ build_with_kaniko:
 
 .test_job_template:
   stage: test
-  image: node:20-alpine
+  # Use the Amazon ECR Public mirror of the official Node images (reliable from GitLab runners)
+  image: public.ecr.aws/docker/library/node:20-alpine
   script:
     - set -eu
     - cd "$SERVICE_PATH"
@@ -66,23 +67,26 @@ test_backend:
   needs: ["build_with_kaniko"]
   variables:
     SERVICE_PATH: services/backend/app
-    POSTGRES_DB: appdb
-    POSTGRES_USER: appuser
-    POSTGRES_PASSWORD: apppassword
-    DATABASE_URL: postgres://appuser:apppassword@postgres:5432/appdb
-  services:
-    - name: postgres:16-alpine
-      alias: postgres
-  before_script:
-    - set -eu
-    - apk add --no-cache postgresql-client
-    - cd "$SERVICE_PATH"
-    - if [ -f package-lock.json ]; then npm ci; else npm install; fi
-    - |
-      until psql "$DATABASE_URL" -c "select 1" >/dev/null 2>&1; do
-        echo "Waiting for Postgres…"
-        sleep 2
-      done
-    - psql "$DATABASE_URL" -f src/init_db.spsql
+
+.django_test_template:
+  stage: test
+  # Mirror of the official Python image hosted on Amazon ECR Public
+  image: public.ecr.aws/docker/library/python:3.12-slim
   script:
-    - npm test
+    - set -eu
+    - cd "$SERVICE_PATH"
+    - apt-get update
+    - apt-get install -y --no-install-recommends build-essential gcc libffi-dev python3-dev
+    - rm -rf /var/lib/apt/lists/*
+    - python -m venv .venv
+    - . .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install --no-input -r requirements.txt
+    - python manage.py migrate --noinput
+    - python manage.py test
+
+test_django:
+  extends: .django_test_template
+  needs: ["build_with_kaniko"]
+  variables:
+    SERVICE_PATH: services/django/lithium

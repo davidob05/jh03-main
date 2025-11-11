@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:20-alpine
+FROM public.ecr.aws/docker/library/node:20-alpine
 
 
 # Create non-root user
