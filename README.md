@@ -97,7 +97,7 @@ If you have run out of energy or time for your project, put a note at the top of
 Did not want to delete the above as it contains useful information. 
 
 ## Summary of changes
-The project now runs as two Docker services: one for the React front end and one for the Django API (plus Postgres for persistence).
+The project now runs as two Docker services: one for the React front end and one for the Django API. Django now bootstraps its own local PostgreSQL instance inside the same container (data files live under `services/django/lithium/.postgres-data`, which is ignored from git).
 
 To work with the codebase:
 
@@ -105,7 +105,7 @@ To work with the codebase:
 2. Start both containers with `make up` (builds images and launches dev services defined in `ops/compose/docker-compose.dev.yml`).
 3. Frontend code lives in `services/frontend/app/src`; frontend tests stay under `services/frontend/app/tests/frontend`.
 4. The Django project (including models, views, and tests) lives in `services/django/lithium`.
-5. Dev servers run inside their containers. Use `docker compose -f ops/compose/docker-compose.dev.yml logs -f frontend` (or `django`) to view output.
+5. Dev servers run inside their containers. Use `docker compose -f ops/compose/docker-compose.dev.yml logs -f frontend` (or `django`) to view output. The Django logs now include messages from the embedded PostgreSQL startup.
 6. Before pushing, run project tests inside the appropriate container (for example `docker compose -f ops/compose/docker-compose.dev.yml exec frontend npm test` or `... exec django python manage.py test`).
 7. Commit and push your changes. CI will build the images on GitLab so the team stays in sync.
 
@@ -120,6 +120,10 @@ To work with the codebase:
 
 - Use `./refresh-environment` whenever you want to stop running containers, rebuild, start fresh, reinstall dependencies, and execute both test suites.
 - Follow logs with `docker compose -f ops/compose/docker-compose.dev.yml logs -f`.
+
+### Resetting the embedded database
+
+- Run `make reset-django-db` to stop the Django container, delete `services/django/lithium/.postgres-data`, and restart it with a brand-new PostgreSQL cluster. All application data will be lost, so only run this when you intentionally want a clean slate.
 
 ### 3. Adding new services
 
