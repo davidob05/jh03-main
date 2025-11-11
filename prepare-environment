@@ -10,7 +10,6 @@ HOST_GID="${HOST_GID_OVERRIDE:-$(id -g)}"
 
 mkdir -p "$(dirname "$COMPOSE_ENV_FILE")"
 mkdir -p "$REPO_ROOT/.docker/node_modules/frontend"
-mkdir -p "$REPO_ROOT/.docker/node_modules/backend"
 
 cat > "$COMPOSE_ENV_FILE" <<EOF
 HOST_UID=$HOST_UID

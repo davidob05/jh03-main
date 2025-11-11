@@ -97,16 +97,16 @@ If you have run out of energy or time for your project, put a note at the top of
 Did not want to delete the above as it contains useful information. 
 
 ## Summary of changes
-The project now runs as two Docker services: one for the React front end and one for the Node/Express API.
+The project now runs as two Docker services: one for the React front end and one for the Django API (plus Postgres for persistence).
 
 To work with the codebase:
 
 1. Clone the repo and switch to the desired branch.
 2. Start both containers with `make up` (builds images and launches dev services defined in `ops/compose/docker-compose.dev.yml`).
 3. Frontend code lives in `services/frontend/app/src`; frontend tests stay under `services/frontend/app/tests/frontend`.
-4. Backend API code lives in `services/backend/app/src`; backend tests now belong in `services/backend/app/tests`.
-5. Dev servers run inside their containers. Use `docker compose -f ops/compose/docker-compose.dev.yml logs -f frontend` (or `backend`) to view output.
-6. Before pushing, run project tests inside the appropriate container (for example `docker compose -f ops/compose/docker-compose.dev.yml exec frontend npm test` or `... exec backend npm test`).
+4. The Django project (including models, views, and tests) lives in `services/django/lithium`.
+5. Dev servers run inside their containers. Use `docker compose -f ops/compose/docker-compose.dev.yml logs -f frontend` (or `django`) to view output.
+6. Before pushing, run project tests inside the appropriate container (for example `docker compose -f ops/compose/docker-compose.dev.yml exec frontend npm test` or `... exec django python manage.py test`).
 7. Commit and push your changes. CI will build the images on GitLab so the team stays in sync.
 
 ## Development workflow
@@ -114,7 +114,7 @@ To work with the codebase:
 ### 1. First-time setup or post-clone refresh
 
 - From the repository root, run `./prepare-environment`.
-- The script writes your UID/GID to `ops/compose/.env`, prepares writable host folders under `.docker/node_modules`, rebuilds both images, launches the dev stack, installs dependencies, and runs the frontend/backend test suites inside their containers.
+- The script writes your UID/GID to `ops/compose/.env`, prepares writable host folders under `.docker/node_modules`, rebuilds both images, launches the dev stack, installs dependencies, and runs the frontend/Django test suites inside their containers.
 
 ### 2. Ongoing development cycle
 
@@ -124,11 +124,11 @@ To work with the codebase:
 ### 3. Adding new services
 
 - Update `ops/scripts/dev-refresh.sh` to include the new service name in `SERVICE_LIST`.
-- Ensure the compose file mounts any service-specific `node_modules` into `.docker/node_modules/<service>` and that the service image runs as the `${HOST_UID}:${HOST_GID}` user.
+- Ensure the compose file mounts any service-specific dependency folders (for example `.docker/node_modules/<service>` for Node services) and that the service image runs as the `${HOST_UID}:${HOST_GID}` user.
 
 ### 4. Continuous integration
 
-- GitLab CI builds every service image with Kaniko and runs `test_frontend` and `test_backend`. Make sure each service has an up-to-date `package-lock.json` so that `npm ci` remains deterministic in CI.
+- GitLab CI builds every service image with Kaniko and runs both the frontend and Django test jobs. Make sure Node services keep an up-to-date `package-lock.json` so that `npm ci` remains deterministic in CI.
 
 ### 5. Troubleshooting
 
