@@ -69,9 +69,9 @@ export const Routes: React.FC = () => {
             {/* <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
             <RouterRoute path="profile" element={<InvigilatorProfile />} /> */}
           </RouterRoute>
-
-          {/* 404 fallback */}
-          <RouterRoute path="*" element={<NotFound />} />
+          <RouterRoute path="/exams/:examId" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminExams />} />
+          </RouterRoute>
         </RouterRoutes>
       </BrowserRouter>
     </ThemeProvider>
