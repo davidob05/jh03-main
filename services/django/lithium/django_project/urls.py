@@ -7,6 +7,8 @@ urlpatterns = [
     path("api/", include("timetabling_system.api.urls")),
     path("", include("timetabling_system.urls")),
     path("accounts/", include("allauth.urls")),
+    path("", include("pages.urls")),
+    path("api/", include("pages.api.urls"))
 ]
 
 if settings.DEBUG:
