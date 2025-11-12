@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     # Local
     "accounts",
     "pages",
+    "timetabling_system"
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#middleware
