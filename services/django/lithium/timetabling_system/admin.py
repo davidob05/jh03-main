@@ -1,7 +1,15 @@
 from django.contrib import admin
 
 
-from .models import Exam, Venue, Student, ExamVenue, StudentExam, Provisions
+from .models import (
+    Exam,
+    Venue,
+    Student,
+    ExamVenue,
+    StudentExam,
+    Provisions,
+    UploadLog,
+)
 
 
 @admin.register(Exam)
@@ -44,10 +52,8 @@ class ProvisionsAdmin(admin.ModelAdmin):
     search_fields = ("student__student_name", "exam__exam_name", "notes")
     list_filter = ("exam",)
 
+
 @admin.register(UploadLog)
 class UploadLogAdmin(admin.ModelAdmin):
     list_display = ("file_name", "uploaded_by", "uploaded_at", "records_created", "records_updated")
     ordering = ("-uploaded_at",)
-from django.contrib import admin
-
-# Register your models here.

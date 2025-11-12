@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -89,15 +90,12 @@ class Provisions(models.Model):
     def __str__(self):
         return f"Provisions for {self.student} in {self.exam}"
 
-class UploadLog(models.Model): #this lets us view upload history
+class UploadLog(models.Model):  # this lets us view upload history
     file_name = models.CharField(max_length=255)
-    uploaded_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     records_created = models.IntegerField(default=0)
     records_updated = models.IntegerField(default=0)
 
     def __str__(self):
         return f"{self.file_name} by {self.uploaded_by} on {self.uploaded_at:%Y-%m-%d %H:%M}"
-from django.db import models
-
-# Create your models here.
