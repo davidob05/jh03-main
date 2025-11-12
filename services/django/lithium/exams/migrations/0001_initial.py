@@ -50,8 +50,8 @@ class Migration(migrations.Migration):
                 ('provision_id', models.AutoField(primary_key=True, serialize=False)),
                 ('provisions', models.JSONField(blank=True, default=list)),
                 ('notes', models.CharField(blank=True, max_length=200, null=True)),
-                ('exam', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='pages.exam')),
-                ('student', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='pages.student')),
+                ('exam', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='exams.exam')),
+                ('student', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='exams.student')),
             ],
         ),
         migrations.CreateModel(
@@ -59,16 +59,16 @@ class Migration(migrations.Migration):
             fields=[
                 ('examvenue_id', models.AutoField(primary_key=True, serialize=False)),
                 ('adj_starttime', models.DateTimeField(blank=True, null=True)),
-                ('exam', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='pages.exam')),
-                ('venue', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='pages.venue')),
+                ('exam', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='exams.exam')),
+                ('venue', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='exams.venue')),
             ],
         ),
         migrations.CreateModel(
             name='StudentExam',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('exam', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='pages.exam')),
-                ('student', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='pages.student')),
+                ('exam', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='exams.exam')),
+                ('student', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='exams.student')),
             ],
             options={
                 'unique_together': {('student', 'exam')},
