@@ -24,8 +24,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        build-essential \
        gcc \
+       gosu \
        libffi-dev \
        libpq-dev \
+       postgresql \
+       postgresql-client \
+       postgresql-contrib \
        python3-dev \
     && rm -rf /var/lib/apt/lists/*
 

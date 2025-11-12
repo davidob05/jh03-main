@@ -1,136 +1,157 @@
-# JH03-main
+# JH03 Platform
 
+An internal tool for uploading and managing university exam timetables. The stack ships as two Dockerised services:
 
+- **Frontend** &mdash; React + Vite UI served from `services/frontend`.
+- **API** &mdash; Django 5 project in `services/django/lithium`, which now boots an embedded PostgreSQL instance and exposes the application, authentication, and health endpoints.
 
-## Getting started
+CI builds each service image with Kaniko and runs the frontend Vitest suite plus the Django test suite on GitLab.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+---
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Tech Stack
 
-## Add your files
+- React 19 + Vite + Material UI (frontend)
+- Django 5 + django-allauth + PostgreSQL (backend)
+- Docker / Docker Compose v2 for local orchestration
+- Vitest and Django’s test runner for automated tests
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+---
 
+## Repository Layout
+
+| Path | Description |
+| --- | --- |
+| `services/frontend/app` | React client, Vite config, Vitest tests under `tests/`. |
+| `services/django/lithium` | Django project, embedded Postgres data dir `.postgres-data/`, management scripts. |
+| `ops/compose/docker-compose.dev.yml` | Compose file used by all Make targets / scripts. |
+| `prepare-environment` / `refresh-environment` | Helper scripts that configure UID/GID mappings and run the dev refresh routine. |
+| `ops/scripts/dev-refresh.sh` | Stops/rebuilds the stack, installs deps, and runs service tests. |
+| `Makefile` | Convenience targets (`up`, `down`, `logs`, `build`, `migrate`, `reset-django-db`). |
+
+---
+
+## Prerequisites
+
+1. Docker Engine / Docker Desktop with Compose v2.
+2. Bash-compatible shell (scripts rely on `bash`).
+3. No other service listening on ports 3000 or 8000.
+
+---
+
+## First-Time Setup
+
+```bash
+./prepare-environment
 ```
-cd existing_repo
-git remote add origin https://stgit.dcs.gla.ac.uk/team-project-h/2025/jh03/jh03-main.git
-git branch -M main
-git push -uf origin main
-```
 
-## Integrate with your tools
+This script:
 
-- [ ] [Set up project integrations](https://stgit.dcs.gla.ac.uk/team-project-h/2025/jh03/jh03-main/-/settings/integrations)
+1. Writes your UID/GID to `ops/compose/.env` so containers run as you.
+2. Creates shared `node_modules`/cache folders under `.docker/`.
+3. Calls `refresh-environment`, which rebuilds the stack, installs dependencies, runs migrations, and executes both test suites inside their containers.
 
-## Collaborate with your team
+---
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+## Everyday Development Workflow
 
-## Test and Deploy
+1. **Start the stack**
 
-Use the built-in continuous integration in GitLab.
+   ```bash
+   make up
+   ```
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+   Builds (if needed) and starts the frontend (port `3000`) and Django API (port `8000`). The Django container automatically:
 
-***
+   - Spins up its own PostgreSQL cluster under `services/django/lithium/.postgres-data`.
+   - Installs/updates the Python virtualenv.
+   - Runs `python manage.py makemigrations` and `python manage.py migrate` before launching the dev server.
 
-# Editing this README
+2. **Watch logs**
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+   ```bash
+   make logs        # tails both services
+   docker compose -f ops/compose/docker-compose.dev.yml logs -f django
+   ```
 
-## Suggestions for a good README
+3. **Stop / tear down**
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+   ```bash
+   make down        # stops containers and removes volumes
+   ```
 
-## Name
-Choose a self-explaining name for your project.
+4. **Full rebuild + test cycle**
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+   ```bash
+   ./refresh-environment
+   ```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+   Wraps `ops/scripts/dev-refresh.sh`: stops everything, rebuilds images, installs dependencies, runs migrations, and executes the frontend + Django test suites.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+---
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## Make Targets
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+| Command | Description |
+| --- | --- |
+| `make up` | Build and start the dev stack (`ops/compose/docker-compose.dev.yml`). |
+| `make down` | Stop containers and remove dev volumes. |
+| `make logs` | Tail combined service logs. |
+| `make build` | Rebuild service images with `--pull`. |
+| `make migrate` | Ensures the Django container is running, then runs `makemigrations` and `migrate` inside it. |
+| `make reset-django-db` | Stops the Django container, deletes `.postgres-data`, and restarts it with a fresh embedded PostgreSQL cluster (all data wiped). |
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+---
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+## Testing
+
+| Service | Command |
+| --- | --- |
+| Frontend | `docker compose -f ops/compose/docker-compose.dev.yml exec frontend npm test` |
+| Frontend (watch) | `docker compose -f ops/compose/docker-compose.dev.yml exec frontend npm run test:watch` |
+| Django (all apps) | `docker compose -f ops/compose/docker-compose.dev.yml exec django bash -lc '. /app/.venv/bin/activate && python manage.py test'` |
+| Django (pages app only) | `docker compose -f ops/compose/docker-compose.dev.yml exec django bash -lc '. /app/.venv/bin/activate && python manage.py test pages'` |
+
+CI mirrors these commands via `.gitlab-ci.yml`.
+
+---
+
+## Working With the Database
+
+- Data lives in `services/django/lithium/.postgres-data/` (git-ignored). Delete it or run `make reset-django-db` to wipe everything.
+- Because migrations run on every container start, schema changes are immediately applied. When you intentionally change models, run `make migrate` to generate migration files in `services/django/lithium/<app>/migrations/` and commit them.
+- `psql` is available inside the Django container: `docker compose -f ops/compose/docker-compose.dev.yml exec django bash -lc 'psql $DJANGO_DB_NAME'`.
+
+---
+
+## Health & Endpoints
+
+- `/healthz` (served from Django) returns `{status: "ok"}` when `SELECT 1` succeeds against PostgreSQL and `503` otherwise. Tests live in `services/django/lithium/pages/tests.py`.
+- Frontend API calls should target `http://django:8000` inside Compose; the Vite client uses `VITE_API_URL` which defaults to that URL through Compose env vars.
+
+---
+
+## Troubleshooting
+
+- **Vitest cannot find dependencies** &mdash; ensure `.docker/node_modules/frontend` is owned by you. Re-run `./prepare-environment` if Docker created them as root.
+- **Django can’t start Postgres** &mdash; another local Postgres might already bind to port `5432` inside the container. Stop conflicting services or change `DJANGO_DB_PORT` in `ops/compose/docker-compose.dev.yml`.
+- **Stale containers** &mdash; run `make down` followed by `docker compose -f ops/compose/docker-compose.dev.yml rm -fsv` to remove orphaned containers.
+- **CI failures** &mdash; confirm `package-lock.json` and Django migrations are committed; the pipelines expect deterministic installs/migrations.
+
+---
 
 ## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+1. Create a feature branch.
+2. Run `./refresh-environment` (or at minimum `make up` + both test suites) before pushing.
+3. Commit code, migration files, and relevant docs together.
+4. Open a merge request; CI must be green before merging.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+For questions, drop a note in your team channel. Happy hacking!
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+---
 
-## License
-For open source projects, say how it is licensed.
+## Acknowledgements & Licensing
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
-
-
-## Team Edit to README, not from the original file
-Did not want to delete the above as it contains useful information. 
-
-## Summary of changes
-The project now runs as two Docker services: one for the React front end and one for the Node/Express API.
-
-To work with the codebase:
-
-1. Clone the repo and switch to the desired branch.
-2. Start both containers with `make up` (builds images and launches dev services defined in `ops/compose/docker-compose.dev.yml`).
-3. Frontend code lives in `services/frontend/app/src`; frontend tests stay under `services/frontend/app/tests/frontend`.
-4. Backend API code lives in `services/backend/app/src`; backend tests now belong in `services/backend/app/tests`.
-5. Dev servers run inside their containers. Use `docker compose -f ops/compose/docker-compose.dev.yml logs -f frontend` (or `backend`) to view output.
-6. Before pushing, run project tests inside the appropriate container (for example `docker compose -f ops/compose/docker-compose.dev.yml exec frontend npm test` or `... exec backend npm test`).
-7. Commit and push your changes. CI will build the images on GitLab so the team stays in sync.
-
-## Development workflow
-
-### 1. First-time setup or post-clone refresh
-
-- From the repository root, run `./prepare-environment`.
-- The script writes your UID/GID to `ops/compose/.env`, prepares writable host folders under `.docker/node_modules`, rebuilds both images, launches the dev stack, installs dependencies, and runs the frontend/backend test suites inside their containers.
-
-### 2. Ongoing development cycle
-
-- Use `./refresh-environment` whenever you want to stop running containers, rebuild, start fresh, reinstall dependencies, and execute both test suites.
-- Follow logs with `docker compose -f ops/compose/docker-compose.dev.yml logs -f`.
-
-### 3. Adding new services
-
-- Update `ops/scripts/dev-refresh.sh` to include the new service name in `SERVICE_LIST`.
-- Ensure the compose file mounts any service-specific `node_modules` into `.docker/node_modules/<service>` and that the service image runs as the `${HOST_UID}:${HOST_GID}` user.
-
-### 4. Continuous integration
-
-- GitLab CI builds every service image with Kaniko and runs `test_frontend` and `test_backend`. Make sure each service has an up-to-date `package-lock.json` so that `npm ci` remains deterministic in CI.
-
-### 5. Troubleshooting
-
-- If `prepare-environment` complains about Docker, verify that Docker Desktop/Engine is running and that the Compose v2 plugin is available.
-- To regenerate lockfiles, run `npm install` inside the host directory (not the container), commit the resulting `package-lock.json`, then re-run `./refresh-environment`.
+- The Django service is adapted from [Lithium](https://github.com/wsvincent/lithium) (formerly DjangoX) by William S. Vincent, released under the MIT License. The upstream copyright and license notice is preserved in `services/django/lithium/LICENSE`.
+- Additional third-party libraries retain their respective licenses; consult `package.json`, `pyproject.toml`, or the `LICENSE` files within each service for details.
