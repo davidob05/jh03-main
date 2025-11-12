@@ -8,6 +8,7 @@ import { Profile } from "./pages/profile";
 import { Exams } from "./pages/exams";
 import { Venues } from "./pages/venues";
 import { Invigilators } from "./pages/invigilators";
+import { Exam } from "./pages/exam";
 
 export const Routes: React.FC = () => {
 
@@ -41,6 +42,9 @@ export const Routes: React.FC = () => {
           </RouterRoute>
           <RouterRoute path="/invigilators" element={<Layout />}>
             <RouterRoute index element={<Invigilators />} />
+          </RouterRoute>
+          <RouterRoute path="/exams/:examId" element={<Layout />}>
+            <RouterRoute index element={<Exam />} />
           </RouterRoute>
         </RouterRoutes>
       </BrowserRouter>
