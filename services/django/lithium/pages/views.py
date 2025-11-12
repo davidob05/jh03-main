@@ -4,11 +4,11 @@ from django.views.generic import TemplateView
 
 
 class HomePageView(TemplateView):
-    template_name = "pages/home.html"
+    template_name = "exams/home.html"
 
 
 class AboutPageView(TemplateView):
-    template_name = "pages/about.html"
+    template_name = "exams/about.html"
 
 
 def healthz_view(_request):
