@@ -92,7 +92,12 @@ class Provisions(models.Model):
 
 class UploadLog(models.Model):  # this lets us view upload history
     file_name = models.CharField(max_length=255)
-    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="timetabling_upload_logs",
+        on_delete=models.SET_NULL,
+        null=True,
+    )
     uploaded_at = models.DateTimeField(auto_now_add=True)
     records_created = models.IntegerField(default=0)
     records_updated = models.IntegerField(default=0)
