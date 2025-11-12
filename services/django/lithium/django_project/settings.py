@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     "debug_toolbar",
     # Local
     "accounts",
-    "pages",
+    "exams",
     "timetabling_system",
 ]
 
