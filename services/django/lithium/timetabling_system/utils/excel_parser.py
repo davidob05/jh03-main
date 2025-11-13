@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from .column_mapper import normalize
+from .column_mapper import map_equivalent_columns, normalize
 from .file_classifier import (
     detect_provision_file,
     detect_venue_file,
@@ -22,6 +22,10 @@ def load_pandas(file):
 
     # Normalize column names: lowercase, strip, underscores, no punctuation
     df.columns = [normalize(c) for c in df.columns]
+
+    # Rename to canonical names when known
+    mapping = map_equivalent_columns(df.columns)
+    df.rename(columns=mapping, inplace=True)
 
     return df
 

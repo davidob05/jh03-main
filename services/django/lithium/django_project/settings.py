@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     "debug_toolbar",
     # Local
     "accounts",
-    "exams",
     "timetabling_system",
 ]
 
@@ -83,20 +82,14 @@ TEMPLATES = [
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
-
-if os.getenv("DJANGO_DB_HOST"):
-    DATABASES["default"] = {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DJANGO_DB_NAME", "postgres"),
+        "NAME": os.getenv("DJANGO_DB_NAME", "exam_db"),
         "USER": os.getenv("DJANGO_DB_USER", "postgres"),
         "PASSWORD": os.getenv("DJANGO_DB_PASSWORD", ""),
         "HOST": os.getenv("DJANGO_DB_HOST", "localhost"),
         "PORT": os.getenv("DJANGO_DB_PORT", "5432"),
     }
+}
 
 # For Docker/PostgreSQL usage uncomment this and comment the DATABASES config above
 # DATABASES = {

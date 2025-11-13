@@ -42,6 +42,14 @@ EQUIVALENT_COLUMNS = {
         "school", "department", "college"
     ],
 
+    "no_students": [
+        "exam_size", "no_students", "number_of_students", "student_count"
+    ],
+
+    "school_contact": [
+        "school_contact", "contact", "contact_name"
+    ],
+
    #provision fields
     "student_id": [
         "mock ids", "mock id", "student id", "id"
