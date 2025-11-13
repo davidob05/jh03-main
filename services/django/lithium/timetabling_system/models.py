@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 
@@ -82,19 +83,35 @@ class StudentExam(models.Model):
 
 class Provisions(models.Model):
     provision_id = models.AutoField(primary_key=True)
-    exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
-    student = models.ForeignKey(Student, on_delete=models.CASCADE)
-    provisions = models.JSONField(default=list, blank=True)
+
+    exam = models.ForeignKey(
+        Exam,
+        to_field="exam_id",
+        on_delete=models.CASCADE
+    )
+    student = models.ForeignKey(
+        Student,
+        to_field="student_id",
+        on_delete=models.CASCADE
+    )
+
+    provisions = ArrayField(
+        models.CharField(max_length=30, choices=ProvisionType.choices),
+        default=list,
+        blank=True
+    )
+
     notes = models.CharField(max_length=200, blank=True, null=True)
 
     def __str__(self):
         return f"Provisions for {self.student} in {self.exam}"
 
+
 class UploadLog(models.Model):  # this lets us view upload history
     file_name = models.CharField(max_length=255)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        related_name="timetabling_upload_logs",
+        related_name="exam_upload_logs",
         on_delete=models.SET_NULL,
         null=True,
     )
