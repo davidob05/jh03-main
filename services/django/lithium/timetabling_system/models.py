@@ -202,7 +202,7 @@ class UploadLog(models.Model):  # this lets us view upload history
     file_name = models.CharField(max_length=255)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        related_name="timetabling_upload_logs",
+        related_name="exam_upload_logs",
         on_delete=models.SET_NULL,
         null=True,
     )
