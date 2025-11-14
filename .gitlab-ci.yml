@@ -72,7 +72,8 @@ test_frontend:
       variables:
         POSTGRES_DB: exam_db
         POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: ""
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_HOST_AUTH_METHOD: trust
   script:
     - set -eu
     - cd "$SERVICE_PATH"
@@ -94,4 +95,4 @@ test_django:
     DJANGO_DB_HOST: db
     DJANGO_DB_NAME: exam_db
     DJANGO_DB_USER: postgres
-    DJANGO_DB_PASSWORD: ""
+    DJANGO_DB_PASSWORD: postgres
