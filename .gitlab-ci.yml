@@ -66,6 +66,13 @@ test_frontend:
   stage: test
   # Mirror of the official Python image hosted on Amazon ECR Public
   image: public.ecr.aws/docker/library/python:3.12-slim
+  services:
+    - name: public.ecr.aws/docker/library/postgres:16-alpine
+      alias: db
+      variables:
+        POSTGRES_DB: exam_db
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: ""
   script:
     - set -eu
     - cd "$SERVICE_PATH"
@@ -84,3 +91,7 @@ test_django:
   needs: ["build_with_kaniko"]
   variables:
     SERVICE_PATH: services/django/lithium
+    DJANGO_DB_HOST: db
+    DJANGO_DB_NAME: exam_db
+    DJANGO_DB_USER: postgres
+    DJANGO_DB_PASSWORD: ""
