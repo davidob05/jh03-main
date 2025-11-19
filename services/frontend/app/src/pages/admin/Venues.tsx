@@ -22,6 +22,7 @@ import InputBase from '@mui/material/InputBase';
 import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
+import { LineWeight } from '@mui/icons-material';
 
 interface VenueData {
   id: number;
@@ -300,7 +301,12 @@ export const AdminVenues: React.FC = () => {
     } else if (selectedIndex > 0) {
       newSelected = newSelected.concat(
         selected.slice(0, selectedIndex),
-        selected.slice(selectedIndex + 1),
+
+} from "@mui/material";
+import { Container, Table, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { C  selected.slice(selectedIndex + 1),
       );
     }
     setSelected(newSelected);
@@ -380,7 +386,10 @@ export const AdminVenues: React.FC = () => {
                     tabIndex={-1}
                     key={row.id}
                     selected={isItemSelected}
-                  >
+                    sx={{
+                      '&:hover .hover-bold': { fontWeight: 'bold' },
+                    }}
+                  >                    
                     <TableCell padding="checkbox">
                       <Checkbox
                         color="primary"
@@ -399,10 +408,11 @@ export const AdminVenues: React.FC = () => {
                     >
                       <Link to={`/venues/${row.code}`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
                     </TableCell>
-                    <TableCell>{row.name}</TableCell>
-                    <TableCell>{row.building}</TableCell>
-                    <TableCell align="right">{row.capacity}</TableCell>
-                    <TableCell>{row.type}</TableCell>
+                    <TableCell className='hover-bold'>{row.subject}</TableCell>
+                    <TableCell>{row.venue}</TableCell>
+                    <TableCell>{formatDateTime(row.startTime)}</TableCell>
+                    <TableCell>{formatDateTime(row.endTime)}</TableCell>
+                    <TableCell>{calculateDuration(row.startTime, row.endTime)}</TableCell>
                   </TableRow>
                 );
               })}
