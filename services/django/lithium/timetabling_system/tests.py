@@ -1,5 +1,8 @@
+from io import BytesIO
 from unittest import mock
 
+import pandas as pd
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
 from django.test import TestCase
 from django.urls import reverse
@@ -50,3 +53,53 @@ class HealthTests(TestCase):
                 },
             },
         )
+
+
+class UploadTimetableFileTests(TestCase):
+    def _build_excel_upload(self, rows):
+        buffer = BytesIO()
+        pd.DataFrame(rows).to_excel(buffer, index=False)
+        buffer.seek(0)
+
+        return SimpleUploadedFile(
+            "test.xlsx",
+            buffer.read(),
+            content_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+        )
+
+    def test_upload_missing_file_returns_400(self):
+        response = self.client.post(reverse("upload-exams"))
+        self.assertEqual(response.status_code, 400)
+        self.assertJSONEqual(
+            response.content,
+            {"status": "error", "message": "No file uploaded."},
+        )
+
+    def test_upload_exam_file_parses_successfully(self):
+        upload = self._build_excel_upload(
+            [
+                {
+                    "exam_code": "ABC123",
+                    "exam_name": "Sample Exam",
+                    "exam_date": "2024-10-01",
+                    "exam_start": "09:00",
+                    "exam_end": "12:00",
+                    "exam_length": 180,
+                    "exam_type": "Written",
+                    "main_venue": "Main Hall",
+                    "school": "Engineering",
+                }
+            ]
+        )
+
+        response = self.client.post(reverse("upload-exams"), {"file": upload})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["type"], "Exam")
+        self.assertEqual(payload["rows"][0]["exam_code"], "ABC123")

@@ -4,7 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
-from .services import process_uploaded_file
+from .utils.excel_parser import parse_excel_file
 
 
 class HomePageView(TemplateView):
@@ -49,11 +49,20 @@ def upload_timetable_file(request):
             {"status": "error", "message": "No file uploaded."}, status=400
         )
 
-    result = process_uploaded_file(upload, request.user)
+    if hasattr(upload, "seek"):
+        upload.seek(0)
 
-    if result.get("status") == "ok":
-        result.setdefault("message", "Upload processed successfully.")
-        result.setdefault("count", result.get("rows_processed", 0))
-        return JsonResponse(result)
+    try:
+        result = parse_excel_file(upload)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": "Failed to parse uploaded file.",
+                "details": str(exc),
+            },
+            status=400,
+        )
 
-    return JsonResponse(result, status=400)
+    status_code = 200 if result.get("status") == "ok" else 400
+    return JsonResponse(result, status=status_code)
