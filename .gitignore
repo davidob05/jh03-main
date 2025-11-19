@@ -36,6 +36,8 @@ services/django/lithium/.postgres-data/
 services/django/lithium/.cache/
 services/django/lithium/.local/
 
+*.sqlite3
+
 # OS / editors
 .DS_Store
 Thumbs.db
