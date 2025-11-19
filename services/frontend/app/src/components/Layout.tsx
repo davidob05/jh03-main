@@ -27,7 +27,17 @@ export const Layout: React.FC = () => {
                   to={item.path}
                   color={location.pathname === item.path ? "secondary" : "inherit"}
                   size="large"
-                  style={{ fontWeight:"bold", fontSize: "16px", textDecoration: location.pathname === item.path ? "underline" : "none" }}
+                  sx= {{
+                    fontWeight: "bold",
+                    fontSize: "16px",
+                    textDecoration: location.pathname === item.path ? "bold" : "none",
+                    color: location.pathname === item.path ? "secondary.main" : "inherit",
+                    backgroundColor: location.pathname === item.path ? "#006fcb" : "none",
+                    "&:hover": {
+                      color: "secondary.main",
+                      backgroundColor: "#006fcb",
+                    },
+                  }}
                 >
                   {item.text}
                 </Button>
