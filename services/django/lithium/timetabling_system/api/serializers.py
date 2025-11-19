@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from pages.models import Exam
+from timetabling_system.models import Exam
 
 class ExamSerializer(serializers.ModelSerializer):
     class Meta:
