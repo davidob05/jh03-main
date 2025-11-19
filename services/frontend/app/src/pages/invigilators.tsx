@@ -5,6 +5,9 @@ import { styled } from '@mui/material/styles';
 import Divider from '@mui/material/Divider';
 import Chip from '@mui/material/Chip';
 import Typography from "@mui/material/Typography";
+import { Box, IconButton } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
+import Link from "@mui/material/Link";
 
 //profile setting
 interface Profile {
@@ -35,25 +38,54 @@ export function ProfileList() {
   }
 
   return (
-    <Stack spacing={2} sx={{ width: "100%" }}>
-      {rows.map((row, rowIndex) => (
-        <React.Fragment key={rowIndex}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            {row.map((p, index) => {
-              const initial = `${p.first_name.charAt(0)}${p.last_name.charAt(0)}`.toUpperCase();
-              return (
-                <Stack key={index} direction="column" alignItems="center" spacing={1}>
-                  <Avatar sx={{ bgcolor: p.color, width: 120, height:120, fontSize: 54 }}>{initial}</Avatar>
-                  <Typography variant="body2">{p.first_name} {p.last_name}</Typography>
-                </Stack>
-              );
-            })}
-          </Stack>
-          {/*only add divider if it's not the last row*/}
-          {rowIndex < rows.length -1 && <Divider flexItem />}
-        </React.Fragment>
-      ))}
-    </Stack>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%"
+      }}
+    >
+      <Stack spacing={2} sx={{ width: "100%", alignItems: "center"}}>
+        {rows.map((row, rowIndex) => (
+          <React.Fragment key={rowIndex}>
+            <Stack direction="row" spacing={2} justifyContent="center">
+              {row.map((p, index) => {
+                const initial = `${p.first_name.charAt(0)}${p.last_name.charAt(0)}`.toUpperCase();
+                const slug = `${p.first_name}-${p.last_name}`.toLowerCase();
+                return (
+                  <Stack key={index} direction="column" alignItems="center" spacing={1} justifyContent="center">
+                    <IconButton
+                      component={RouterLink}
+                      to={`/profile/${slug}`}
+                    >
+                      <Avatar sx={{ bgcolor: p.color, width: 120, height:120, fontSize: 54 }}>{initial}</Avatar>
+                    </IconButton>
+                    <Link
+                      component={RouterLink}
+                      to={`/profile/${slug}`}
+                      underline="none"
+                      sx={{
+                        color: "#006fcb",
+                        "&:hover": {
+                          textDecoration: "underline",
+                        },
+                      }}
+                    >
+                      <Typography variant="body2">{p.first_name} {p.last_name}</Typography>
+                    </Link>
+                  </Stack>
+                );
+              })}
+            </Stack>
+            {/*only add divider if it's not the last row*/}
+            {rowIndex < rows.length -1 && (<Divider sx={{ width: "60%", mt: 1 }} />
+            )}
+          </React.Fragment>
+        ))}
+      </Stack>
+    </Box>
   );
 }
 
@@ -78,10 +110,16 @@ export function DividerText() {
 
 export const Invigilators: React.FC = () => {
   return (
-    <div>
-      <h1>Invigilators Page</h1>
-      <p>This is the Invigilators page.</p>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%"
+      }}
+    >
     <ProfileList />
-    </div>
+    </Box>
   );
 }
