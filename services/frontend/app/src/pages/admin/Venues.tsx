@@ -24,8 +24,13 @@ import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
 
 interface VenueData {
+interface VenueData {
   id: number;
   code: string;
+  name: string;
+  building: string;
+  capacity: number;
+  type: string;
   name: string;
   building: string;
   capacity: number;
@@ -33,8 +38,14 @@ interface VenueData {
 }
 
 function createVenueData(
+function createVenueData(
   id: number,
   code: string,
+  name: string,
+  building: string,
+  capacity: number,
+  type: string,
+): VenueData {
   name: string,
   building: string,
   capacity: number,
@@ -48,9 +59,21 @@ function createVenueData(
     capacity,
     type,
   };
+    name,
+    building,
+    capacity,
+    type,
+  };
 }
 
 const rows = [
+  createVenueData(1, 'A101', 'Room A101', 'Main Building A', 50, 'Classroom'),
+  createVenueData(2, 'B205', 'Room B205', 'Science Building B', 75, 'Lecture Hall'),
+  createVenueData(3, 'LAB3', 'Lab Building 3', 'Engineering Complex', 30, 'Laboratory'),
+  createVenueData(4, 'HALL-C', 'Hall C', 'Arts Building', 150, 'Auditorium'),
+  createVenueData(5, 'SCI-2', 'Science Block 2', 'Science Complex', 60, 'Laboratory'),
+  createVenueData(6, 'LT-1', 'Lecture Theatre 1', 'Main Building A', 200, 'Lecture Hall'),
+  createVenueData(7, 'COM-301', 'Computer Lab 301', 'Computer Science Building', 40, 'Computer Lab'),
   createVenueData(1, 'A101', 'Room A101', 'Main Building A', 50, 'Classroom'),
   createVenueData(2, 'B205', 'Room B205', 'Science Building B', 75, 'Lecture Hall'),
   createVenueData(3, 'LAB3', 'Lab Building 3', 'Engineering Complex', 30, 'Laboratory'),
@@ -87,6 +110,7 @@ function getComparator<Key extends keyof any>(
 interface HeadCell {
   disablePadding: boolean;
   id: keyof VenueData;
+  id: keyof VenueData;
   label: string;
   numeric: boolean;
 }
@@ -97,35 +121,46 @@ const headCells: readonly HeadCell[] = [
     numeric: false,
     disablePadding: true,
     label: 'Venue Code',
+    label: 'Venue Code',
   },
   {
+    id: 'name',
     id: 'name',
     numeric: false,
     disablePadding: false,
     label: 'Name',
+    label: 'Name',
   },
   {
     id: 'building',
+    id: 'building',
     numeric: false,
     disablePadding: false,
+    label: 'Building',
     label: 'Building',
   },
   {
     id: 'capacity',
     numeric: true,
+    id: 'capacity',
+    numeric: true,
     disablePadding: false,
+    label: 'Capacity',
     label: 'Capacity',
   },
   {
     id: 'type',
+    id: 'type',
     numeric: false,
     disablePadding: false,
+    label: 'Type',
     label: 'Type',
   },
 ];
 
 interface EnhancedTableProps {
   numSelected: number;
+  onRequestSort: (event: React.MouseEvent<unknown>, property: keyof VenueData) => void;
   onRequestSort: (event: React.MouseEvent<unknown>, property: keyof VenueData) => void;
   onSelectAllClick: (event: React.ChangeEvent<HTMLInputElement>) => void;
   order: Order;
@@ -137,6 +172,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
   const { onSelectAllClick, order, orderBy, numSelected, rowCount, onRequestSort } =
     props;
   const createSortHandler =
+    (property: keyof VenueData) => (event: React.MouseEvent<unknown>) => {
     (property: keyof VenueData) => (event: React.MouseEvent<unknown>) => {
       onRequestSort(event, property);
     };
@@ -151,6 +187,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
             checked={rowCount > 0 && numSelected === rowCount}
             onChange={onSelectAllClick}
             inputProps={{
+              'aria-label': 'select all venues',
               'aria-label': 'select all venues',
             }}
           />
@@ -189,6 +226,7 @@ interface EnhancedTableToolbarProps {
 
 function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
   const { numSelected, searchQuery, onSearchChange } = props;
+  const { numSelected, searchQuery, onSearchChange } = props;
 
   return (
     <Toolbar
@@ -220,6 +258,7 @@ function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
             component="div"
           >
             Venues
+            Venues
           </Typography>
           <Box
             sx={{
@@ -233,6 +272,7 @@ function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
           >
             <SearchIcon sx={{ color: 'action.active', mr: 1 }} />
             <InputBase
+              placeholder="Search venues..."
               placeholder="Search venues..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
@@ -261,8 +301,9 @@ function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
   );
 }
 
-export const AdminVenues: React.FC = () => {
+export const Venues: React.FC = () => {
   const [order, setOrder] = React.useState<Order>('asc');
+  const [orderBy, setOrderBy] = React.useState<keyof VenueData>('code');
   const [orderBy, setOrderBy] = React.useState<keyof VenueData>('code');
   const [selected, setSelected] = React.useState<readonly number[]>([]);
   const [page, setPage] = React.useState(0);
@@ -271,6 +312,7 @@ export const AdminVenues: React.FC = () => {
 
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
+    property: keyof VenueData,
     property: keyof VenueData,
   ) => {
     const isAsc = orderBy === property && order === 'asc';
@@ -327,6 +369,10 @@ export const AdminVenues: React.FC = () => {
     return rows.filter(
       (row) =>
         row.code.toLowerCase().includes(lowerQuery) ||
+        row.name.toLowerCase().includes(lowerQuery) ||
+        row.building.toLowerCase().includes(lowerQuery) ||
+        row.type.toLowerCase().includes(lowerQuery) ||
+        row.capacity.toString().includes(lowerQuery)
         row.name.toLowerCase().includes(lowerQuery) ||
         row.building.toLowerCase().includes(lowerQuery) ||
         row.type.toLowerCase().includes(lowerQuery) ||
@@ -398,7 +444,12 @@ export const AdminVenues: React.FC = () => {
                       padding="none"
                     >
                       <Link to={`/venues/${row.code}`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
+                      <Link to={`/venues/${row.code}`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
                     </TableCell>
+                    <TableCell>{row.name}</TableCell>
+                    <TableCell>{row.building}</TableCell>
+                    <TableCell align="right">{row.capacity}</TableCell>
+                    <TableCell>{row.type}</TableCell>
                     <TableCell>{row.name}</TableCell>
                     <TableCell>{row.building}</TableCell>
                     <TableCell align="right">{row.capacity}</TableCell>
@@ -412,6 +463,7 @@ export const AdminVenues: React.FC = () => {
                     height: 53 * emptyRows,
                   }}
                 >
+                  <TableCell colSpan={7} />
                   <TableCell colSpan={7} />
                 </TableRow>
               )}
@@ -430,4 +482,5 @@ export const AdminVenues: React.FC = () => {
       </Paper>
     </Box>
   );
+};
 };
