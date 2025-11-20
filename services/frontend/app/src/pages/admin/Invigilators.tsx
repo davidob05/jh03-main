@@ -46,6 +46,7 @@ import { Link as MUILink } from '@mui/material';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
+import PendingIcon from '@mui/icons-material/Pending';
 import DownloadIcon from '@mui/icons-material/Download';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import PersonAddIconAlt1 from '@mui/icons-material/PersonAddAlt1';
@@ -743,7 +744,7 @@ export const AdminInvigilators: React.FC = () => {
                 bulkAction === "export"
                   ? "This downloads the selected invigilator's timetable(s)"
                   : bulkAction === "notify"
-                  ? "Send a notification to selected invigilator(s)"
+                  ? "Send a notification to the selected invigilator(s)"
                   : "Choose an action"
               }
             >
@@ -752,7 +753,7 @@ export const AdminInvigilators: React.FC = () => {
               ) : bulkAction === "notify" ? (
                 <NotificationsIcon color="action" />
               ) : (
-                <DownloadIcon color="disabled" /> // neutral icon before selection
+                <PendingIcon color="disabled" /> // neutral icon before selection
               )}
             </Tooltip>
           </Stack>

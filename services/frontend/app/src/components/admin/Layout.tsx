@@ -46,7 +46,7 @@ export const AdminLayout: React.FC = () => {
               ))}
             </Box>
 
-            <IconButton component={Link} to="/profile">
+            <IconButton component={Link} to="/admin/profile">
               <Avatar sx={{ bgcolor: "secondary.main", width: 40, height: 40, color: "black", fontWeight: "bold" }}>A</Avatar>
             </IconButton>
           </Box>
