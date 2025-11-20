@@ -1,13 +1,22 @@
 import { createTheme, ThemeProvider } from "@mui/material";
 import React, { useMemo } from "react";
 import { BrowserRouter, Routes as RouterRoutes, Route as RouterRoute } from "react-router-dom";
-import { Layout } from "./components/Layout";
-import { Home } from "./pages/home";
-import { Calendar } from "./pages/calendar";
-import { Profile } from "./pages/profile";
-import { Exams } from "./pages/exams";
-import { Venues } from "./pages/venues";
-import { Invigilators } from "./pages/invigilators";
+import { NotFound } from "./pages/NotFound";
+
+// Import admin pages and layout
+import { AdminLayout } from "./components/admin/Layout";
+import { AdminDashboard } from "./pages/admin/Dashboard";
+import { AdminCalendar } from "./pages/admin/Calendar";
+import { AdminProfile } from "./pages/admin/Profile";
+import { AdminExams } from "./pages/admin/Exams";
+import { AdminVenues } from "./pages/admin/Venues";
+import { AdminInvigilators } from "./pages/admin/Invigilators";
+
+// Import invigilator pages and layout
+// import { InvigilatorLayout } from "./components/invigilator/Layout";
+// import { InvigilatorDashboard } from "./pages/invigilator/Dashboard";
+// import { InvigilatorTimetable } from "./pages/invigilator/Timetable";
+// import { InvigilatorProfile } from "./pages/invigilator/Profile";
 
 export const Routes: React.FC = () => {
 
@@ -24,24 +33,25 @@ export const Routes: React.FC = () => {
     <ThemeProvider theme={theme}>
       <BrowserRouter>
         <RouterRoutes>
-          <RouterRoute path="/admin" element={<Layout />}>
-            <RouterRoute index element={<Home />} />
+          {/* Administrator Pages */}
+          <RouterRoute path="/admin" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminDashboard />} />
+            <RouterRoute path="exams" element={<AdminExams />} />
+            <RouterRoute path="venues" element={<AdminVenues />} />
+            <RouterRoute path="calendar" element={<AdminCalendar />} />
+            <RouterRoute path="profile" element={<AdminProfile />} />
+            <RouterRoute path="invigilators" element={<AdminInvigilators />} />
           </RouterRoute>
-          <RouterRoute path="/admin/exams" element={<Layout />}>
-            <RouterRoute index element={<Exams />} />
-          </RouterRoute>
-          <RouterRoute path="/admin/venues" element={<Layout />}>
-            <RouterRoute index element={<Venues />} />
-          </RouterRoute>
-          <RouterRoute path="/admin/calendar" element={<Layout />}>
-            <RouterRoute index element={<Calendar />} />
-          </RouterRoute>
-          <RouterRoute path="/admin/profile" element={<Layout />}>
-            <RouterRoute index element={<Profile />} />
-          </RouterRoute>
-          <RouterRoute path="/admin/invigilators" element={<Layout />}>
-            <RouterRoute index element={<Invigilators />} />
-          </RouterRoute>
+
+          {/* Invigilator Pages */}
+          {/* <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
+            <RouterRoute index element={<InvigilatorDashboard />} /> 
+            <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
+            <RouterRoute path="profile" element={<InvigilatorProfile />} />
+          </RouterRoute> */}
+
+          {/* 404 fallback */}
+          <RouterRoute path="*" element={<NotFound />} />
         </RouterRoutes>
       </BrowserRouter>
     </ThemeProvider>

@@ -294,7 +294,7 @@ function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
   );
 }
 
-export const Exams: React.FC = () => {
+export const AdminExams: React.FC = () => {
   const [order, setOrder] = React.useState<Order>('asc');
   const [orderBy, setOrderBy] = React.useState<keyof ExamData>('code');
   const [selected, setSelected] = React.useState<readonly number[]>([]);

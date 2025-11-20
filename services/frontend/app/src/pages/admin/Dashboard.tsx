@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import { Upload as UploadIcon } from "@mui/icons-material";
 
-export const Home: React.FC = () => {
+export const AdminDashboard: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{

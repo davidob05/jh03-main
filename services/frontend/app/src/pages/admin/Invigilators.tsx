@@ -48,7 +48,8 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
 import DownloadIcon from '@mui/icons-material/Download';
 import NotificationsIcon from '@mui/icons-material/Notifications';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import PersonAddIconAlt1 from '@mui/icons-material/PersonAddAlt1';
+import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import SearchIcon from '@mui/icons-material/Search';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -68,7 +69,7 @@ type ViewMode = 'list' | 'grid' | 'calendar';
 type SortField = 'firstName' | 'lastName';
 type SortOrder = 'asc' | 'desc';
 
-export const Invigilators: React.FC = () => {
+export const AdminInvigilators: React.FC = () => {
   const [invigilators, setInvigilators] = useState<Invigilator[]>([]);
   const [filtered, setFiltered] = useState<Invigilator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -708,7 +709,7 @@ export const Invigilators: React.FC = () => {
         {/* Pagination & Bulk Actions */}
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3} mt={4}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Button variant="outlined" startIcon={<PersonAddIcon />} onClick={toggleSelectAll}>
+            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemoveIcon />) : (<PersonAddIconAlt1 />)} onClick={toggleSelectAll}>
               {selected.length === filtered.length
                 ? "Deselect all invigilators"
                 : `Select all ${filtered.length} invigilators`}

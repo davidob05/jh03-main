@@ -1,9 +1,9 @@
 import { Container, Table, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CButton } from "../utils/globalStyles";
+import { CButton } from "../../utils/globalStyles";
 
-export const Profile: React.FC = () => {
+export const AdminProfile: React.FC = () => {
   const navigate = useNavigate();
 
   const [profileDetails, searchQuery] = useState({

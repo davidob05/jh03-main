@@ -3,7 +3,7 @@ import React from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
 import { text } from "stream/consumers";
 
-export const Layout: React.FC = () => {
+export const AdminLayout: React.FC = () => {
   const location = useLocation();
 
   const menuItems = [
