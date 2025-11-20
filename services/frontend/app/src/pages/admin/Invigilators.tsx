@@ -60,6 +60,7 @@ import { InvigilatorAvailabilityModal } from "../../components/admin/Invigilator
 import ViewListIcon from '@mui/icons-material/ViewList';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
+import PendingIcon from '@mui/icons-material/Pending';
 import DownloadIcon from '@mui/icons-material/Download';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import PersonAddIconAlt1 from '@mui/icons-material/PersonAddAlt1';
@@ -681,7 +682,7 @@ export const AdminInvigilators: React.FC = () => {
               ) : bulkAction === "notify" ? (
                 <Notifications color="action" />
               ) : (
-                <Pending color="disabled" /> // neutral icon before selection
+                <PendingIcon color="disabled" /> // neutral icon before selection
               )}
             </Tooltip>
           </Stack>
