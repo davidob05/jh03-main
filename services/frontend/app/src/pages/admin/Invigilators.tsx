@@ -767,7 +767,7 @@ export const AdminInvigilators: React.FC = () => {
                 bulkAction === "export"
                   ? "This downloads the selected invigilator's timetable(s)"
                   : bulkAction === "notify"
-                  ? "Send a notification to selected invigilator(s)"
+                  ? "Send a notification to the selected invigilator(s)"
                   : "Choose an action"
               }
             >
@@ -776,7 +776,7 @@ export const AdminInvigilators: React.FC = () => {
               ) : bulkAction === "notify" ? (
                 <NotificationsIcon color="action" />
               ) : (
-                <DownloadIcon color="disabled" /> // neutral icon before selection
+                <PendingIcon color="disabled" /> // neutral icon before selection
               )}
             </Tooltip>
           </Stack>
