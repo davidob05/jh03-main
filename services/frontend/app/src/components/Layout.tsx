@@ -9,11 +9,11 @@ export const Layout: React.FC = () => {
   const location = useLocation();
 
   const menuItems = [
-    { text: "Home", path: "/" },
-    { text: "Exams", path: "/exams" },
-    { text: "Venues", path: "/venues" },
-    { text: "Calendar", path: "/calendar" },
-    { text: "Invigilators", path: "/invigilators" }
+    { text: "Home", path: "/admin" },
+    { text: "Exams", path: "/admin/exams" },
+    { text: "Venues", path: "/admin/venues" },
+    { text: "Calendar", path: "/admin/calendar" },
+    { text: "Invigilators", path: "/admin/invigilators" }
   ];
     
   return (

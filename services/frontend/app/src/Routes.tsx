@@ -25,22 +25,22 @@ export const Routes: React.FC = () => {
     <ThemeProvider theme={theme}>
       <BrowserRouter>
         <RouterRoutes>
-          <RouterRoute path="/" element={<Layout />}>
+          <RouterRoute path="/admin" element={<Layout />}>
             <RouterRoute index element={<Home />} />
           </RouterRoute>
-          <RouterRoute path="/exams" element={<Layout />}>
+          <RouterRoute path="/admin/exams" element={<Layout />}>
             <RouterRoute index element={<Exams />} />
           </RouterRoute>
-          <RouterRoute path="/venues" element={<Layout />}>
+          <RouterRoute path="/admin/venues" element={<Layout />}>
             <RouterRoute index element={<Venues />} />
           </RouterRoute>
-          <RouterRoute path="/calendar" element={<Layout />}>
+          <RouterRoute path="/admin/calendar" element={<Layout />}>
             <RouterRoute index element={<Calendar />} />
           </RouterRoute>
-          <RouterRoute path="/profile" element={<Layout />}>
+          <RouterRoute path="/admin/profile" element={<Layout />}>
             <RouterRoute index element={<Profile />} />
           </RouterRoute>
-          <RouterRoute path="/invigilators" element={<Layout />}>
+          <RouterRoute path="/admin/invigilators" element={<Layout />}>
             <RouterRoute index element={<Invigilators />} />
           </RouterRoute>
           <RouterRoute path="/exams/:examId" element={<Layout />}>
