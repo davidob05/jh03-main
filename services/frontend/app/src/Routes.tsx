@@ -34,22 +34,23 @@ export const Routes: React.FC = () => {
     <ThemeProvider theme={theme}>
       <BrowserRouter>
         <RouterRoutes>
-          {/* Administrator Pages */}
           <RouterRoute path="/admin" element={<AdminLayout />}>
             <RouterRoute index element={<AdminDashboard />} />
-            <RouterRoute path="exams" element={<AdminExams />} />
-            <RouterRoute path="venues" element={<AdminVenues />} />
-            <RouterRoute path="calendar" element={<AdminCalendar />} />
-            <RouterRoute path="profile" element={<AdminProfile />} />
-            <RouterRoute path="invigilators" element={<AdminInvigilators />} />
-            <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
           </RouterRoute>
-
-          {/* Invigilator Pages */}
-          <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
-            <RouterRoute index element={<InvigilatorDashboard />} /> 
-            {/* <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
-            <RouterRoute path="profile" element={<InvigilatorProfile />} /> */}
+          <RouterRoute path="/admin/exams" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminExams />} />
+          </RouterRoute>
+          <RouterRoute path="/admin/venues" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminVenues />} />
+          </RouterRoute>
+          <RouterRoute path="/admin/calendar" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminCalendar />} />
+          </RouterRoute>
+          <RouterRoute path="/admin/profile" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminProfile />} />
+          </RouterRoute>
+          <RouterRoute path="/admin/invigilators" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminInvigilators />} />
           </RouterRoute>
           <RouterRoute path="/exams/:examId" element={<AdminLayout />}>
             <RouterRoute index element={<AdminExams />} />
