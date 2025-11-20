@@ -69,8 +69,13 @@ if ! run_as_dev psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'"
   run_as_dev createdb "$DB_NAME"
 fi
 
-if [ ! -d /app/.venv ]; then
-  run_as_dev python -m venv /app/.venv
+VENV_DIR=/app/.venv
+
+# Ensure the volume backing the venv is writable by the dev user; otherwise pip falls back to --user.
+mkdir -p "$VENV_DIR"
+chown -R "$HOST_UID:$HOST_GID" "$VENV_DIR"
+if [ ! -x "$VENV_DIR/bin/python" ]; then
+  run_as_dev python -m venv "$VENV_DIR"
 fi
 
 run_as_dev bash -lc '. /app/.venv/bin/activate && pip install --no-input --upgrade pip && pip install --no-input -r requirements.txt'

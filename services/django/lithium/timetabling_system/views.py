@@ -4,6 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
+from .services import ingest_upload_result
 from .utils.excel_parser import parse_excel_file
 
 
@@ -63,6 +64,15 @@ def upload_timetable_file(request):
             },
             status=400,
         )
+
+    if result.get("status") == "ok":
+        ingest_summary = ingest_upload_result(
+            result,
+            file_name=getattr(upload, "name", "uploaded_file"),
+            uploaded_by=request.user,
+        )
+        if ingest_summary:
+            result["ingest"] = ingest_summary
 
     status_code = 200 if result.get("status") == "ok" else 400
     return JsonResponse(result, status=status_code)

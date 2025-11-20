@@ -3,6 +3,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from timetabling_system.models import Exam
+from timetabling_system.services import ingest_upload_result
 from timetabling_system.utils.excel_parser import parse_excel_file
 from .serializers import ExamSerializer
 
@@ -40,6 +41,15 @@ class TimetableUploadView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if result.get("status") == "ok":
+            ingest_summary = ingest_upload_result(
+                result,
+                file_name=getattr(upload, "name", "uploaded_file"),
+                uploaded_by=request.user,
+            )
+            if ingest_summary:
+                result["ingest"] = ingest_summary
 
         http_status = (
             status.HTTP_200_OK if result.get("status") == "ok" else status.HTTP_400_BAD_REQUEST
