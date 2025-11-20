@@ -34,40 +34,23 @@ export const Routes: React.FC = () => {
     <ThemeProvider theme={theme}>
       <BrowserRouter>
         <RouterRoutes>
-          {/* Administrator Pages */}
           <RouterRoute path="/admin" element={<AdminLayout />}>
             <RouterRoute index element={<AdminDashboard />} />
-            <RouterRoute path="exams" element={<AdminExams />} />
-            <RouterRoute path="venues" element={<AdminVenues />} />
-            <RouterRoute path="calendar" element={<AdminCalendar />} />
-            <RouterRoute path="profile" element={<AdminProfile />} />
-            <RouterRoute path="invigilators" element={<AdminInvigilators />} />
-            <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
           </RouterRoute>
-          <RouterRoute path="/admin/exams" element={<Layout />}>
-            <RouterRoute index element={<Exams />} />
+          <RouterRoute path="/admin/exams" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminExams />} />
           </RouterRoute>
-          <RouterRoute path="/admin/venues" element={<Layout />}>
-            <RouterRoute index element={<Venues />} />
+          <RouterRoute path="/admin/venues" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminVenues />} />
           </RouterRoute>
-          <RouterRoute path="/admin/calendar" element={<Layout />}>
-            <RouterRoute index element={<Calendar />} />
+          <RouterRoute path="/admin/calendar" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminCalendar />} />
           </RouterRoute>
-          <RouterRoute path="/admin/profile" element={<Layout />}>
-            <RouterRoute index element={<Profile />} />
+          <RouterRoute path="/admin/profile" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminProfile />} />
           </RouterRoute>
-          <RouterRoute path="/admin/invigilators" element={<Layout />}>
-            <RouterRoute index element={<Invigilators />} />
-          </RouterRoute>
-          <RouterRoute path="/exams/:examId" element={<Layout />}>
-            <RouterRoute index element={<Exam />} />
-          </RouterRoute>
-
-          {/* Invigilator Pages */}
-          <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
-            <RouterRoute index element={<InvigilatorDashboard />} /> 
-            {/* <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
-            <RouterRoute path="profile" element={<InvigilatorProfile />} /> */}
+          <RouterRoute path="/admin/invigilators" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminInvigilators />} />
           </RouterRoute>
           <RouterRoute path="/exams/:examId" element={<AdminLayout />}>
             <RouterRoute index element={<AdminExams />} />
