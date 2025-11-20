@@ -35,15 +35,8 @@ export const Routes: React.FC = () => {
     <ThemeProvider theme={theme}>
       <BrowserRouter>
         <RouterRoutes>
-          {/* Administrator Pages */}
           <RouterRoute path="/admin" element={<AdminLayout />}>
             <RouterRoute index element={<AdminDashboard />} />
-            <RouterRoute path="exams" element={<AdminExams />} />
-            <RouterRoute path="venues" element={<AdminVenues />} />
-            <RouterRoute path="calendar" element={<AdminCalendar />} />
-            <RouterRoute path="profile" element={<AdminProfile />} />
-            <RouterRoute path="invigilators" element={<AdminInvigilators />} />
-            <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
           </RouterRoute>
           <RouterRoute path="/admin/exams" element={<AdminLayout />}>
           <RouterRoute path="/admin/exams" element={<AdminLayout />}>
