@@ -146,12 +146,12 @@ export const Calendar: React.FC = () => {
     Math.min(...examData.map((exam) => new Date(exam.startTime).getTime()))
   );
 
-  // Initialize with the first exam date at midnight
+  // Initialise with the first exam date at midnight
   const [currentDate, setCurrentDate] = useState(
     new Date(firstExamDate.getFullYear(), firstExamDate.getMonth(), firstExamDate.getDate())
   );
 
-  // Calculate visible time range (one day: 6 AM to 8 PM for better viewing)
+  // Calculate visible time range (one day: 8 AM to 8 PM for better viewing)
   const getTimeRange = (date: Date) => {
     const startOfDay = new Date(date);
     startOfDay.setHours(8, 0, 0, 0);
