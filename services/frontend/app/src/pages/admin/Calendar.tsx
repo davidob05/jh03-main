@@ -137,7 +137,7 @@ const items: ExamItem[] = examData.map((exam) => ({
   canChangeGroup: false,
 }));
 
-export const Calendar: React.FC = () => {
+export const AdminCalendar: React.FC = () => {
 
   const navigate = useNavigate();
 

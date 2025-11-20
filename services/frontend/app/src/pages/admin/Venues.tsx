@@ -261,7 +261,7 @@ function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
   );
 }
 
-export const Venues: React.FC = () => {
+export const AdminVenues: React.FC = () => {
   const [order, setOrder] = React.useState<Order>('asc');
   const [orderBy, setOrderBy] = React.useState<keyof VenueData>('code');
   const [selected, setSelected] = React.useState<readonly number[]>([]);

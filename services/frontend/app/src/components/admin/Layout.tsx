@@ -5,7 +5,7 @@ import { text } from "stream/consumers";
 import { Upload as UploadIcon } from "@mui/icons-material";
 
 
-export const Layout: React.FC = () => {
+export const AdminLayout: React.FC = () => {
   const location = useLocation();
 
   const menuItems = [

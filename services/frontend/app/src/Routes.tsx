@@ -1,14 +1,22 @@
 import { createTheme, ThemeProvider } from "@mui/material";
 import React, { useMemo } from "react";
 import { BrowserRouter, Routes as RouterRoutes, Route as RouterRoute } from "react-router-dom";
-import { Layout } from "./components/Layout";
-import { Home } from "./pages/home";
-import { Calendar } from "./pages/calendar";
-import { Profile } from "./pages/profile";
-import { Exams } from "./pages/exams";
-import { Venues } from "./pages/venues";
-import { Invigilators } from "./pages/invigilators";
-import { Exam } from "./pages/exam";
+import { NotFound } from "./pages/NotFound";
+
+// Import admin pages and layout
+import { AdminLayout } from "./components/admin/Layout";
+import { AdminDashboard } from "./pages/admin/Dashboard";
+import { AdminCalendar } from "./pages/admin/Calendar";
+import { AdminProfile } from "./pages/admin/Profile";
+import { AdminExams } from "./pages/admin/Exams";
+import { AdminVenues } from "./pages/admin/Venues";
+import { AdminInvigilators } from "./pages/admin/Invigilators";
+
+// Import invigilator pages and layout
+// import { InvigilatorLayout } from "./components/invigilator/Layout";
+// import { InvigilatorDashboard } from "./pages/invigilator/Dashboard";
+// import { InvigilatorTimetable } from "./pages/invigilator/Timetable";
+// import { InvigilatorProfile } from "./pages/invigilator/Profile";
 
 export const Routes: React.FC = () => {
 
@@ -25,8 +33,14 @@ export const Routes: React.FC = () => {
     <ThemeProvider theme={theme}>
       <BrowserRouter>
         <RouterRoutes>
-          <RouterRoute path="/admin" element={<Layout />}>
-            <RouterRoute index element={<Home />} />
+          {/* Administrator Pages */}
+          <RouterRoute path="/admin" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminDashboard />} />
+            <RouterRoute path="exams" element={<AdminExams />} />
+            <RouterRoute path="venues" element={<AdminVenues />} />
+            <RouterRoute path="calendar" element={<AdminCalendar />} />
+            <RouterRoute path="profile" element={<AdminProfile />} />
+            <RouterRoute path="invigilators" element={<AdminInvigilators />} />
           </RouterRoute>
           <RouterRoute path="/admin/exams" element={<Layout />}>
             <RouterRoute index element={<Exams />} />
