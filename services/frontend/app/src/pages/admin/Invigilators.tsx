@@ -57,6 +57,18 @@ import dayjs, { Dayjs } from 'dayjs';
 import { Link as RouterLink } from 'react-router-dom';
 import { Link as MUILink } from '@mui/material';
 import { InvigilatorAvailabilityModal } from "../../components/admin/InvigilatorAvailabilityModal";
+import ViewListIcon from '@mui/icons-material/ViewList';
+import GridViewIcon from '@mui/icons-material/GridView';
+import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
+import DownloadIcon from '@mui/icons-material/Download';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import PersonAddIconAlt1 from '@mui/icons-material/PersonAddAlt1';
+import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
+import SearchIcon from '@mui/icons-material/Search';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 interface Invigilator {
   id: number;
@@ -626,7 +638,7 @@ export const AdminInvigilators: React.FC = () => {
         {/* Pagination & Bulk Actions */}
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3} mt={4}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemove />) : (<PersonAddAlt1 />)} onClick={toggleSelectAll}>
+            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemoveIcon />) : (<PersonAddIconAlt1 />)} onClick={toggleSelectAll}>
               {selected.length === filtered.length
                 ? "Deselect all invigilators"
                 : `Select all ${filtered.length} invigilators`}
