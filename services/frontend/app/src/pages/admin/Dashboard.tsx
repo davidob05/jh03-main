@@ -104,6 +104,18 @@ const mockNotifications: Notification[] = [
 export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4); // show 4 by default
   const [uploadType, setUploadType] = useState("");
+import React, { useState } from "react";
+import {
+  Box,
+  Button,
+  Paper,
+  Typography,
+  Alert,
+  CircularProgress,
+} from "@mui/material";
+import { Upload as UploadIcon } from "@mui/icons-material";
+
+export const AdminDashboard: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{
@@ -143,16 +155,27 @@ export const AdminDashboard: React.FC = () => {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Upload failed");
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
 
       const result = await response.json();
-      setUploadStatus({ type: "success", message: `Successfully uploaded ${selectedFile.name}. ${result.count || 0} records added.` });
+      setUploadStatus({
+        type: "success",
+        message: `Successfully uploaded ${selectedFile.name}. ${result.count || 0} exams added to database.`,
+      });
       setSelectedFile(null);
-
-      const fileInput = document.getElementById("file-upload") as HTMLInputElement;
+      // Reset file input
+      const fileInput = document.getElementById(
+        "file-upload"
+      ) as HTMLInputElement;
       if (fileInput) fileInput.value = "";
-    } catch (err) {
-      setUploadStatus({ type: "error", message: err instanceof Error ? err.message : "Failed to upload file" });
+    } catch (error) {
+      setUploadStatus({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to upload file",
+      });
     } finally {
       setUploading(false);
     }
@@ -212,7 +235,9 @@ export const AdminDashboard: React.FC = () => {
             color="primary"
             onClick={handleUpload}
             disabled={!selectedFile || uploading}
-            startIcon={uploading ? <CircularProgress size={20} /> : <UploadIcon />}
+            startIcon={
+              uploading ? <CircularProgress size={20} /> : <UploadIcon />
+            }
           >
             {uploading ? "Uploading..." : "Upload"}
           </Button>
@@ -361,6 +386,11 @@ export const AdminDashboard: React.FC = () => {
             )}
           </>
         )}
+      </Paper>
+          {uploadStatus.type && (
+            <Alert severity={uploadStatus.type}>{uploadStatus.message}</Alert>
+          )}
+        </Box>
       </Paper>
     </Box>
   );
