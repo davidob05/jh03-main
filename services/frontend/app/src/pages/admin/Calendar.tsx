@@ -54,7 +54,6 @@ import Timeline, {
   SidebarHeader,
   DateHeader,
 } from "react-calendar-timeline";
-
 import "react-calendar-timeline/dist/style.css";
 import { Box, Button, Typography, Paper } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
