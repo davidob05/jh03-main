@@ -1,10 +1,6 @@
 import React, { useState } from "react";
 import {
-  Box,
-  Typography,
   Stack,
-  Button,
-  Paper,
   Chip,
   ToggleButton,
   ToggleButtonGroup,
@@ -19,7 +15,6 @@ import {
   ArrowForward,
   Today,
   GridView,
-  Timeline,
   Search,
 } from "@mui/icons-material";
 import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
@@ -53,21 +48,53 @@ const departmentColors: Record<string, string> = {
   Biology: "#009688",
 };
 
-const examData: ExamDetails[] = [
+
+import Timeline, {
+  TimelineHeaders,
+  SidebarHeader,
+  DateHeader,
+} from "react-calendar-timeline";
+
+import "react-calendar-timeline/dist/style.css";
+import { Box, Button, Typography, Paper } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import { Dayjs } from 'dayjs';
+import { useNavigate } from "react-router-dom";
+
+interface ExamItem {
+  id: number;
+  code: string;
+  group: number;
+  title: string;
+  start_time: number;
+  end_time: number;
+  itemProps: {
+    style: {
+      background: string;
+      color: string;
+      border: string;
+      borderRadius: string;
+    };
+  };
+  canMove: boolean;
+  canResize: boolean;
+  canChangeGroup: boolean;
+}
+
+interface VenueGroup {
+  id: number;
+  title: string;
+}
+
+const examData = [
   {
     id: 1,
     code: "CS101",
-    subject: "Introduction to Programming",
-    department: "CS",
-    mainVenue: "James Watt South - J15",
-    mainStartTime: "2025-12-10T09:00",
-    mainEndTime: "2025-12-10T11:00",
-    venues: [
-      { venue: "James Watt South - J15", startTime: "2025-12-10T09:00", endTime: "2025-12-10T11:00", students: 245, invigilators: 8 },
-      { venue: "Boyd Orr - Lecture Theatre 1", startTime: "2025-12-10T09:00", endTime: "2025-12-10T11:00", students: 180, invigilators: 6 },
-      { venue: "Sir Charles Wilson - Main Hall", startTime: "2025-12-10T09:00", endTime: "2025-12-10T11:00", students: 90, invigilators: 4 },
-      { venue: "Separate Room SR7 (Provisions)", startTime: "2025-12-10T09:00", endTime: "2025-12-10T11:30", students: 12, invigilators: 3 },
-    ],
+    subject: "Introduction to Computer Science",
+    venue: "Room A101",
+    startTime: "2025-11-15T09:00",
+    endTime: "2025-11-15T11:00",
   },
   {
     id: 2,
