@@ -30,7 +30,7 @@ export const NotFound: React.FC = () => {
       <Button
         variant="contained"
         component={Link}
-        to="/"
+        to="/admin"
         sx={{ px: 4, py: 1.2 }}
       >
         Go Home

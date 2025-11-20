@@ -76,7 +76,7 @@ export const AdminDashboard: React.FC = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        Homepage
+        Dashboard
       </Typography>
 
       <Paper
