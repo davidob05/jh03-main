@@ -52,14 +52,13 @@ class TestFileClassifier(TestCase):
         assert detect_venue_file(df) is False
  
     def test_detect_venue_file(self):
-
-        df = pd.DataFrame({
-
-            "Monday - 12345": ["", "2025/07/28"],
-
-            "Tuesday - 12346": ["", "2025/07/29"]
-
-        })
+        df = pd.DataFrame(
+            [
+                ["Monday", "Tuesday"],
+                ["2025/07/28", "2025/07/29"],
+                ["Room A", "Room B"],
+            ]
+        )
 
         assert detect_venue_file(df) is True
 

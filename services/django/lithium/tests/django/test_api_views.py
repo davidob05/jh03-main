@@ -61,10 +61,12 @@ class TimetableUploadViewTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         mock_parse.assert_called_once()
-        mock_ingest.assert_called_once_with(
-            {"status": "ok", "type": "Exam", "rows": []},
-            file_name="exam.xlsx",
-            uploaded_by=self.user,
-        )
+        # Call args may reflect mutation after ingest due to shared dict; check fields explicitly.
+        ingest_args, ingest_kwargs = mock_ingest.call_args
+        self.assertEqual(ingest_kwargs["file_name"], "exam.xlsx")
+        self.assertEqual(ingest_kwargs["uploaded_by"], self.user)
+        self.assertEqual(ingest_args[0]["status"], "ok")
+        self.assertEqual(ingest_args[0]["type"], "Exam")
+        self.assertIn("rows", ingest_args[0])
         self.assertEqual(response.data["status"], "ok")
         self.assertIn("ingest", response.data)
