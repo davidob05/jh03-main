@@ -20,7 +20,7 @@ up:
 	@echo "Waiting for the Django virtualenv to be ready..."
 	docker compose -f $(DEV_COMPOSE) exec django bash -lc 'while [ ! -x /app/.venv/bin/python ]; do sleep 2; done'
 	@echo "Running Django test suite..."
-	docker compose -f $(DEV_COMPOSE) exec django bash -lc '$(SMOKE_DJANGO_CMD)'
+	docker compose -f $(DEV_COMPOSE) exec django bash -lc '. /app/.venv/bin/activate && python manage.py test tests timetabling_system accounts'
 down: ; docker compose -f $(DEV_COMPOSE) down -v || true
 logs: ; docker compose -f $(DEV_COMPOSE) logs -f --tail=200 || echo "No services running"
 build:; docker compose -f $(DEV_COMPOSE) build --pull || echo "Nothing to build"
