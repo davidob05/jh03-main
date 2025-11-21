@@ -2,13 +2,17 @@ SHELL := /bin/bash
 DEV_COMPOSE := ops/compose/docker-compose.dev.yml
 DJANGO_DIR := services/django/lithium
 DJANGO_MANAGE := ./$(DJANGO_DIR)/scripts/manage.sh
+FRONTEND_DIR := services/frontend/app
 
 
 .PHONY: up down logs build reset-django-db makemigrations migrate
 up:
+	@echo "Installing frontend dependencies locally so the container can run tests without hitting the network..."
+	rm -rf $(FRONTEND_DIR)/node_modules
+	cd $(FRONTEND_DIR) && npm ci --no-progress --prefer-offline
 	docker compose -f $(DEV_COMPOSE) up -d --build || echo "No services defined yet"
 	@echo "Running frontend tests inside the container..."
-	docker compose -f $(DEV_COMPOSE) exec frontend sh -lc 'cd /app && if [ -f package-lock.json ]; then npm ci; else npm install; fi && npm test'
+	docker compose -f $(DEV_COMPOSE) exec frontend sh -lc 'set -eu; cd /app; npm test'
 	@echo "Waiting for the Django virtualenv to be ready..."
 	docker compose -f $(DEV_COMPOSE) exec django bash -lc 'while [ ! -x /app/.venv/bin/python ]; do sleep 2; done'
 	@echo "Running Django test suite..."
