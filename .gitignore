@@ -22,6 +22,7 @@ build/
 services/django/lithium/.postgres-data/
 services/django/lithium/.cache/
 services/django/lithium/.local/
+services/django/lithium/timetabling_system/migrations/0003_alter_uploadlog_uploaded_by.py
 
 # OS / editors
 .DS_Store
