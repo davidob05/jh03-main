@@ -92,6 +92,7 @@ DATABASES = {
         "NAME": os.getenv("DJANGO_DB_NAME", "exam_db"),
         "USER": os.getenv("DJANGO_DB_USER", "postgres"),
         "PASSWORD": os.getenv("DJANGO_DB_PASSWORD", ""),
+        # Default to local dev but allow CI/docker to override via env (e.g. HOST=db)
         "HOST": os.getenv("DJANGO_DB_HOST", "127.0.0.1"),
         "PORT": os.getenv("DJANGO_DB_PORT", "5432"),
     }
