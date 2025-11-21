@@ -16,7 +16,7 @@ up:
 	cd $(FRONTEND_DIR) && npm ci --no-progress --prefer-offline
 	docker compose -f $(DEV_COMPOSE) up -d --build || echo "No services defined yet"
 	@echo "Running frontend tests inside the container..."
-	docker compose -f $(DEV_COMPOSE) exec frontend sh -lc 'set -eu; cd /app; $(SMOKE_FRONTEND_CMD)'
+	docker compose -f $(DEV_COMPOSE) exec frontend sh -lc 'set -eu; cd /app; npm test'
 	@echo "Waiting for the Django virtualenv to be ready..."
 	docker compose -f $(DEV_COMPOSE) exec django bash -lc 'while [ ! -x /app/.venv/bin/python ]; do sleep 2; done'
 	@echo "Running Django test suite..."
