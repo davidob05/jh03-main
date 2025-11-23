@@ -7,6 +7,7 @@ from django.utils import timezone
 from timetabling_system.models import (
     Exam,
     ExamVenue,
+    ExamVenueProvisionType,
     Provisions,
     Student,
     StudentExam,
@@ -107,6 +108,50 @@ class UploadProcessorTests(TestCase):
         self.assertTrue(StudentExam.objects.filter(student=student, exam=exam).exists())
         self.assertEqual(UploadLog.objects.count(), 1)
 
+    def test_provision_values_map_to_enum_slugs(self):
+        exam = Exam.objects.create(
+            exam_name="Discrete Maths",
+            exam_length=120,
+            start_time=timezone.make_aware(datetime(2025, 7, 2, 9, 0)),
+            course_code="MATH101",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Mathematics",
+            date_exam=timezone.now().date(),
+            school_contact="",
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S54321",
+                    "student_name": "Bob Example",
+                    "exam_code": exam.course_code,
+                    "provisions": (
+                        "Extra time 15 minutes every hour; "
+                        "Assisted evacuation required; "
+                        "Use of a computer"
+                    ),
+                }
+            ],
+        }
+
+        summary = ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        self.assertTrue(summary["handled"])
+        self.assertEqual(summary["created"], 1)
+        provision = Provisions.objects.get(student__student_id="S54321", exam=exam)
+        self.assertEqual(
+            provision.provisions,
+            [
+                "extra_time_15_per_hour",
+                "assisted_evacuation_required",
+                "use_computer",
+            ],
+        )
+        self.assertTrue(StudentExam.objects.filter(student__student_id="S54321", exam=exam).exists())
+
     def test_unsupported_file_type_returns_summary(self):
         result = {"status": "ok", "type": "Unknown", "days": []}
         summary = ingest_upload_result(result, file_name="venue.xlsx", uploaded_by=self.user)
@@ -121,7 +166,7 @@ class UploadProcessorTests(TestCase):
             "days": [
                 {
                     "day": "Monday",
-                    "date": "2025/07/28",
+                    "date": "2025-07-28",
                     "rooms": [
                         {
                             "name": "Main Hall",
@@ -155,6 +200,7 @@ class UploadProcessorTests(TestCase):
         self.assertEqual(purple_lab.capacity, 50)
         self.assertEqual(purple_lab.venuetype, VenueType.PURPLE_CLUSTER)
         self.assertTrue(purple_lab.is_accessible)
+        self.assertIn("2025-07-28", main_hall.availability)
         self.assertEqual(UploadLog.objects.count(), 1)
 
         # Update capacities and accessibility to ensure updates are counted
@@ -171,3 +217,117 @@ class UploadProcessorTests(TestCase):
         self.assertTrue(main_hall.is_accessible)
         self.assertEqual(purple_lab.capacity, 60)
         self.assertEqual(UploadLog.objects.count(), 2)
+
+    def test_provision_values_map_to_enum_slugs(self):
+        exam = Exam.objects.create(
+            exam_name="Discrete Maths",
+            exam_length=120,
+            start_time=timezone.make_aware(datetime(2025, 7, 2, 9, 0)),
+            course_code="MATH101",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Mathematics",
+            date_exam=timezone.now().date(),
+            school_contact="",
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S54321",
+                    "student_name": "Bob Example",
+                    "exam_code": exam.course_code,
+                    "provisions": (
+                        "Extra time 15 minutes every hour; "
+                        "Assisted evacuation required; "
+                        "Use of a computer"
+                    ),
+                }
+            ],
+        }
+
+        summary = ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        self.assertTrue(summary["handled"])
+        self.assertEqual(summary["created"], 1)
+        provision = Provisions.objects.get(student__student_id="S54321", exam=exam)
+        self.assertEqual(
+            provision.provisions,
+            [
+                "extra_time_15_per_hour",
+                "assisted_evacuation_required",
+                "use_computer",
+            ],
+        )
+        self.assertTrue(StudentExam.objects.filter(student__student_id="S54321", exam=exam).exists())
+
+    def test_provisions_assign_existing_or_new_exam_venue(self):
+        exam_date = datetime(2025, 7, 10).date()
+        exam = Exam.objects.create(
+            exam_name="Networks",
+            exam_length=120,
+            start_time=timezone.make_aware(datetime(2025, 7, 10, 9, 0)),
+            course_code="NET101",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Engineering",
+            date_exam=exam_date,
+            school_contact="",
+        )
+
+        separate_room = Venue.objects.create(
+            venue_name="Quiet Room 1",
+            capacity=10,
+            venuetype=VenueType.SEPARATE_ROOM,
+            is_accessible=True,
+            qualifications=[],
+            availability=[exam_date.isoformat()],
+        )
+        existing_ev = ExamVenue.objects.create(
+            exam=exam,
+            venue=separate_room,
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+        )
+
+        computer_lab = Venue.objects.create(
+            venue_name="Computer Lab 1",
+            capacity=25,
+            venuetype=VenueType.COMPUTER_CLUSTER,
+            is_accessible=True,
+            qualifications=[],
+            availability=[exam_date.isoformat()],
+        )
+
+        # First upload should use existing separate room exam venue
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S70001",
+                    "student_name": "Separate Room Student",
+                    "exam_code": exam.course_code,
+                    "provisions": "Separate room on own",
+                }
+            ],
+        }
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        se_student_exam = StudentExam.objects.get(student__student_id="S70001", exam=exam)
+        self.assertEqual(se_student_exam.exam_venue_id, existing_ev.pk)
+
+        # Second upload needs computer lab; should create new ExamVenue with that venue
+        result["rows"][0] = {
+            "student_id": "S70002",
+            "student_name": "Computer Student",
+            "exam_code": exam.course_code,
+            "provisions": "Use of a computer",
+        }
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        comp_student_exam = StudentExam.objects.get(student__student_id="S70002", exam=exam)
+        self.assertIsNotNone(comp_student_exam.exam_venue)
+        self.assertEqual(comp_student_exam.exam_venue.venue, computer_lab)
+        self.assertEqual(
+            comp_student_exam.exam_venue.provision_capabilities,
+            [ExamVenueProvisionType.USE_COMPUTER],
+        )
