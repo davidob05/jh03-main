@@ -218,6 +218,35 @@ class UploadProcessorTests(TestCase):
         self.assertEqual(purple_lab.capacity, 60)
         self.assertEqual(UploadLog.objects.count(), 2)
 
+    def test_venue_availability_merges_across_days(self):
+        result = {
+            "status": "ok",
+            "type": "Venue",
+            "days": [
+                {
+                    "day": "Monday",
+                    "date": "2025-07-28",
+                    "rooms": [{"name": "Room A"}],
+                },
+                {
+                    "day": "Tuesday",
+                    "date": "2025-07-29",
+                    "rooms": [{"name": "Room A"}],
+                },
+            ],
+        }
+
+        ingest_upload_result(result, file_name="venues.xlsx", uploaded_by=self.user)
+        room = Venue.objects.get(pk="Room A")
+        self.assertEqual(sorted(room.availability), ["2025-07-28", "2025-07-29"])
+
+        # Reupload with different capacity should update and retain availability
+        result["days"][0]["rooms"][0]["capacity"] = 20
+        ingest_upload_result(result, file_name="venues.xlsx", uploaded_by=self.user)
+        room.refresh_from_db()
+        self.assertEqual(sorted(room.availability), ["2025-07-28", "2025-07-29"])
+        self.assertEqual(room.capacity, 20)
+
     def test_provision_values_map_to_enum_slugs(self):
         exam = Exam.objects.create(
             exam_name="Discrete Maths",
@@ -333,3 +362,54 @@ class UploadProcessorTests(TestCase):
             comp_student_exam.exam_venue.venue.provision_capabilities,
             [ExamVenueProvisionType.USE_COMPUTER],
         )
+
+    def test_provisions_skip_exam_venue_if_venue_lacks_capability(self):
+        exam_date = datetime(2025, 8, 1).date()
+        exam = Exam.objects.create(
+            exam_name="Data Science",
+            exam_length=120,
+            start_time=timezone.make_aware(datetime(2025, 8, 1, 9, 0)),
+            course_code="DS101",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            date_exam=exam_date,
+            school_contact="",
+        )
+
+        venue_without_caps = Venue.objects.create(
+            venue_name="Big Hall",
+            capacity=200,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+            availability=[exam_date.isoformat()],
+            provision_capabilities=[],
+        )
+        ExamVenue.objects.create(exam=exam, venue=venue_without_caps, provision_capabilities=[])
+
+        computer_room = Venue.objects.create(
+            venue_name="Comp Lab 2",
+            capacity=30,
+            venuetype=VenueType.COMPUTER_CLUSTER,
+            is_accessible=True,
+            availability=[exam_date.isoformat()],
+            provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S80001",
+                    "student_name": "Comp Student",
+                    "exam_code": exam.course_code,
+                    "provisions": "Use of a computer",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        student_exam = StudentExam.objects.get(student__student_id="S80001", exam=exam)
+        self.assertIsNotNone(student_exam.exam_venue)
+        self.assertEqual(student_exam.exam_venue.venue, computer_room)
