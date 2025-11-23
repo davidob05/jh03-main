@@ -705,6 +705,9 @@ def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamV
     iso_date = exam_date.isoformat() if exam_date else None
 
     def _compatible(venue: Venue) -> bool:
+        venue_caps = venue.provision_capabilities or []
+        if required_caps and not all(cap in venue_caps for cap in required_caps):
+            return False
         if ExamVenueProvisionType.ACCESSIBLE_HALL in required_caps and not venue.is_accessible:
             return False
         if ExamVenueProvisionType.USE_COMPUTER in required_caps and venue.venuetype not in (
