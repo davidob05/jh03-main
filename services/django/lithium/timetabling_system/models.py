@@ -13,6 +13,7 @@ class ProvisionType(models.TextChoices):
     ASSISTED_EVAC_REQUIRED = 'assisted_evacuation_required', 'Assisted evacuation required'
     EXAM_ADDITIONAL_COMMENT = 'exam_additional_comment', 'Exam Additional Comment'
     ALTERNATIVE_FORMAT_PAPER = 'alternative_format_paper', 'Exam paper required in alternative format'
+    EXTRA_TIME = 'extra_time', 'Extra Time'
     EXTRA_TIME_100 = 'extra_time_100', 'Extra time 100%'
     EXTRA_TIME_15_PER_HOUR = 'extra_time_15_per_hour', 'Extra time 15 minutes every hour'
     EXTRA_TIME_20_PER_HOUR = 'extra_time_20_per_hour', 'Extra time 20 minutes every hour'
@@ -25,6 +26,8 @@ class ProvisionType(models.TextChoices):
     USE_COMPUTER = 'use_computer', 'Use of a computer'
     USE_READER = 'use_reader', 'Use of a reader'
     USE_SCRIBE = 'use_scribe', 'Use of a scribe'
+    READER = 'reader', 'Reader'
+    SCRIBE = 'scribe', 'Scribe'
 
 
 class ExamVenueProvisionType(models.TextChoices):
@@ -129,7 +132,7 @@ class Provisions(models.Model):
     )
 
     provisions = ArrayField(
-        models.CharField(max_length=30, choices=ProvisionType.choices),
+        models.CharField(max_length=50, choices=ProvisionType.choices),
         default=list,
         blank=True
     )
