@@ -35,7 +35,7 @@ coverage/
 services/django/lithium/.postgres-data/
 services/django/lithium/.cache/
 services/django/lithium/.local/
-services/django/lithium/timetabling_system/migrations/0003_alter_uploadlog_uploaded_by.py
+services/django/lithium/timetabling_system/migrations/*
 
 *.sqlite3
 
