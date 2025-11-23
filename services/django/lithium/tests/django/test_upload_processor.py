@@ -283,6 +283,7 @@ class UploadProcessorTests(TestCase):
             is_accessible=True,
             qualifications=[],
             availability=[exam_date.isoformat()],
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
         )
         existing_ev = ExamVenue.objects.create(
             exam=exam,
@@ -297,6 +298,7 @@ class UploadProcessorTests(TestCase):
             is_accessible=True,
             qualifications=[],
             availability=[exam_date.isoformat()],
+            provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
         )
 
         # First upload should use existing separate room exam venue
@@ -328,6 +330,6 @@ class UploadProcessorTests(TestCase):
         self.assertIsNotNone(comp_student_exam.exam_venue)
         self.assertEqual(comp_student_exam.exam_venue.venue, computer_lab)
         self.assertEqual(
-            comp_student_exam.exam_venue.provision_capabilities,
+            comp_student_exam.exam_venue.venue.provision_capabilities,
             [ExamVenueProvisionType.USE_COMPUTER],
         )

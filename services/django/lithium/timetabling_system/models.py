@@ -73,6 +73,11 @@ class Venue(models.Model):
     is_accessible = models.BooleanField(default=True)
     qualifications = models.JSONField(default=list, blank=True)
     availability = models.JSONField(default=list, blank=True)
+    provision_capabilities = ArrayField(
+        models.CharField(max_length=40, choices=ExamVenueProvisionType.choices),
+        default=list,
+        blank=True,
+    )
 
     def __str__(self):
         return self.venue_name
