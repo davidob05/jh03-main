@@ -49,7 +49,7 @@ class ProvisionsAdmin(admin.ModelAdmin):
 @admin.register(UploadLog)
 class UploadLogAdmin(admin.ModelAdmin):
     list_display = ("file_name", "uploaded_by", "uploaded_at", "records_created", "records_updated")
-    ordering = ("-uploaded_at",)from django.conf import settings
+    ordering = ("-uploaded_at",);from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 

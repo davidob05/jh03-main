@@ -648,6 +648,10 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
 
     return summary
 
+def _create_provision_exam_venues():
+    provision_list = Provisions.objects.all()
+    for provision in provision_list:
+        evs = ExamVenue.objects.all(exam=provision.exam)
 
 def _extract_venue_names(row: Dict[str, Any]) -> List[str]:
     raw_value = row.get("main_venue") or row.get("venue")
@@ -663,6 +667,75 @@ def _extract_venue_names(row: Dict[str, Any]) -> List[str]:
         if name:
             normalized.append(name)
     return normalized
+
+
+def _required_capabilities(provisions: List[str]) -> List[str]:
+    mapping = {
+        ProvisionType.SEPARATE_ROOM_ON_OWN: ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN,
+        ProvisionType.SEPARATE_ROOM_NOT_ON_OWN: ExamVenueProvisionType.SEPARATE_ROOM_NOT_ON_OWN,
+        ProvisionType.USE_COMPUTER: ExamVenueProvisionType.USE_COMPUTER,
+        ProvisionType.ACCESSIBLE_HALL: ExamVenueProvisionType.ACCESSIBLE_HALL,
+    }
+    caps: List[str] = []
+    for prov in provisions or []:
+        cap = mapping.get(prov)
+        if cap and cap not in caps:
+            caps.append(cap)
+    return caps
+
+
+def _find_matching_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamVenue]:
+    if not exam:
+        return None
+    exam_venues = ExamVenue.objects.filter(exam=exam)
+    if not required_caps:
+        return exam_venues.first()
+    for ev in exam_venues:
+        current = ev.provision_capabilities or []
+        if all(cap in current for cap in required_caps):
+            return ev
+    return None
+
+
+def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamVenue]:
+    if not exam or not required_caps:
+        return None
+
+    exam_date = getattr(exam, "date_exam", None)
+    iso_date = exam_date.isoformat() if exam_date else None
+
+    def _compatible(venue: Venue) -> bool:
+        if ExamVenueProvisionType.ACCESSIBLE_HALL in required_caps and not venue.is_accessible:
+            return False
+        if ExamVenueProvisionType.USE_COMPUTER in required_caps and venue.venuetype not in (
+            VenueType.COMPUTER_CLUSTER,
+            VenueType.PURPLE_CLUSTER,
+        ):
+            return False
+        if ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN in required_caps and venue.venuetype != VenueType.SEPARATE_ROOM:
+            return False
+        if ExamVenueProvisionType.SEPARATE_ROOM_NOT_ON_OWN in required_caps and venue.venuetype != VenueType.SEPARATE_ROOM:
+            return False
+        return True
+
+    candidates = []
+    for venue in Venue.objects.all():
+        if not _compatible(venue):
+            continue
+        availability = venue.availability or []
+        if iso_date and availability and iso_date not in availability:
+            continue
+        candidates.append(venue)
+
+    if not candidates:
+        return None
+
+    selected = candidates[0]
+    return ExamVenue.objects.create(
+        exam=exam,
+        venue=selected,
+        provision_capabilities=required_caps,
+    )
 
 
 def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
@@ -693,7 +766,10 @@ def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
             venue_name=name,
             defaults=defaults,
         )
-        ExamVenue.objects.get_or_create(exam=exam, venue=venue)
+        ExamVenue.objects.get_or_create(
+            exam=exam,
+            venue=venue,
+        )
 
 
 @transaction.atomic
@@ -704,7 +780,12 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     """
     rooms: List[Dict[str, Any]] = []
     for day in days or []:
-        rooms.extend(day.get("rooms", []))
+        day_date = _coerce_date(day.get("date"))
+        for room in day.get("rooms", []):
+            room_copy = dict(room)
+            room_copy["_day_date"] = day_date
+            room_copy["_day_name"] = day.get("day")
+            rooms.append(room_copy)
 
     summary = _base_summary(len(rooms))
     seen_names = set()
@@ -728,12 +809,32 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             "venuetype": room.get("venuetype") or VenueType.SCHOOL_TO_SORT,
             "is_accessible": bool(room.get("accessible", True)),
             "qualifications": room.get("qualifications") or [],
+            "availability": [],
         }
 
-        _, created = Venue.objects.update_or_create(
+        day_date = room.get("_day_date")
+        if day_date:
+            defaults["availability"] = [day_date.isoformat()]
+
+        venue_obj, created = Venue.objects.get_or_create(
             venue_name=name,
             defaults=defaults,
         )
+
+        updated_fields = []
+        for field in ("capacity", "venuetype", "is_accessible", "qualifications"):
+            if getattr(venue_obj, field) != defaults[field]:
+                setattr(venue_obj, field, defaults[field])
+                updated_fields.append(field)
+
+        if defaults["availability"]:
+            merged = sorted(set((venue_obj.availability or []) + defaults["availability"]))
+            if merged != (venue_obj.availability or []):
+                venue_obj.availability = merged
+                updated_fields.append("availability")
+
+        if updated_fields:
+            venue_obj.save(update_fields=updated_fields)
 
         if created:
             summary["created"] += 1
