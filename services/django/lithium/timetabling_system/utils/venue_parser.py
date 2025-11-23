@@ -23,7 +23,6 @@ def _cell_to_date_text(cell):
             return str(val).strip()
     return None
 
-
 def parse_venue_file(file):
     print("Parsing venue file...")
     wb = load_workbook(file)
