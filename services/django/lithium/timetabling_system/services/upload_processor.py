@@ -331,6 +331,18 @@ PROVISION_SLUG_MAP.update({
     _slugify(choice.label): choice.value
     for choice in ProvisionType
 })
+# Common shorthand/synonyms from legacy data
+PROVISION_SLUG_MAP.update({
+    "reader": ProvisionType.READER,
+    "use_reader": ProvisionType.READER,
+    "useofareader": ProvisionType.READER,
+    "scribe": ProvisionType.SCRIBE,
+    "use_scribe": ProvisionType.SCRIBE,
+    "useofascribe": ProvisionType.SCRIBE,
+    "computer": ProvisionType.USE_COMPUTER,
+    "use_computer": ProvisionType.USE_COMPUTER,
+    "extra_time": ProvisionType.EXTRA_TIME,
+})
 
 
 def _normalize_provisions(value: Any) -> List[str]:
