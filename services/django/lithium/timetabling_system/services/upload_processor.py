@@ -13,6 +13,9 @@ from timetabling_system.models import (
     Provisions,
     Student,
     StudentExam,
+    ExamVenue,
+    Venue,
+    VenueType,
     UploadLog,
 )
 
@@ -41,6 +44,8 @@ def ingest_upload_result(
         summary = _import_exam_rows(rows)
     elif file_type == "Provisions":
         summary = _import_provision_rows(rows)
+    elif file_type == "Venue":
+        summary = _import_venue_days(result.get("days", []))
     else:
         return {
             "handled": False,
@@ -269,7 +274,7 @@ def _import_exam_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             summary["errors"].append(f"Row {idx}: {exc}")
             continue
 
-        _, created = Exam.objects.update_or_create(
+        exam_obj, created = Exam.objects.update_or_create(
             course_code=payload["course_code"],
             defaults=payload["defaults"],
         )
@@ -277,6 +282,8 @@ def _import_exam_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             summary["created"] += 1
         else:
             summary["updated"] += 1
+
+        _create_exam_venue_links(exam_obj, raw)
 
     return summary
 
@@ -391,6 +398,100 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
                 "provisions": provisions,
                 "notes": notes or None,
             },
+        )
+
+        if created:
+            summary["created"] += 1
+        else:
+            summary["updated"] += 1
+
+    return summary
+
+
+def _extract_venue_names(row: Dict[str, Any]) -> List[str]:
+    raw_value = row.get("main_venue") or row.get("venue")
+    if _is_missing(raw_value):
+        return []
+    if isinstance(raw_value, (list, tuple, set)):
+        tokens = raw_value
+    else:
+        tokens = re.split(r"[;,/|]", str(raw_value))
+    normalized: List[str] = []
+    for token in tokens:
+        name = _clean_string(token, max_length=255)
+        if name:
+            normalized.append(name)
+    return normalized
+
+
+def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
+    """
+    Ensure Venue rows exist for each venue name in the exam upload,
+    and create ExamVenue links to the associated exam.
+    """
+    if not exam:
+        return
+
+    venue_names = _extract_venue_names(raw_row)
+    if not venue_names:
+        return
+
+    seen = set()
+    for name in venue_names:
+        if name in seen:
+            continue
+        seen.add(name)
+
+        defaults = {
+            "capacity": 0,
+            "venuetype": VenueType.SCHOOL_TO_SORT,
+            "is_accessible": True,
+            "qualifications": [],
+        }
+        venue, _ = Venue.objects.get_or_create(
+            venue_name=name,
+            defaults=defaults,
+        )
+        ExamVenue.objects.get_or_create(exam=exam, venue=venue)
+
+
+@transaction.atomic
+def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Venue uploads carry a list of day blocks, each with a list of rooms.
+    We treat each room as a Venue row and upsert by venue_name.
+    """
+    rooms: List[Dict[str, Any]] = []
+    for day in days or []:
+        rooms.extend(day.get("rooms", []))
+
+    summary = _base_summary(len(rooms))
+    seen_names = set()
+
+    for idx, room in enumerate(rooms, start=1):
+        name = _clean_string(room.get("name"), max_length=255)
+        if not name:
+            summary["skipped"] += 1
+            summary["errors"].append(f"Room {idx}: Missing name.")
+            continue
+
+        if name in seen_names:
+            summary["skipped"] += 1
+            summary["errors"].append(f"Room {idx}: Duplicate room '{name}' in upload; skipped.")
+            continue
+
+        seen_names.add(name)
+
+        defaults = {
+            "capacity": _coerce_int(room.get("capacity")) or 0,
+            "venuetype": room.get("venuetype") or VenueType.SCHOOL_TO_SORT,
+            "is_accessible": bool(room.get("accessible", True)),
+            "qualifications": room.get("qualifications") or [],
+        }
+
+        _, created = Venue.objects.update_or_create(
+            venue_name=name,
+            defaults=defaults,
         )
 
         if created:
