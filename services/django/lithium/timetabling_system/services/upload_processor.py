@@ -791,7 +791,6 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             rooms.append(room_copy)
 
     summary = _base_summary(len(rooms))
-    seen_names = set()
 
     for idx, room in enumerate(rooms, start=1):
         name = _clean_string(room.get("name"), max_length=255)
@@ -800,15 +799,9 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             summary["errors"].append(f"Room {idx}: Missing name.")
             continue
 
-        if name in seen_names:
-            summary["skipped"] += 1
-            summary["errors"].append(f"Room {idx}: Duplicate room '{name}' in upload; skipped.")
-            continue
-
-        seen_names.add(name)
-
+        cap_val = _coerce_int(room.get("capacity"))
         defaults = {
-            "capacity": _coerce_int(room.get("capacity")) or 0,
+            "capacity": cap_val if cap_val is not None else 0,
             "venuetype": room.get("venuetype") or VenueType.SCHOOL_TO_SORT,
             "is_accessible": bool(room.get("accessible", True)),
             "qualifications": room.get("qualifications") or [],
@@ -825,10 +818,13 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         )
 
         updated_fields = []
-        for field in ("capacity", "venuetype", "is_accessible", "qualifications"):
+        for field in ("venuetype", "is_accessible", "qualifications"):
             if getattr(venue_obj, field) != defaults[field]:
                 setattr(venue_obj, field, defaults[field])
                 updated_fields.append(field)
+        if cap_val is not None and venue_obj.capacity != cap_val:
+            venue_obj.capacity = cap_val
+            updated_fields.append("capacity")
 
         if defaults["availability"]:
             merged = sorted(set((venue_obj.availability or []) + defaults["availability"]))
