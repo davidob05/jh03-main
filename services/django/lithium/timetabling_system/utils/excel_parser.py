@@ -66,7 +66,8 @@ def parse_excel_file(file):
     try:
         df = load_pandas(file)
     except Exception:
-        # If pandas cannot read → may still be a venue file with merged cells
+        if hasattr(file, "seek"):
+            file.seek(0)
         return parse_venue_file(file)
 
     # ------------------------------------------
@@ -96,6 +97,8 @@ def parse_excel_file(file):
     # 2. Detect VENUE file
     # ------------------------------------------
     if detect_venue_file(df):
+        if hasattr(file, "seek"):
+            file.seek(0)
         return parse_venue_file(file)
 
     # ------------------------------------------
