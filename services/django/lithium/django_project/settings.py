@@ -89,7 +89,7 @@ TEMPLATES = [
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DJANGO_DB_NAME", "exam_db"),
+        "NAME": os.getenv("DJANGO_DB_NAME", "postgres"),
         "USER": os.getenv("DJANGO_DB_USER", "postgres"),
         "PASSWORD": os.getenv("DJANGO_DB_PASSWORD", "postgres"),
         "HOST": os.getenv("DJANGO_DB_HOST", "127.0.0.1"),
