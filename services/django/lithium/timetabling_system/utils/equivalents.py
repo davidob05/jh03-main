@@ -29,17 +29,19 @@ EQUIVALENT_COLUMNS = {
 
     "exam_length": [
         "exam length", "exam duration", "duration", "length", "time allowed",
-        "exam duration (hours:minutes)"
+        "exam duration (hours:minutes)", "exam duration (hoursminutes)"
     ],
 
     "exam_type": [
         "exam type", "assessment type", "type", "online/ on campus exam",
         "online/ on campus/digital on campus exam", "online on campus digital on campus exam",
-        "assessment type (online exams/ venue (on campus exams)", "digital on campus exam"
+        "digital on campus exam"
     ],
 
     "main_venue": [
-        "main venue", "venue", "location", "room", "exam venue"
+        "main venue", "venue", "location", "room", "exam venue",
+        "assessment type (online exams/ venue (on campus exams)",
+        "assessment type online exams venue on campus exams"
     ],
 
     "school": [
@@ -47,11 +49,11 @@ EQUIVALENT_COLUMNS = {
     ],
 
     "no_students": [
-        "exam_size", "no_students", "number_of_students", "student_count"
+        "exam_size", "no_students", "number_of_students", "student_count", "exam size"
     ],
 
     "school_contact": [
-        "school_contact", "contact", "contact_name"
+        "school_contact", "contact", "contact_name", "school contact"
     ],
 
    #provision fields

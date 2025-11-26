@@ -4,9 +4,12 @@ from .equivalents import EQUIVALENT_COLUMNS
 def normalize(col):
     """Normalize column names: lowercase, underscores, remove punctuation."""
     text = str(col).strip().lower()
+    if text.startswith("unnamed") or text in ("", "nan"):
+        return ""
     text = re.sub(r'\s+', '_', text)            # collapse all whitespace (incl. newlines)
     text = re.sub(r'[^a-z0-9_]', '', text)      # drop punctuation
     text = re.sub(r'_+', '_', text).strip('_')  # collapse duplicate underscores
+
     return text
 
 def map_equivalent_columns(columns):

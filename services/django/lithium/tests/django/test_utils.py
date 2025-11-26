@@ -11,6 +11,8 @@ from timetabling_system.utils.file_classifier import (
     detect_venue_file
 
 )
+from timetabling_system.utils.excel_parser import _apply_best_header, _sanitize_dataframe
+from timetabling_system.utils.column_mapper import normalize, map_equivalent_columns
  
  
 class TestFileClassifier(TestCase):
@@ -107,6 +109,109 @@ class TestFileClassifier(TestCase):
         assert detect_provision_file(df) is True
         assert detect_exam_file(df) is False
         assert detect_venue_file(df) is False
+
+    def test_provision_requires_provision_column(self):
+        df = pd.DataFrame(
+            {
+                "Student ID": ["12345"],
+                "Student Name": ["Alice"],
+            }
+        )
+
+        assert detect_provision_file(df) is False
+        assert detect_exam_file(df) is False
+        assert detect_venue_file(df) is False
+
+    def test_detect_exam_file_with_equivalent_columns(self):
+        df = pd.DataFrame(
+            {
+                "Course Code": [1],
+                "Assessment Name": ["Test"],
+                "Date": ["2025-06-01"],
+            }
+        )
+
+        assert detect_exam_file(df) is True
+        assert detect_provision_file(df) is False
+
+    def test_sanitize_dataframe_replaces_nan_and_drops_empty_column(self):
+        df = pd.DataFrame(
+            {
+                "Exam Code": [1],
+                "": [pd.NA],
+            }
+        )
+        df.columns = [normalize(c) for c in df.columns]
+        mapping = map_equivalent_columns(df.columns)
+        df.rename(columns=mapping, inplace=True)
+
+        cleaned = _sanitize_dataframe(df)
+
+        assert "" not in cleaned.columns
+        assert cleaned.iloc[0]["exam_code"] == 1
+        assert not pd.isna(cleaned.iloc[0]["exam_code"])
+
+    def test_apply_best_header_adds_school(self):
+        df = pd.DataFrame(
+            [
+                ["August Resit Exam Final Timetable", "", ""],
+                ["ADAM SMITH BUSINESS SCHOOL", "", ""],
+                ["Exam Code", "Exam Name", "Exam date"],
+                ["CHEM101", "Chemistry 1", "2025-06-01"],
+            ]
+        )
+
+        parsed, school = _apply_best_header(df)
+        parsed.columns = [normalize(c) for c in parsed.columns]
+        mapping = map_equivalent_columns(parsed.columns)
+        parsed.rename(columns=mapping, inplace=True)
+        if school and "school" not in parsed.columns:
+            parsed["school"] = school
+
+        assert school == "ADAM SMITH BUSINESS SCHOOL"
+        assert "school" in parsed.columns
+        assert parsed.iloc[0]["school"] == "ADAM SMITH BUSINESS SCHOOL"
+
+    def test_detect_provision_file_with_equivalent_columns(self):
+        df = pd.DataFrame(
+            {
+                "Mock ID": ["12345"],
+                "Names": ["Alice"],
+                "Exam provision data as presented to registry": ["extra_time"],
+            }
+        )
+
+        assert detect_provision_file(df) is True
+        assert detect_exam_file(df) is False
+
+    def test_exam_not_classified_as_venue_when_days_present(self):
+        df = pd.DataFrame(
+            {
+                "Day": ["Monday", "Tuesday"],
+                "Date": ["2025-06-01", "2025-06-02"],
+                "Exam Code": ["CHEM101", "MATH202"],
+                "Assessment Name": ["Chemistry 1", "Maths 2"],
+                "Exam Start": ["09:00", "13:00"],
+                "Exam End": ["11:00", "15:00"],
+                "Main Venue": ["Hall A", "Hall B"],
+            }
+        )
+
+        assert detect_exam_file(df) is True
+        assert detect_venue_file(df) is False
+        assert detect_provision_file(df) is False
+
+    def test_exam_file_with_unnamed_columns_uses_first_row_as_header(self):
+        df = pd.DataFrame(
+            [
+                ["Exam Code", "Assessment Name", "Date"],
+                ["CHEM101", "Chemistry 1", "2025-06-01"],
+            ],
+            columns=["Unnamed: 0", "Unnamed: 1", "Unnamed: 2"],
+        )
+
+        assert detect_exam_file(df) is True
+        assert detect_provision_file(df) is False
 
     def test_detect_venue_with_weekday_columns(self):
         df = pd.DataFrame(
