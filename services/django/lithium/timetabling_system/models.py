@@ -51,12 +51,10 @@ class Exam(models.Model):
     exam_id = models.AutoField(primary_key=True)
     exam_name = models.CharField(max_length=30)
     exam_length = models.IntegerField()
-    start_time = models.DateTimeField()
     course_code = models.CharField(max_length=30)
     exam_type = models.CharField(max_length=30)
     no_students = models.IntegerField()
     exam_school = models.CharField(max_length=30)
-    date_exam = models.DateField()
     school_contact = models.CharField(max_length=100)
 
     def __str__(self):
@@ -101,6 +99,7 @@ class ExamVenue(models.Model):
         default=list,
         blank=True,
     )
+    is_core_exam = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.exam} at {self.venue}"

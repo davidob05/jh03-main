@@ -284,7 +284,7 @@ def _import_exam_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         else:
             summary["updated"] += 1
 
-        _create_exam_venue_links(exam_obj, raw)
+        _create_exam_venue_links(exam_obj, raw, start_dt=payload.get("start_dt"))
 
     return summary
 
@@ -308,15 +308,17 @@ def _build_exam_payload(row: Dict[str, Any]) -> Dict[str, Any]:
     defaults = {
         "exam_name": _clean_string(row.get("exam_name"), max_length=30) or course_code,
         "exam_length": exam_length,
-        "start_time": start_dt,
         "exam_type": _clean_string(row.get("exam_type"), max_length=30) or "Exam",
         "no_students": _coerce_int(row.get("no_students")) or 0,
         "exam_school": _clean_string(row.get("school"), max_length=30) or "Unassigned",
-        "date_exam": exam_date,
         "school_contact": _clean_string(row.get("school_contact"), max_length=100),
     }
 
-    return {"course_code": course_code, "defaults": defaults}
+    return {
+        "course_code": course_code,
+        "defaults": defaults,
+        "start_dt": start_dt,
+    }
 
 
 def _slugify(value: str) -> str:
@@ -476,12 +478,32 @@ def _find_matching_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[
     return None
 
 
+def _core_exam_datetime(exam: Exam) -> Optional[datetime]:
+    if not exam:
+        return None
+    core_ev = (
+        ExamVenue.objects.filter(exam=exam, is_core_exam=True)
+        .exclude(adj_starttime__isnull=True)
+        .order_by("examvenue_id")
+        .first()
+    )
+    if core_ev:
+        return core_ev.adj_starttime
+    fallback = (
+        ExamVenue.objects.filter(exam=exam)
+        .exclude(adj_starttime__isnull=True)
+        .order_by("examvenue_id")
+        .first()
+    )
+    return fallback.adj_starttime if fallback else None
+
+
 def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamVenue]:
     if not exam or not required_caps:
         return None
 
-    exam_date = getattr(exam, "date_exam", None)
-    iso_date = exam_date.isoformat() if exam_date else None
+    core_dt = _core_exam_datetime(exam)
+    iso_date = core_dt.date().isoformat() if core_dt else None
 
     def _compatible(venue: Venue) -> bool:
         venue_caps = venue.provision_capabilities or []
@@ -517,13 +539,16 @@ def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamV
         exam=exam,
         venue=selected,
         provision_capabilities=required_caps,
+        adj_starttime=core_dt,
+        is_core_exam=False,
     )
 
 
-def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
+def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any], *, start_dt: Optional[datetime] = None) -> None:
     """
     Ensure Venue rows exist for each venue name in the exam upload,
-    and create ExamVenue links to the associated exam.
+    and create ExamVenue links to the associated exam. The first venue
+    from the exam upload is treated as the core exam venue.
     """
     if not exam:
         return
@@ -532,6 +557,8 @@ def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
     if not venue_names:
         return
 
+    start_dt = _ensure_aware(start_dt) if start_dt else None
+    core_examvenue_id = None
     seen = set()
     for name in venue_names:
         if name in seen:
@@ -548,10 +575,34 @@ def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
             venue_name=name,
             defaults=defaults,
         )
-        ExamVenue.objects.get_or_create(
+
+        is_core = core_examvenue_id is None
+        ev_defaults = {
+            "provision_capabilities": [],
+            "is_core_exam": is_core,
+            "adj_starttime": start_dt,
+        }
+        exam_venue, created = ExamVenue.objects.get_or_create(
             exam=exam,
             venue=venue,
+            defaults=ev_defaults,
         )
+
+        updated_fields = []
+        if exam_venue.is_core_exam != is_core:
+            exam_venue.is_core_exam = is_core
+            updated_fields.append("is_core_exam")
+        if start_dt and exam_venue.adj_starttime != start_dt:
+            exam_venue.adj_starttime = start_dt
+            updated_fields.append("adj_starttime")
+        if updated_fields:
+            exam_venue.save(update_fields=updated_fields)
+
+        if is_core:
+            core_examvenue_id = exam_venue.pk
+
+    if core_examvenue_id:
+        ExamVenue.objects.filter(exam=exam).exclude(pk=core_examvenue_id).update(is_core_exam=False)
 
 
 @transaction.atomic

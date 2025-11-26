@@ -58,7 +58,12 @@ class UploadProcessorTests(TestCase):
         self.assertEqual(UploadLog.objects.count(), 1)
         # Venue + ExamVenue created
         self.assertTrue(Venue.objects.filter(venue_name="Main Hall").exists())
-        self.assertTrue(ExamVenue.objects.filter(exam=exam, venue__venue_name="Main Hall").exists())
+        main_ev = ExamVenue.objects.get(exam=exam, venue__venue_name="Main Hall")
+        self.assertTrue(main_ev.is_core_exam)
+        self.assertEqual(
+            main_ev.adj_starttime,
+            timezone.make_aware(datetime(2025, 7, 1, 9, 0)),
+        )
 
         result["rows"][0]["exam_name"] = "Updated Algorithms"
         result["rows"][0]["main_venue"] = "Main Hall; Overflow Room"
@@ -70,19 +75,34 @@ class UploadProcessorTests(TestCase):
         self.assertEqual(UploadLog.objects.count(), 2)
         # New ExamVenue for new venue name
         self.assertTrue(Venue.objects.filter(venue_name="Overflow Room").exists())
-        self.assertTrue(ExamVenue.objects.filter(exam=exam, venue__venue_name="Overflow Room").exists())
+        overflow_ev = ExamVenue.objects.get(exam=exam, venue__venue_name="Overflow Room")
+        self.assertFalse(overflow_ev.is_core_exam)
+        main_ev.refresh_from_db()
+        self.assertTrue(main_ev.is_core_exam)
 
     def test_provision_rows_create_students_and_links(self):
         exam = Exam.objects.create(
             exam_name="Algorithms",
             exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 7, 1, 9, 0)),
             course_code="ABC123",
             exam_type="Written",
             no_students=0,
             exam_school="Engineering",
-            date_exam=timezone.now().date(),
             school_contact="",
+        )
+        core_venue = Venue.objects.create(
+            venue_name="Main Hall",
+            capacity=200,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+            qualifications=[],
+            availability=[],
+        )
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=core_venue,
+            adj_starttime=timezone.make_aware(datetime(2025, 7, 1, 9, 0)),
+            is_core_exam=True,
         )
 
         result = {
@@ -112,13 +132,25 @@ class UploadProcessorTests(TestCase):
         exam = Exam.objects.create(
             exam_name="Discrete Maths",
             exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 7, 2, 9, 0)),
             course_code="MATH101",
             exam_type="Written",
             no_students=0,
             exam_school="Mathematics",
-            date_exam=timezone.now().date(),
             school_contact="",
+        )
+        core_venue = Venue.objects.create(
+            venue_name="Main Venue",
+            capacity=150,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+            qualifications=[],
+            availability=[],
+        )
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=core_venue,
+            adj_starttime=timezone.make_aware(datetime(2025, 7, 2, 9, 0)),
+            is_core_exam=True,
         )
 
         result = {
@@ -251,13 +283,25 @@ class UploadProcessorTests(TestCase):
         exam = Exam.objects.create(
             exam_name="Discrete Maths",
             exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 7, 2, 9, 0)),
             course_code="MATH101",
             exam_type="Written",
             no_students=0,
             exam_school="Mathematics",
-            date_exam=timezone.now().date(),
             school_contact="",
+        )
+        core_venue = Venue.objects.create(
+            venue_name="Main Venue 2",
+            capacity=150,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+            qualifications=[],
+            availability=[],
+        )
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=core_venue,
+            adj_starttime=timezone.make_aware(datetime(2025, 7, 2, 9, 0)),
+            is_core_exam=True,
         )
 
         result = {
@@ -296,12 +340,10 @@ class UploadProcessorTests(TestCase):
         exam = Exam.objects.create(
             exam_name="Networks",
             exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 7, 10, 9, 0)),
             course_code="NET101",
             exam_type="Written",
             no_students=0,
             exam_school="Engineering",
-            date_exam=exam_date,
             school_contact="",
         )
 
@@ -318,6 +360,8 @@ class UploadProcessorTests(TestCase):
             exam=exam,
             venue=separate_room,
             provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+            adj_starttime=timezone.make_aware(datetime(2025, 7, 10, 9, 0)),
+            is_core_exam=True,
         )
 
         computer_lab = Venue.objects.create(
@@ -368,12 +412,10 @@ class UploadProcessorTests(TestCase):
         exam = Exam.objects.create(
             exam_name="Data Science",
             exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 8, 1, 9, 0)),
             course_code="DS101",
             exam_type="Written",
             no_students=0,
             exam_school="Computing",
-            date_exam=exam_date,
             school_contact="",
         )
 
@@ -385,7 +427,13 @@ class UploadProcessorTests(TestCase):
             availability=[exam_date.isoformat()],
             provision_capabilities=[],
         )
-        ExamVenue.objects.create(exam=exam, venue=venue_without_caps, provision_capabilities=[])
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=venue_without_caps,
+            provision_capabilities=[],
+            adj_starttime=timezone.make_aware(datetime(2025, 8, 1, 9, 0)),
+            is_core_exam=True,
+        )
 
         computer_room = Venue.objects.create(
             venue_name="Comp Lab 2",
