@@ -22,9 +22,9 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - DJANGO_SETTINGS_MODULE=django_project.settings
-      - DJANGO_DB_NAME=exam_db
+      - DJANGO_DB_NAME=postgres
       - DJANGO_DB_USER=postgres
-      - DJANGO_DB_PASSWORD=
+      - DJANGO_DB_PASSWORD=postgres
       - DJANGO_DB_HOST=127.0.0.1
       - DJANGO_DB_PORT=5432
       - DJANGO_POSTGRES_DATA=/app/.postgres-data
