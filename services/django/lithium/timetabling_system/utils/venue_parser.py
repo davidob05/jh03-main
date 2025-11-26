@@ -54,18 +54,16 @@ def parse_venue_file(file):
             if not value:
                 continue
 
-            # Detect red font (non-accessible)
+            # Detect red font to flag accessible rooms
             font_color = cell.font.color
-            is_red = (
-                font_color
-                and font_color.type == "rgb"
-                and font_color.rgb
-                and font_color.rgb.upper().startswith("FF0000")
-            )
+            is_accessible = True
+            if font_color and font_color.type == "rgb" and font_color.rgb:
+                rgb_hex = font_color.rgb.upper()
+                is_accessible = rgb_hex.endswith("FF0000")
 
             rooms.append({
                 "name": str(value).strip(),
-                "accessible": not is_red
+                "accessible": is_accessible
             })
 
         results.append({
