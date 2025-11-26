@@ -116,6 +116,7 @@ This script:
 | `make up` | Build and start the dev stack (`ops/compose/docker-compose.dev.yml`). |
 | `make django` | Start only the Django service in the foreground (logs stay attached). |
 | `make frontend` | Start only the frontend service in the foreground (no dependencies). |
+| `make test` | Run full unit tests for frontend and Django inside running containers (no rebuild). |
 | `make down` | Stop containers and remove dev volumes. |
 | `make logs` | Tail combined service logs. |
 | `make build` | Rebuild service images with `--pull`. |
