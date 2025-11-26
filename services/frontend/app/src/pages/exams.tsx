@@ -27,6 +27,7 @@ import MenuItem from '@mui/material/MenuItem';
 import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
+import { apiBaseUrl } from '../utils/api';
 
 interface ExamData {
   exam_id: number;
@@ -77,7 +78,7 @@ function calculateDuration(startTime: string, endTime: string): string {
 }
 
 const fetchExams = async (): Promise<ExamData[]> => {
-  const response = await fetch('http://localhost:8000/api/exams/');
+  const response = await fetch(apiBaseUrl + "/exams/");
   if (!response.ok) throw new Error('Unable to load exams');
   return response.json();
 };
