@@ -3,7 +3,11 @@ from .equivalents import EQUIVALENT_COLUMNS
 
 def normalize(col):
     """Normalize column names: lowercase, underscores, remove punctuation."""
-    return re.sub(r'[^a-z0-9_]', '', col.strip().lower().replace(" ", "_"))
+    text = str(col).strip().lower()
+    text = re.sub(r'\s+', '_', text)            # collapse all whitespace (incl. newlines)
+    text = re.sub(r'[^a-z0-9_]', '', text)      # drop punctuation
+    text = re.sub(r'_+', '_', text).strip('_')  # collapse duplicate underscores
+    return text
 
 def map_equivalent_columns(columns):
     """Map messy Excel columns to standardized field names."""
