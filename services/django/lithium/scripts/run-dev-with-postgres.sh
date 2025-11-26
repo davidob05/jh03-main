@@ -32,6 +32,7 @@ DB_NAME=${DJANGO_DB_NAME:-postgres}
 
 mkdir -p "$POSTGRES_DIR"
 chown "$HOST_UID:$HOST_GID" "$POSTGRES_DIR"
+chmod 750 "$POSTGRES_DIR"  # Postgres requires 0700/0750 on data dir
 mkdir -p /var/run/postgresql
 chown "$HOST_UID:$HOST_GID" /var/run/postgresql
 chmod 775 /var/run/postgresql
