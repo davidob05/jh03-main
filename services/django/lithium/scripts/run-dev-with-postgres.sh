@@ -26,8 +26,9 @@ run_as_dev() {
 
 POSTGRES_DIR=${DJANGO_POSTGRES_DATA:-/app/.postgres-data}
 POSTGRES_PORT=${DJANGO_DB_PORT:-5432}
+DB_HOST=${DJANGO_DB_HOST:-127.0.0.1}
 DB_SUPERUSER=${DJANGO_DB_USER:-postgres}
-DB_NAME=${DJANGO_DB_NAME:-postgres}
+DB_NAME=${DJANGO_DB_NAME:-exam_db}
 
 mkdir -p "$POSTGRES_DIR"
 chown "$HOST_UID:$HOST_GID" "$POSTGRES_DIR"
@@ -48,7 +49,7 @@ host    all             all             ::1/128                 trust
 EOF
 fi
 
-export PGHOST=127.0.0.1
+export PGHOST=$DB_HOST
 export PGPORT=$POSTGRES_PORT
 export PGUSER=$DB_SUPERUSER
 
