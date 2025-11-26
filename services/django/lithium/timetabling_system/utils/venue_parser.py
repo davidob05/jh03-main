@@ -23,12 +23,14 @@ def _cell_to_date_text(cell):
             return str(val).strip()
     return None
 
+
 def parse_venue_file(file):
     print("Parsing venue file...")
     wb = load_workbook(file)
     ws = wb.active
 
     results = []
+    venue_index = {}  # venue_name -> accessibility flag (False if any instance is inaccessible)
 
     # Read column pairs: (header row, date row, data rows)
     header_row = 1
@@ -64,10 +66,16 @@ def parse_venue_file(file):
                 and font_color.rgb.upper().startswith("FF0000")
             )
 
+            room_name = str(value).strip()
+            accessible = not is_red
+
             rooms.append({
-                "name": str(value).strip(),
-                "accessible": not is_red
+                "name": room_name,
+                "accessible": accessible
             })
+
+            # Track venue-level accessibility; once false, remain false.
+            venue_index[room_name] = venue_index.get(room_name, True) and accessible
 
         results.append({
             "day": day_text,
@@ -75,8 +83,14 @@ def parse_venue_file(file):
             "rooms": rooms
         })
 
+    venues = [
+        {"name": name, "is_accessible": accessible}
+        for name, accessible in venue_index.items()
+    ]
+
     return {
         "status": "ok",
         "type": "Venue",
-        "days": results
+        "days": results,
+        "venues": venues,
     }
