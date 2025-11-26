@@ -14,10 +14,11 @@ class ExamViewSet(viewsets.ReadOnlyModelViewSet):
 
 class TimetableUploadView(APIView):
     """Accepts an uploaded Excel file and routes it through the parser helpers."""
-
     parser_classes = (MultiPartParser, FormParser)
 
+
     def post(self, request, *args, **kwargs):
+        
         upload = request.FILES.get("file")
         if not upload:
             return Response(
@@ -27,9 +28,9 @@ class TimetableUploadView(APIView):
 
         if hasattr(upload, "seek"):
             upload.seek(0)
-
+                    
         try:
-            result = parse_excel_file(upload)
+            result = parse_excel_file(upload.read())
         except Exception as exc:  # pragma: no cover - defensive fallback
             return Response(
                 {

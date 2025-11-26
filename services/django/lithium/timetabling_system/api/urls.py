@@ -6,8 +6,7 @@ router = DefaultRouter()
 router.register("exams", ExamViewSet, basename="exam")
 
 urlpatterns = [
-    path("exams/upload/", TimetableUploadView.as_view(), name="api-exam-upload"),
-    path("exams/upload", TimetableUploadView.as_view()),
+    path("exams-upload", TimetableUploadView.as_view(), name="api-exam-upload"),
 ]
 
 urlpatterns += router.urls

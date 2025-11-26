@@ -28,6 +28,7 @@ import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { LineWeight } from '@mui/icons-material';
+import { apiBaseUrl } from '../utils/api';
 
 interface ExamData {
   exam_id: number;
@@ -78,7 +79,7 @@ function calculateDuration(startTime: string, endTime: string): string {
 }
 
 const fetchExams = async (): Promise<ExamData[]> => {
-  const response = await fetch('http://localhost:8000/api/exams/');
+  const response = await fetch(apiBaseUrl + "/exams/");
   if (!response.ok) throw new Error('Unable to load exams');
   return response.json();
 };
@@ -476,7 +477,7 @@ export const AdminExams: React.FC = () => {
                       <Link to={`/exams/${row.code}`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
                     </TableCell>
                     <TableCell className='hover-bold'>{row.subject}</TableCell>
-                    <TableCell>{row.venue}</TableCell>
+                    <TableCell>{row.venues}</TableCell>
                     <TableCell>{formatDateTime(row.startTime)}</TableCell>
                     <TableCell>{formatDateTime(row.endTime)}</TableCell>
                     <TableCell>{calculateDuration(row.startTime, row.endTime)}</TableCell>

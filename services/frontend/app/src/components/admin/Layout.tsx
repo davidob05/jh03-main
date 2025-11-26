@@ -2,6 +2,8 @@ import { AppBar, Toolbar, Box, Button, Avatar, IconButton } from "@mui/material"
 import React from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
 import { text } from "stream/consumers";
+import { Upload as UploadIcon } from "@mui/icons-material";
+
 
 export const AdminLayout: React.FC = () => {
   const location = useLocation();
