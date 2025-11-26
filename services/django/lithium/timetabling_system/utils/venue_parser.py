@@ -1,4 +1,27 @@
+from datetime import date, datetime
+
 from openpyxl import load_workbook
+from openpyxl.utils.datetime import from_excel
+
+
+def _cell_to_date_text(cell):
+    val = cell.value
+    if isinstance(val, datetime):
+        return val.date().isoformat()
+    if isinstance(val, date):
+        return val.isoformat()
+    if isinstance(val, (int, float)):
+        try:
+            return from_excel(val).date().isoformat()
+        except Exception:
+            return str(val)
+    if val:
+        try:
+            parsed = datetime.fromisoformat(str(val))
+            return parsed.date().isoformat()
+        except Exception:
+            return str(val).strip()
+    return None
 
 def parse_venue_file(file):
     print("Parsing venue file...")
@@ -17,7 +40,7 @@ def parse_venue_file(file):
         date_cell = ws.cell(date_row, col)
 
         day_text = str(day_cell.value).strip() if day_cell.value else None
-        date_text = str(date_cell.value).strip() if date_cell.value else None
+        date_text = _cell_to_date_text(date_cell)
 
         # Skip empty columns
         if not day_text:

@@ -1,11 +1,30 @@
 # JH03 Platform
 
-An internal tool for uploading and managing university exam timetables. The stack ships as two Dockerised services:
+An internal tool for uploading and managing university exam timetables and matching students (and their provisions) to suitable venues. The stack ships as two Dockerised services:
 
 - **Frontend** &mdash; React + Vite UI served from `services/frontend`.
-- **API** &mdash; Django 5 project in `services/django/lithium`, which now boots an embedded PostgreSQL instance and exposes the application, authentication, and health endpoints.
+- **API** &mdash; Django 5 project in `services/django/lithium`, which boots an embedded PostgreSQL instance and exposes the application, authentication, and health endpoints.
 
 CI builds each service image with Kaniko and runs the frontend Vitest suite plus the Django test suite on GitLab.
+
+---
+
+## How uploads work (today)
+
+1) **Venue uploads** (extra rooms sheet, venue-style Excel)  
+   - Creates/updates `Venue` rows.  
+   - Captures capacity, venue type, accessibility, qualifications, per-day availability (ISO dates), and provision capabilities you can set on the venue. These venues start as “spares” for allocation.
+
+2) **Exam uploads** (exam timetable sheet)  
+   - Creates/updates `Exam` rows.  
+   - Creates `ExamVenue` links for any venue names in the sheet (no availability captured here).
+
+3) **Manual step**  
+   - Tag each `Venue` (and thus the linked `ExamVenue`) with provision capabilities (e.g., separate room, accessible hall, computer).
+
+4) **Provisions uploads** (student provision sheet)  
+   - Upserts `Student`, `StudentExam`, and `Provisions` rows (normalises phrases like “reader/scribe/extra time”).  
+   - For each student + exam, it finds an existing `ExamVenue` whose venue has the required capabilities; if none match, it picks a compatible available venue and creates a new `ExamVenue`, attaching it to the student.
 
 ---
 

@@ -84,6 +84,9 @@ test_frontend:
     - . .venv/bin/activate
     - pip install --upgrade pip
     - pip install --no-input -r requirements.txt
+    # Regenerate migrations on the fly because app migrations are git-ignored
+    - find timetabling_system/migrations -type f ! -name "__init__.py" -delete
+    - python manage.py makemigrations timetabling_system --noinput
     - python manage.py migrate --noinput
     - python manage.py test
 

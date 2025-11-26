@@ -6,10 +6,35 @@ from django.db import models
 # ---------- ENUM TYPES ----------
 
 class ProvisionType(models.TextChoices):
+    DATA_AS_PRESENTED_TO_REGISTRY = 'data_as_presented_to_registry', 'Data as presented to Registry'
+    ACCESSIBLE_EXAM_HALL_GROUND_OR_LIFT = 'accessible_exam_hall_ground_or_lift', 'Accessible exam hall: must be ground floor or have reliable lift access available'
+    ACCESSIBLE_HALL = 'accessible_hall', 'Accessible hall'
+    ALLOWED_EAT_DRINK = 'allowed_eat_drink', 'Allowed to eat and drink'
+    ASSISTED_EVAC_REQUIRED = 'assisted_evacuation_required', 'Assisted evacuation required'
+    EXAM_ADDITIONAL_COMMENT = 'exam_additional_comment', 'Exam Additional Comment'
+    ALTERNATIVE_FORMAT_PAPER = 'alternative_format_paper', 'Exam paper required in alternative format'
     EXTRA_TIME = 'extra_time', 'Extra Time'
-    COMPUTER_NEEDED = 'computer_needed', 'Computer Needed'
+    EXTRA_TIME_100 = 'extra_time_100', 'Extra time 100%'
+    EXTRA_TIME_15_PER_HOUR = 'extra_time_15_per_hour', 'Extra time 15 minutes every hour'
+    EXTRA_TIME_20_PER_HOUR = 'extra_time_20_per_hour', 'Extra time 20 minutes every hour'
+    EXTRA_TIME_30_PER_HOUR = 'extra_time_30_per_hour', 'Extra time 30 minutes every hour'
+    INVIGILATOR_AWARENESS = 'invigilator_awareness', 'Invigilator awareness'
+    SEATED_AT_BACK = 'seated_at_back', 'Seated at back'
+    SEPARATE_ROOM_NOT_ON_OWN = 'separate_room_not_on_own', 'Separate room not on own'
+    SEPARATE_ROOM_ON_OWN = 'separate_room_on_own', 'Separate room on own'
+    TOILET_BREAKS_REQUIRED = 'toilet_breaks_required', 'Toilet breaks required'
+    USE_COMPUTER = 'use_computer', 'Use of a computer'
+    USE_READER = 'use_reader', 'Use of a reader'
+    USE_SCRIBE = 'use_scribe', 'Use of a scribe'
     READER = 'reader', 'Reader'
     SCRIBE = 'scribe', 'Scribe'
+
+
+class ExamVenueProvisionType(models.TextChoices):
+    SEPARATE_ROOM_ON_OWN = 'separate_room_on_own', 'Separate room on own'
+    SEPARATE_ROOM_NOT_ON_OWN = 'separate_room_not_on_own', 'Separate room not on own'
+    USE_COMPUTER = 'use_computer', 'Use of a computer'
+    ACCESSIBLE_HALL = 'accessible_hall', 'Accessible hall'
 
 
 class VenueType(models.TextChoices):
@@ -47,6 +72,12 @@ class Venue(models.Model):
     )
     is_accessible = models.BooleanField(default=True)
     qualifications = models.JSONField(default=list, blank=True)
+    availability = models.JSONField(default=list, blank=True)
+    provision_capabilities = ArrayField(
+        models.CharField(max_length=40, choices=ExamVenueProvisionType.choices),
+        default=list,
+        blank=True,
+    )
 
     def __str__(self):
         return self.venue_name
@@ -65,6 +96,11 @@ class ExamVenue(models.Model):
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
     venue = models.ForeignKey(Venue, on_delete=models.CASCADE)
     adj_starttime = models.DateTimeField(blank=True, null=True)
+    provision_capabilities = ArrayField(
+        models.CharField(max_length=40, choices=ExamVenueProvisionType.choices),
+        default=list,
+        blank=True,
+    )
 
     def __str__(self):
         return f"{self.exam} at {self.venue}"
@@ -73,7 +109,12 @@ class ExamVenue(models.Model):
 class StudentExam(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
-
+    exam_venue = models.ForeignKey(
+        ExamVenue,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
     class Meta:
         unique_together = ('student', 'exam')
 
@@ -96,7 +137,7 @@ class Provisions(models.Model):
     )
 
     provisions = ArrayField(
-        models.CharField(max_length=30, choices=ProvisionType.choices),
+        models.CharField(max_length=50, choices=ProvisionType.choices),
         default=list,
         blank=True
     )
