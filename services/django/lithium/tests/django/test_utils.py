@@ -11,7 +11,12 @@ from timetabling_system.utils.file_classifier import (
     detect_venue_file
 
 )
-from timetabling_system.utils.excel_parser import _apply_best_header, _sanitize_dataframe
+from timetabling_system.utils.excel_parser import (
+    _apply_best_header,
+    _sanitize_dataframe,
+    parse_excel_file,
+    prepare_exam_provision_df,
+)
 from timetabling_system.utils.column_mapper import normalize, map_equivalent_columns
  
  
@@ -134,6 +139,27 @@ class TestFileClassifier(TestCase):
         assert detect_exam_file(df) is True
         assert detect_provision_file(df) is False
 
+    def test_prepare_exam_provision_df_adds_school_and_maps_venue(self):
+        df = pd.DataFrame(
+            [
+                ["August Resit Exam Final Timetable", "", "", ""],
+                ["ADAM SMITH BUSINESS SCHOOL", "", "", ""],
+                [
+                    "Exam Code",
+                    "Exam Name",
+                    "Exam date",
+                    "Assessment Type (Online Exams/ Venue (On Campus Exams)",
+                ],
+                ["CHEM101", "Chemistry 1", "2025-06-01", "Main Hall"],
+            ]
+        )
+
+        prepared = prepare_exam_provision_df(df)
+
+        assert "school" in prepared.columns
+        assert prepared.iloc[0]["school"] == "ADAM SMITH BUSINESS SCHOOL"
+        assert "main_venue" in prepared.columns
+
     def test_sanitize_dataframe_replaces_nan_and_drops_empty_column(self):
         df = pd.DataFrame(
             {
@@ -213,6 +239,54 @@ class TestFileClassifier(TestCase):
         assert detect_exam_file(df) is True
         assert detect_provision_file(df) is False
 
+    def test_parse_excel_file_exam(self):
+        from tempfile import NamedTemporaryFile
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["August Resit Exam Final Timetable", "", "", ""])
+        ws.append(["ADAM SMITH BUSINESS SCHOOL", "", "", ""])
+        ws.append(
+            [
+                "Exam Code",
+                "Exam Name",
+                "Exam date",
+                "Exam Start (BST)",
+                "Exam Duration (Hours:Minutes)",
+                "Exam finish",
+                "Online/ On Campus Exam",
+                "Assessment Type (Online Exams/ Venue (On Campus Exams)",
+                "Exam Size",
+                "School Contact ",
+                "School",
+            ]
+        )
+        ws.append(
+            [
+                "CHEM101",
+                "Chemistry 1",
+                "2025-06-01",
+                "09:00",
+                "02:00",
+                "11:00",
+                "On Campus",
+                "Main Hall",
+                10,
+                "",
+                "ADAM SMITH BUSINESS SCHOOL",
+            ]
+        )
+
+        with NamedTemporaryFile(suffix=".xlsx") as tmp:
+            wb.save(tmp.name)
+            tmp.seek(0)
+            result = parse_excel_file(tmp)
+
+        assert result["status"] == "ok"
+        assert result["type"] == "Exam"
+        assert "school" in result["columns"]
+
     def test_detect_venue_with_weekday_columns(self):
         df = pd.DataFrame(
             [
@@ -231,5 +305,25 @@ class TestFileClassifier(TestCase):
         assert detect_venue_file(df) is True
         assert detect_exam_file(df) is False
         assert detect_provision_file(df) is False
+
+    def test_parse_excel_file_venue(self):
+        from tempfile import NamedTemporaryFile
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["Monday", "Tuesday"])
+        ws.append(["2025-07-28", "2025-07-29"])
+        ws.append(["Room A", "Room B"])
+        ws.append(["Room C", ""])
+
+        with NamedTemporaryFile(suffix=".xlsx") as tmp:
+            wb.save(tmp.name)
+            tmp.seek(0)
+            result = parse_excel_file(tmp)
+
+        assert result["status"] == "ok"
+        assert result["type"] == "Venue"
+        assert "days" in result and len(result["days"]) == 2
 
  

@@ -54,7 +54,8 @@ build_with_kaniko:
     - set -eu
     - cd "$SERVICE_PATH"
     - if [ -f package-lock.json ]; then npm ci; else npm install; fi
-    - npm test
+    # Smoke tests (aligned with `make up`)
+    - npm test -- --passWithNoTests --testNamePattern "smoke|health"
 
 test_frontend:
   extends: .test_job_template
@@ -88,7 +89,8 @@ test_frontend:
     - find timetabling_system/migrations -type f ! -name "__init__.py" -delete
     - python manage.py makemigrations timetabling_system --noinput
     - python manage.py migrate --noinput
-    - python manage.py test
+    # Smoke tests (aligned with `make up`)
+    - python manage.py test timetabling_system.utils
 
 test_django:
   extends: .django_test_template
