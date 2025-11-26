@@ -18,6 +18,7 @@ class ExamVenueSerializer(serializers.ModelSerializer):
 
 
 
+
 class ExamSerializer(serializers.ModelSerializer):
     venues = serializers.SerializerMethodField()
     exam_venues = ExamVenueSerializer(source="examvenue_set", many=True, read_only=True)
