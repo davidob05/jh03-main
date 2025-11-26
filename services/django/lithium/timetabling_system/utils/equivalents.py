@@ -11,7 +11,7 @@ EQUIVALENT_COLUMNS = {
     ],
 
     "exam_name": [
-        "exam name", "assessment name", "module", "name"
+        "exam name", "assessment name", "module", "name", "exam"
     ],
 
     "exam_date": [
@@ -19,23 +19,27 @@ EQUIVALENT_COLUMNS = {
     ],
 
     "exam_start": [
-        "exam start", "exam start time", "ol start", "oc start", "start"
+        "exam start", "exam start time", "ol start", "oc start", "start", "start time",
+        "exam start (bst)", "exam start bst"
     ],
 
     "exam_end": [
-        "exam end", "exam finish", "ol finish", "oc finish", "end"
+        "exam end", "exam finish", "ol finish", "oc finish", "end", "finish time"
     ],
 
     "exam_length": [
-        "exam length", "exam duration", "duration", "length", "time allowed"
+        "exam length", "exam duration", "duration", "length", "time allowed",
+        "exam duration (hours:minutes)"
     ],
 
     "exam_type": [
-        "exam type", "assessment type", "type"
+        "exam type", "assessment type", "type", "online/ on campus exam",
+        "online/ on campus/digital on campus exam", "online on campus digital on campus exam",
+        "assessment type (online exams/ venue (on campus exams)", "digital on campus exam"
     ],
 
     "main_venue": [
-        "main venue", "venue", "location", "room"
+        "main venue", "venue", "location", "room", "exam venue"
     ],
 
     "school": [
@@ -52,19 +56,21 @@ EQUIVALENT_COLUMNS = {
 
    #provision fields
     "student_id": [
-        "mock ids", "mock id", "student id", "id"
+        "mock ids", "mock id", "student id", "id", "student id mock ids"
     ],
 
     "student_name": [
-        "names", "student name", "name"
+        "names", "student name", "name", "student name mock names"
     ],
 
     "provisions": [
-        "registry", "exam provision", "provision", "adjustments"
+        "registry", "exam provision", "provision", "adjustments", "exam provision data as presented to registry"
     ],
 
     "additional_info": [
-        "additional information", "notes", "comments", "info"
+        "additional information", "notes", "comments", "info",
+        "additional information student identifers have been removed",
+        "additional information student identifiers have been removed"
     ],
 
     # -------------------------
