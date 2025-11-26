@@ -140,7 +140,7 @@ CI mirrors these commands via `.gitlab-ci.yml`.
 - Data lives in `services/django/lithium/.postgres-data/` (git-ignored). Delete it or run `make reset-django-db` to wipe everything.
 - Because migrations run on every container start, schema changes are immediately applied. When you intentionally change models, run `make migrate` to generate migration files in `services/django/lithium/<app>/migrations/` and commit them.
 - `psql` is available inside the Django container: `docker compose -f ops/compose/docker-compose.dev.yml exec django bash -lc 'psql $DJANGO_DB_NAME'`.
-- The Django service reads the same environment variables locally and in CI: `DJANGO_DB_HOST` (default `127.0.0.1`), `DJANGO_DB_PORT` (`5432`), `DJANGO_DB_NAME` (`exam_db`), `DJANGO_DB_USER` (`postgres`), `DJANGO_DB_PASSWORD` (blank). Override as needed; both Docker Compose and GitLab pass these through unchanged.
+ - The Django service reads the same environment variables locally and in CI: `DJANGO_DB_HOST` (default `127.0.0.1`), `DJANGO_DB_PORT` (`5432`), `DJANGO_DB_NAME` (`postgres`), `DJANGO_DB_USER` (`postgres`), `DJANGO_DB_PASSWORD` (`postgres`). Override as needed; both Docker Compose and GitLab pass these through unchanged.
 
 ---
 
