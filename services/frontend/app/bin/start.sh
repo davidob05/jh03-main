@@ -20,4 +20,5 @@ if [ ! -d node_modules ]; then
 fi
 
 echo "[frontend] Starting Vite dev server..."
-exec npm run start "$@"
+# Ignore any passed arguments (the base image CMD defaults to "idle").
+exec npm run start

@@ -114,6 +114,8 @@ This script:
 | Command | Description |
 | --- | --- |
 | `make up` | Build and start the dev stack (`ops/compose/docker-compose.dev.yml`). |
+| `make django` | Start only the Django service in the foreground (logs stay attached). |
+| `make frontend` | Start only the frontend service in the foreground (no dependencies). |
 | `make down` | Stop containers and remove dev volumes. |
 | `make logs` | Tail combined service logs. |
 | `make build` | Rebuild service images with `--pull`. |
@@ -132,6 +134,17 @@ This script:
 | Django (pages app only) | `docker compose -f ops/compose/docker-compose.dev.yml exec django bash -lc '. /app/.venv/bin/activate && python manage.py test pages'` |
 
 CI mirrors these commands via `.gitlab-ci.yml`.
+
+---
+
+## Create a Django superuser
+
+1. Ensure the Django container is running (`make up` or `make django`).
+2. Run:
+   ```bash
+   docker compose -f ops/compose/docker-compose.dev.yml exec django bash -lc '. /app/.venv/bin/activate && python manage.py createsuperuser'
+   ```
+3. Follow the prompts for username/email/password. The user will exist in the embedded PostgreSQL data dir (`services/django/lithium/.postgres-data/`).
 
 ---
 
