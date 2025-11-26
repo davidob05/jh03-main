@@ -32,10 +32,23 @@ def parse_venue_file(file):
     results = []
     venue_index = {}  # venue_name -> accessibility flag (False if any instance is inaccessible)
 
+    # Find the first non-empty row; some templates start with a blank row.
+    header_row = None
+    for row in range(1, ws.max_row + 1):
+        if any(ws.cell(row, col).value for col in range(1, ws.max_column + 1)):
+            header_row = row
+            break
+
+    if header_row is None or header_row + 1 > ws.max_row:
+        return {
+            "status": "error",
+            "type": "Venue",
+            "message": "Could not locate header rows in venue file."
+        }
+
     # Read column pairs: (header row, date row, data rows)
-    header_row = 1
-    date_row = 2
-    first_data_row = 3
+    date_row = header_row + 1
+    first_data_row = date_row + 1
 
     for col in range(1, ws.max_column + 1):
         day_cell = ws.cell(header_row, col)
@@ -49,13 +62,13 @@ def parse_venue_file(file):
             continue
 
         rooms = []
+        
 
         for row in range(first_data_row, ws.max_row + 1):
             cell = ws.cell(row, col)
             value = cell.value
 
-            if not value:
-                continue
+            if not value: continue
 
             # Detect red font (non-accessible)
             font_color = cell.font.color
@@ -73,9 +86,11 @@ def parse_venue_file(file):
                 "name": room_name,
                 "accessible": accessible
             })
+            
 
             # Track venue-level accessibility; once false, remain false.
             venue_index[room_name] = venue_index.get(room_name, True) and accessible
+
 
         results.append({
             "day": day_text,
