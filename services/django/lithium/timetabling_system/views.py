@@ -6,6 +6,7 @@ from django.views.generic import TemplateView
 
 from .services import ingest_upload_result
 from .utils.excel_parser import parse_excel_file
+from .utils.venue_ingest import upsert_venues
 
 
 class HomePageView(TemplateView):

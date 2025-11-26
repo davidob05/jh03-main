@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from timetabling_system.models import Exam
 from timetabling_system.services import ingest_upload_result
 from timetabling_system.utils.excel_parser import parse_excel_file
+from timetabling_system.utils.venue_ingest import upsert_venues
 from .serializers import ExamSerializer
 
 

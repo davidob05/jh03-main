@@ -6,6 +6,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
 from django.test import TestCase
 from django.urls import reverse
+from openpyxl import Workbook
+from openpyxl.styles import Font
+
+from timetabling_system.models import Venue
 
 
 class HomePageTests(TestCase):
@@ -70,6 +74,31 @@ class UploadTimetableFileTests(TestCase):
             ),
         )
 
+    def _build_venue_upload(self):
+        buffer = BytesIO()
+        wb = Workbook()
+        ws = wb.active
+
+        ws["A1"] = "Monday"
+        ws["B1"] = "Tuesday"
+        ws["A2"] = "01/01/2025"
+        ws["B2"] = "02/01/2025"
+        ws["A3"] = "Hall A"
+        ws["B3"] = "Lab B"
+        ws["B3"].font = Font(color="FF0000")  # mark as not accessible
+
+        wb.save(buffer)
+        buffer.seek(0)
+
+        return SimpleUploadedFile(
+            "venues.xlsx",
+            buffer.read(),
+            content_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+        )
+
     def test_upload_missing_file_returns_400(self):
         response = self.client.post(reverse("upload-exams"))
         self.assertEqual(response.status_code, 400)
@@ -103,3 +132,23 @@ class UploadTimetableFileTests(TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["type"], "Exam")
         self.assertEqual(payload["rows"][0]["exam_code"], "ABC123")
+
+    def test_upload_venue_file_populates_database(self):
+        upload = self._build_venue_upload()
+
+        response = self.client.post(reverse("upload-exams"), {"file": upload})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["type"], "Venue")
+        self.assertEqual(payload["records_created"], 2)
+        self.assertEqual(payload["records_updated"], 0)
+
+        venues = {v.venue_name: v for v in Venue.objects.all()}
+        self.assertEqual(len(venues), 2)
+        self.assertTrue(venues["Hall A"].is_accessible)
+        self.assertFalse(venues["Lab B"].is_accessible)
+        self.assertEqual(venues["Hall A"].capacity, 0)
+        self.assertEqual(venues["Hall A"].venuetype, "school_to_sort")
