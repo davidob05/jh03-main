@@ -32,7 +32,7 @@ class TimetableUploadView(APIView):
             upload.seek(0)
                     
         try:
-            result = parse_excel_file(upload)
+            result = parse_excel_file(upload.read())
         except Exception as exc:  # pragma: no cover - defensive fallback
             return Response(
                 {
