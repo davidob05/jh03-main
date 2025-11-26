@@ -34,7 +34,7 @@ def ingest_upload_result(
     Unsupported file types return a handled=False summary so callers can show
     a helpful message without treating the upload as an error.
     """
-
+    
     if not result or result.get("status") != "ok":
         return None
 
@@ -560,6 +560,7 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     Venue uploads carry a list of day blocks, each with a list of rooms.
     We treat each room as a Venue row and upsert by venue_name.
     """
+    
     rooms: List[Dict[str, Any]] = []
     for day in days or []:
         day_date = _coerce_date(day.get("date"))
