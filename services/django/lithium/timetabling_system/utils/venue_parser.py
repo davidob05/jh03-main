@@ -1,6 +1,7 @@
 from openpyxl import load_workbook
 
 def parse_venue_file(file):
+    print("Parsing venue file...")
     wb = load_workbook(file)
     ws = wb.active
 

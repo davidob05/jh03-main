@@ -1,6 +1,7 @@
 # timetabling_system/utils/file_classifier.py
 
 def detect_provision_file(df):
+    print("Detecting provision file...")
     """Provision files contain student + registry info."""
     cols = set(df.columns)
 
@@ -13,6 +14,7 @@ def detect_provision_file(df):
 
 
 def detect_exam_file(df):
+    print("Detecting exam file...")
     """Exam files contain exam session fields but no student data."""
     cols = set(df.columns)
 
@@ -33,6 +35,7 @@ def detect_exam_file(df):
 
 
 def detect_venue_file(df):
+    print("Detecting venue file...")
     """
     Venue files are column-based:
     Row 1 = day names
