@@ -5,7 +5,7 @@ DJANGO_MANAGE := ./$(DJANGO_DIR)/scripts/manage.sh
 FRONTEND_DIR := services/frontend/app
 
 
-.PHONY: up down logs build reset-django-db makemigrations migrate
+.PHONY: up down logs build reset-django-db makemigrations migrate django frontend
 up:
 	@echo "Installing frontend dependencies locally so the container can run tests without hitting the network..."
 	rm -rf $(FRONTEND_DIR)/node_modules
@@ -33,3 +33,12 @@ makemigrations:
 
 migrate: makemigrations
 	$(DJANGO_MANAGE) migrate
+
+django:
+	docker compose -f $(DEV_COMPOSE) up --build --no-deps django
+
+frontend:
+	@if [ ! -d $(FRONTEND_DIR)/node_modules ]; then \
+		cd $(FRONTEND_DIR) && npm ci --no-progress --prefer-offline; \
+	fi
+	docker compose -f $(DEV_COMPOSE) up --build --no-deps frontend
