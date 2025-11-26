@@ -87,7 +87,7 @@ def detect_venue_file(df):
     weekdays = ("monday", "tuesday", "wednesday", "thursday", "friday", "sat", "sun", "saturday", "sunday")
 
     def weekday_hits(seq):
-        return sum(any(day in str(cell).lower() for day in weekdays) for cell in seq)
+        return sum(any(day in str(cell).lower().split("-")[0] for day in weekdays) for cell in seq)
 
     def date_hits(seq):
         return sum(_looks_like_date_cell(cell) for cell in seq)
