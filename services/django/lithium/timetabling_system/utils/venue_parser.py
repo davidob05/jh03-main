@@ -95,6 +95,7 @@ def parse_venue_file(file):
             # Track venue-level accessibility; once false, remain false.
             venue_index[room_name] = venue_index.get(room_name, True) and accessible
 
+
         results.append({
             "day": day_text,
             "date": date_text,

@@ -781,6 +781,7 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     Venue uploads carry a list of day blocks, each with a list of rooms.
     We treat each room as a Venue row and upsert by venue_name.
     """
+    
     rooms: List[Dict[str, Any]] = []
     for day in days or []:
         day_date = _coerce_date(day.get("date"))
