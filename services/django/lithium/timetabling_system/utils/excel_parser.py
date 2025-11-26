@@ -150,16 +150,8 @@ def parse_excel_file(file):
         }
 
     # ------------------------------------------
-    # 2. Detect VENUE file
-    # ------------------------------------------
-    if detect_venue_file(df):
-        if hasattr(file, "seek"):
-            file.seek(0)
-        return parse_venue_file(file)
-
-    # ------------------------------------------
-    # 3. Detect EXAM file
-    # ------------------------------------------
+    # 2. Detect EXAM file
+    # (Check exam before venue to avoid misclassifying exam tables that include day/date columns.)
     if detect_exam_file(df):
         file_type = "Exam"
 
