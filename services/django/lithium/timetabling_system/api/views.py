@@ -51,6 +51,8 @@ class TimetableUploadView(APIView):
             )
             if ingest_summary:
                 result["ingest"] = ingest_summary
+                result["records_created"] = ingest_summary.get("created", 0)
+                result["records_updated"] = ingest_summary.get("updated", 0)
 
         http_status = (
             status.HTTP_200_OK if result.get("status") == "ok" else status.HTTP_400_BAD_REQUEST

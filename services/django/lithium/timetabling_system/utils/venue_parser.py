@@ -72,11 +72,11 @@ def parse_venue_file(file):
 
             # Detect red font (non-accessible)
             font_color = cell.font.color
+            rgb = str(font_color.rgb).upper() if font_color and font_color.rgb else ""
             is_red = (
                 font_color
                 and font_color.type == "rgb"
-                and font_color.rgb
-                and font_color.rgb.upper().startswith("FF0000")
+                and "FF0000" in rgb
             )
 
             room_name = str(value).strip()
