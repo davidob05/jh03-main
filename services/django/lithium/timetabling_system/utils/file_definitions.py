@@ -18,7 +18,6 @@ REQUIRED_EXAM_COLUMNS = [
     "exam_name",
     "exam_date",
     "exam_start",
-    "exam_end",          # sometimes called OC/OL start/finish
     "exam_length",
     "exam_type",
     "main_venue",        # mapped from Main Venue, Venue, etc.
