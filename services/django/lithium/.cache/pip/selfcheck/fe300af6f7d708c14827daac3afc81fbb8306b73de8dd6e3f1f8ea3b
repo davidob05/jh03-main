@@ -1,6 +1,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 {"key":"/usr/local","last_check":"2025-11-19T14:41:55.786768+00:00","pypi_version":"25.3"}
 =======
 {"key":"/usr/local","last_check":"2025-11-11T23:10:23.401149+00:00","pypi_version":"25.3"}
@@ -11,3 +12,6 @@
 =======
 {"key":"/usr/local","last_check":"2025-11-19T14:41:55.786768+00:00","pypi_version":"25.3"}
 >>>>>>> 42a2399d (fixes)
+=======
+{"key":"/usr/local","last_check":"2025-11-19T14:41:55.786768+00:00","pypi_version":"25.3"}
+>>>>>>> 53ac0f91 (branch up to date)
