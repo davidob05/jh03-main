@@ -74,6 +74,8 @@ def upload_timetable_file(request):
         )
         if ingest_summary:
             result["ingest"] = ingest_summary
+            result["records_created"] = ingest_summary.get("created", 0)
+            result["records_updated"] = ingest_summary.get("updated", 0)
 
     status_code = 200 if result.get("status") == "ok" else 400
     return JsonResponse(result, status=status_code)
