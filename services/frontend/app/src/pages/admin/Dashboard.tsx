@@ -127,10 +127,7 @@ export const AdminDashboard: React.FC = () => {
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setUploadStatus({
-        type: "error",
-        message: "Please select a file first",
-      });
+      setUploadStatus({ type: "error", message: "Please select a file first" });
       return;
     }
 
@@ -146,27 +143,16 @@ export const AdminDashboard: React.FC = () => {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
+      if (!response.ok) throw new Error("Upload failed");
 
       const result = await response.json();
-      setUploadStatus({
-        type: "success",
-        message: `Successfully uploaded ${selectedFile.name}. ${result.count || 0} exams added to database.`,
-      });
+      setUploadStatus({ type: "success", message: `Successfully uploaded ${selectedFile.name}. ${result.count || 0} records added.` });
       setSelectedFile(null);
-      // Reset file input
-      const fileInput = document.getElementById(
-        "file-upload"
-      ) as HTMLInputElement;
+
+      const fileInput = document.getElementById("file-upload") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
-    } catch (error) {
-      setUploadStatus({
-        type: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to upload file",
-      });
+    } catch (err) {
+      setUploadStatus({ type: "error", message: err instanceof Error ? err.message : "Failed to upload file" });
     } finally {
       setUploading(false);
     }
