@@ -12,7 +12,6 @@ class ExamVenueSerializer(serializers.ModelSerializer):
             "venue_name",
             "start_time",
             "exam_length",
-            "adj_starttime",
             "core",
             "provision_capabilities",
         )
