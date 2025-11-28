@@ -5,11 +5,15 @@ import Timeline, {
   DateHeader,
 } from "react-calendar-timeline";
 import "react-calendar-timeline/dist/style.css";
-import { Box, Button, Typography, Paper } from "@mui/material";
+import { Box, Button, Typography, Paper, Select, MenuItem, FormControl, InputLabel, TextField, Stack } from "@mui/material";
+import { Link as RouterLink } from 'react-router-dom';
+import { Link as MUILink } from '@mui/material';
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { Dayjs } from 'dayjs';
 import { useNavigate } from "react-router-dom";
+import { LocalizationProvider, DatePicker } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 
 interface ExamItem {
   id: number;
@@ -151,6 +155,11 @@ export const AdminCalendar: React.FC = () => {
     new Date(firstExamDate.getFullYear(), firstExamDate.getMonth(), firstExamDate.getDate())
   );
 
+  //Adding drop downs for year, month and day
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
+  const [selectedDay, setSelectedDay] = useState(currentDate.getDate());
+
   // Calculate visible time range (one day: 8 AM to 8 PM for better viewing)
   const getTimeRange = (date: Date) => {
     const startOfDay = new Date(date);
@@ -208,113 +217,149 @@ export const AdminCalendar: React.FC = () => {
   };
 
   return (
-    <Box sx={{ width: "100%", p: 3 }}>
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            mb: 2,
-          }}
-        >
-          <Typography variant="h4" component="h1">
-            Exam Calendar
-          </Typography>
+    <LocalizationProvider>
+      <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
+        <Typography variant="h4" component="h1">
+          Exam Calendar
+        </Typography>
+        
+          <Stack gap={1} mb={3}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" paddingTop={1}>
+              <Typography variant="h4" fontSize={26}>
+                {formatDate(currentDate)}
+              </Typography>
+
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<ArrowBackIcon />}
+                  onClick={handlePreviousDay}
+                >
+                  Previous Day
+                </Button>
+                <Button variant="contained" onClick={handleToday}>
+                  Today
+                </Button>
+                <Button
+                  variant="outlined"
+                  endIcon={<ArrowForwardIcon />}
+                  onClick={handleNextDay}
+                >
+                  Next Day
+                </Button>
+              </Box>
+            </Stack>
+
+            {currentDayItems.length === 0 && (
+              <Typography variant="body1" color="text.secondary">
+                No exams scheduled for this day
+              </Typography>
+            )}
+          </Stack>
+
+        {/* Edit Search Filter links */}
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "space-between", paddingBottom:1}}>
+            <Typography
+              variant="body1"
+              sx={{ cursor: "pointer" }}
+              >
+                <MUILink component={RouterLink} to="/" underline="hover" fontSize={18} display={"flex"} alignItems={"center"} fontFamily={"sans-serif"}>
+                  Edit
+                </MUILink>
+              </Typography>
+
           <Box sx={{ display: "flex", gap: 1 }}>
-            <Button
-              variant="outlined"
-              startIcon={<ArrowBackIcon />}
-              onClick={handlePreviousDay}
+          <Typography
+            sx={{ cursor: "pointer" }}
             >
-              Previous Day
-            </Button>
-            <Button variant="contained" onClick={handleToday}>
-              Today
-            </Button>
-            <Button
-              variant="outlined"
-              endIcon={<ArrowForwardIcon />}
-              onClick={handleNextDay}
+              <MUILink component={RouterLink} to="/admin/exams" underline="hover" fontSize={18} display={"flex"} alignItems={"center"} fontFamily={"sans-serif"}>
+              Search
+              </MUILink>
+            </Typography>
+
+            <Typography
+            sx={{ cursor: "pointer" }}
             >
-              Next Day
-            </Button>
+              <MUILink component={RouterLink} to="/admin/exams" underline="hover" fontSize={18} display={"flex"} alignItems={"center"}fontFamily={"sans-serif"}>
+              Filter
+            </MUILink>
+            </Typography>
           </Box>
         </Box>
-        <Typography variant="h6" color="text.secondary">
-          {formatDate(currentDate)}
-        </Typography>
-        {currentDayItems.length === 0 && (
-          <Typography variant="body1" sx={{ mt: 2 }} color="text.secondary">
-            No exams scheduled for this day
-          </Typography>
-        )}
-      </Paper>
 
-      <Paper sx={{ p: 0, overflow: "hidden" }}>
-        <div
-          style={{
-            textAlign: "center",
-            fontWeight: "normal",
-            fontSize: "18px",
-            fontFamily: "arial",
-            padding: "16 px",
-            borderBottom: "1px solid #ccc",
-            background: "#fafafa",
-          }}
+        <Paper sx={{ p: 0, overflow: "hidden" }}>
+          <Timeline
+            groups={groups}
+            items={currentDayItems}
+            visibleTimeStart={timeRange.visibleTimeStart}
+            visibleTimeEnd={timeRange.visibleTimeEnd}
+            sidebarWidth={150}
+            lineHeight={50}
+            itemHeightRatio={0.75}
+            canMove={false}
+            canResize={false}
+            canChangeGroup={false}
+            dragSnap={Infinity}
+            buffer={1}
+            stackItems
+            onItemDoubleClick={(itemId) => {
+              const item = items.find((it) => it.id === itemId);
+              if (!item || !item.code) return;
+              navigate(`/exams/${item.code}`);
+            }}
+            onTimeChange={() => {
+              // Prevent time range changes - keep it fixed to one day
+            }}
           >
-            {formatDate(currentDate)}
-          </div>
-        <Timeline
-          groups={groups}
-          items={currentDayItems}
-          visibleTimeStart={timeRange.visibleTimeStart}
-          visibleTimeEnd={timeRange.visibleTimeEnd}
-          canMove={false}
-          canResize={false}
-          canChangeGroup={false}
-          stackItems
-          onItemDoubleClick={(itemId) => {
-            const item = items.find((it) => it.id === itemId);
-            if (!item || !item.code) return;
-            navigate(`/exams/${item.code}`);
-          }}
-          itemHeightRatio={0.75}
-          sidebarWidth={150}
-          onTimeChange={() => {
-            // Prevent time range changes - keep it fixed to one day
-          }}
-        >
-          <TimelineHeaders>
-            <SidebarHeader>
-              {({ getRootProps }) => (
-                <div
-                  {...getRootProps()}
-                  style={{
-                    background: "#f5f5f5",
-                    color: "#333",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    padding: "10px",
-                    width: "150px",
-                  }}
-                >
-                  Venues
-                </div>
-              )}
-            </SidebarHeader>
-            <DateHeader
-              unit="hour"
-              labelFormat={([startTime]) => {
-                const date = new Date(startTime.valueOf());
-                const hours = date.getHours().toString().padStart(2, '0');
-                const minutes = date.getMinutes().toString().padStart(2, '0');
-                return `${hours}:${minutes}`;
-              }}
-            />
-          </TimelineHeaders>
-        </Timeline>
-      </Paper>
-    </Box>
+            <TimelineHeaders>
+              <SidebarHeader>
+                {({ getRootProps }) => (
+                  <div
+                    {...getRootProps()}
+                    style={{
+                      background: "#f5f5f5",
+                      color: "#333",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                      padding: "10px",
+                      width: "150px",
+                    }}
+                  >
+                    Venues
+                  </div>
+                )}
+              </SidebarHeader>
+              <DateHeader
+                unit="hour"
+                labelFormat={([startTime]) => {
+                  const date = new Date(startTime.valueOf());
+                  const hours = date.getHours().toString().padStart(2, '0');
+                  const minutes = date.getMinutes().toString().padStart(2, '0');
+                  return `${hours}:${minutes}`;
+                }}>
+                {(props: any) => {
+                  const { getIntervalProps, intervalText } = props;
+                  return (
+                    <div
+                      {...getIntervalProps()}
+                      style={{
+                        background: "red",
+                        color: "red",
+                        padding: "6px 10px",
+                        fontWeight: 600,
+                        textAlign: "center",
+                        borderRight: "1px solid rgba(255,255,255,.15)",
+                      }}
+                    >
+                      {intervalText}
+                    </div>
+                  );
+                }}
+              </DateHeader>
+            </TimelineHeaders>
+          </Timeline>
+        </Paper>
+      </Box>
+    </LocalizationProvider>
   );
 };
