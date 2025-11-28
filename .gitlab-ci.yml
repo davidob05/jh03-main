@@ -90,12 +90,12 @@ test_frontend:
     - python manage.py migrate --noinput
     - python manage.py test
 
-#test_django:
- # extends: .django_test_template
-  #needs: ["build_with_kaniko"]
-  #variables:
-   # SERVICE_PATH: services/django/lithium
-    #DJANGO_DB_HOST: db
-    #DJANGO_DB_NAME: exam_db
-    #DJANGO_DB_USER: postgres
-    #DJANGO_DB_PASSWORD: postgres
+test_django:
+ extends: .django_test_template
+  needs: ["build_with_kaniko"]
+  variables:
+   SERVICE_PATH: services/django/lithium
+    DJANGO_DB_HOST: db
+    DJANGO_DB_NAME: exam_db
+    DJANGO_DB_USER: postgres
+    DJANGO_DB_PASSWORD: postgres
