@@ -22,6 +22,7 @@ build/
 services/django/lithium/.postgres-data/
 services/django/lithium/.cache/
 services/django/lithium/.local/
+services/django/lithium/timetabling_system/migrations/*
 
 *.sqlite3
 
@@ -34,3 +35,5 @@ Thumbs.db
 # Misc
 *.tar
 *.log
+
+*.sqlite3

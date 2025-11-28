@@ -1,11 +1,30 @@
 # JH03 Platform
 
-An internal tool for uploading and managing university exam timetables. The stack ships as two Dockerised services:
+An internal tool for uploading and managing university exam timetables and matching students (and their provisions) to suitable venues. The stack ships as two Dockerised services:
 
 - **Frontend** &mdash; React + Vite UI served from `services/frontend`.
-- **API** &mdash; Django 5 project in `services/django/lithium`, which now boots an embedded PostgreSQL instance and exposes the application, authentication, and health endpoints.
+- **API** &mdash; Django 5 project in `services/django/lithium`, which boots an embedded PostgreSQL instance and exposes the application, authentication, and health endpoints.
 
 CI builds each service image with Kaniko and runs the frontend Vitest suite plus the Django test suite on GitLab.
+
+---
+
+## How uploads work (today)
+
+1) **Venue uploads** (extra rooms sheet, venue-style Excel)  
+   - Creates/updates `Venue` rows.  
+   - Captures capacity, venue type, accessibility, qualifications, per-day availability (ISO dates), and provision capabilities you can set on the venue. These venues start as “spares” for allocation.
+
+2) **Exam uploads** (exam timetable sheet)  
+   - Creates/updates `Exam` rows.  
+   - Creates `ExamVenue` links for any venue names in the sheet (no availability captured here).
+
+3) **Manual step**  
+   - Tag each `Venue` (and thus the linked `ExamVenue`) with provision capabilities (e.g., separate room, accessible hall, computer).
+
+4) **Provisions uploads** (student provision sheet)  
+   - Upserts `Student`, `StudentExam`, and `Provisions` rows (normalises phrases like “reader/scribe/extra time”).  
+   - For each student + exam, it finds an existing `ExamVenue` whose venue has the required capabilities; if none match, it picks a compatible available venue and creates a new `ExamVenue`, attaching it to the student.
 
 ---
 
@@ -95,6 +114,9 @@ This script:
 | Command | Description |
 | --- | --- |
 | `make up` | Build and start the dev stack (`ops/compose/docker-compose.dev.yml`). |
+| `make django` | Start only the Django service in the foreground (logs stay attached). |
+| `make frontend` | Start only the frontend service in the foreground (no dependencies). |
+| `make test` | Run full unit tests for frontend and Django inside running containers (no rebuild). |
 | `make down` | Stop containers and remove dev volumes. |
 | `make logs` | Tail combined service logs. |
 | `make build` | Rebuild service images with `--pull`. |
@@ -116,11 +138,23 @@ CI mirrors these commands via `.gitlab-ci.yml`.
 
 ---
 
+## Create a Django superuser
+
+1. Ensure the Django container is running (`make up` or `make django`).
+2. Run:
+   ```bash
+   docker compose -f ops/compose/docker-compose.dev.yml exec django bash -lc '. /app/.venv/bin/activate && python manage.py createsuperuser'
+   ```
+3. Follow the prompts for username/email/password. The user will exist in the embedded PostgreSQL data dir (`services/django/lithium/.postgres-data/`).
+
+---
+
 ## Working With the Database
 
 - Data lives in `services/django/lithium/.postgres-data/` (git-ignored). Delete it or run `make reset-django-db` to wipe everything.
 - Because migrations run on every container start, schema changes are immediately applied. When you intentionally change models, run `make migrate` to generate migration files in `services/django/lithium/<app>/migrations/` and commit them.
 - `psql` is available inside the Django container: `docker compose -f ops/compose/docker-compose.dev.yml exec django bash -lc 'psql $DJANGO_DB_NAME'`.
+ - The Django service reads the same environment variables locally and in CI: `DJANGO_DB_HOST` (default `127.0.0.1`), `DJANGO_DB_PORT` (`5432`), `DJANGO_DB_NAME` (`postgres`), `DJANGO_DB_USER` (`postgres`), `DJANGO_DB_PASSWORD` (`postgres`). Override as needed; both Docker Compose and GitLab pass these through unchanged.
 
 ---
 

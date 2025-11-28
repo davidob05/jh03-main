@@ -1,5 +1,5 @@
 # Lithium: A Django-Powered Boilerplate
-Lithium is a batteries-included Django starter project with everything you need to start coding, including user authentication, static files, default styling, debugging, DRY forms, custom error pages, and more.
+Lithium is a batteries-included Django starter project with everything you need to start coding, including user authentication, static files, default styling, debugging, DRY forms, custom error views, and more.
 
 > This project was formerly known as _DjangoX_ but was renamed to _Lithium_ in November 2024.
 
@@ -16,7 +16,7 @@ https://github.com/user-attachments/assets/8698e9dd-1794-4f96-9c3f-85add17e330b
 - Styling with [Bootstrap v5](https://getbootstrap.com/)
 - Debugging with [django-debug-toolbar](https://github.com/jazzband/django-debug-toolbar)
 - DRY forms with [django-crispy-forms](https://github.com/django-crispy-forms/django-crispy-forms)
-- Custom 404, 500, and 403 error pages
+- Custom 404, 500, and 403 error views
 
 ## Table of Contents
 * **[Installation](#installation)**
