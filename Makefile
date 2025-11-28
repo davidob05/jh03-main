@@ -5,7 +5,7 @@ DJANGO_MANAGE := ./$(DJANGO_DIR)/scripts/manage.sh
 FRONTEND_DIR := services/frontend/app
 
 
-.PHONY: up down logs build reset-django-db makemigrations migrate
+.PHONY: up down logs build reset-django-db makemigrations migrate django frontend
 up:
 	@echo "Installing frontend dependencies locally so the container can run tests without hitting the network..."
 	rm -rf $(FRONTEND_DIR)/node_modules
@@ -33,3 +33,11 @@ makemigrations:
 
 migrate: makemigrations
 	$(DJANGO_MANAGE) migrate
+
+# Run Django service in the foreground (shows container logs)
+django:
+	HOST_UID=$$(id -u) HOST_GID=$$(id -g) docker compose -f $(DEV_COMPOSE) up django
+
+# Run frontend dev server in the foreground (brings up django dependency too)
+frontend:
+	HOST_UID=$$(id -u) HOST_GID=$$(id -g) docker compose -f $(DEV_COMPOSE) up frontend

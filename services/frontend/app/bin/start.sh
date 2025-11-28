@@ -3,6 +3,11 @@ set -eu
 
 cd /app
 
+# Ignore the default CMD argument ("idle") passed from the Dockerfile so Vite serves the real app root.
+if [ "${1-}" = "idle" ]; then
+    shift
+fi
+
 if [ ! -f package.json ]; then
     echo "[frontend] No package.json found. Container is idle."
     exec sleep infinity
