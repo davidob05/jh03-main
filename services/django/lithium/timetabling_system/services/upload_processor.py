@@ -284,7 +284,12 @@ def _import_exam_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         else:
             summary["updated"] += 1
 
-        _create_exam_venue_links(exam_obj, raw)
+        _create_exam_venue_links(
+            exam_obj,
+            raw,
+            start_time=payload["start_time"],
+            exam_length=payload["exam_length"],
+        )
 
     return summary
 
@@ -295,28 +300,25 @@ def _build_exam_payload(row: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("Missing exam_code / course_code.")
 
     exam_date = _coerce_date(row.get("exam_date"))
-    if not exam_date:
-        raise ValueError("Missing exam_date.")
-
     start_dt = _combine_start_datetime(row.get("exam_start"), exam_date)
-    if not start_dt:
-        raise ValueError("Missing exam_start or unable to parse start time.")
-
-    start_dt = _ensure_aware(start_dt)
-    exam_length = _duration_in_minutes(row.get("exam_length"), row.get("exam_end"), start_dt)
+    start_dt = _ensure_aware(start_dt) if start_dt else None
+    duration = _duration_in_minutes(row.get("exam_length"), row.get("exam_end"), start_dt)
+    duration = duration if duration > 0 else None
 
     defaults = {
         "exam_name": _clean_string(row.get("exam_name"), max_length=30) or course_code,
-        "exam_length": exam_length,
-        "start_time": start_dt,
         "exam_type": _clean_string(row.get("exam_type"), max_length=30) or "Exam",
         "no_students": _coerce_int(row.get("no_students")) or 0,
         "exam_school": _clean_string(row.get("school"), max_length=30) or "Unassigned",
-        "date_exam": exam_date,
         "school_contact": _clean_string(row.get("school_contact"), max_length=100),
     }
 
-    return {"course_code": course_code, "defaults": defaults}
+    return {
+        "course_code": course_code,
+        "defaults": defaults,
+        "start_time": start_dt,
+        "exam_length": duration,
+    }
 
 
 def _slugify(value: str) -> str:
@@ -520,7 +522,13 @@ def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamV
     )
 
 
-def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
+def _create_exam_venue_links(
+    exam: Exam,
+    raw_row: Dict[str, Any],
+    *,
+    start_time: Optional[datetime] = None,
+    exam_length: Optional[int] = None,
+) -> None:
     """
     Ensure Venue rows exist for each venue name in the exam upload,
     and create ExamVenue links to the associated exam.
@@ -548,10 +556,28 @@ def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
             venue_name=name,
             defaults=defaults,
         )
-        ExamVenue.objects.get_or_create(
+        exam_venue, created = ExamVenue.objects.get_or_create(
             exam=exam,
             venue=venue,
+            defaults={
+                "start_time": start_time,
+                "exam_length": exam_length,
+                "core": True,
+            },
         )
+
+        updates = []
+        if start_time and exam_venue.start_time != start_time:
+            exam_venue.start_time = start_time
+            updates.append("start_time")
+        if exam_length is not None and exam_venue.exam_length != exam_length:
+            exam_venue.exam_length = exam_length
+            updates.append("exam_length")
+        if created and exam_venue.core is not True:
+            exam_venue.core = True
+            updates.append("core")
+        if updates and not created:
+            exam_venue.save(update_fields=updates)
 
 
 @transaction.atomic

@@ -50,13 +50,10 @@ class VenueType(models.TextChoices):
 class Exam(models.Model):
     exam_id = models.AutoField(primary_key=True)
     exam_name = models.CharField(max_length=30)
-    exam_length = models.IntegerField()
-    start_time = models.DateTimeField()
     course_code = models.CharField(max_length=30)
     exam_type = models.CharField(max_length=30)
     no_students = models.IntegerField()
     exam_school = models.CharField(max_length=30)
-    date_exam = models.DateField()
     school_contact = models.CharField(max_length=100)
 
     def __str__(self):
@@ -95,7 +92,9 @@ class ExamVenue(models.Model):
     examvenue_id = models.AutoField(primary_key=True)
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
     venue = models.ForeignKey(Venue, on_delete=models.CASCADE)
-    adj_starttime = models.DateTimeField(blank=True, null=True)
+    start_time = models.DateTimeField(blank=True, null=True)
+    exam_length = models.IntegerField(blank=True, null=True)
+    core = models.BooleanField(default=False)
     provision_capabilities = ArrayField(
         models.CharField(max_length=40, choices=ExamVenueProvisionType.choices),
         default=list,

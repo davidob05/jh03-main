@@ -14,10 +14,10 @@ from .models import (
 
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
-    list_display = ("exam_name", "course_code", "exam_school", "date_exam", "exam_type")
+    list_display = ("exam_name", "course_code", "exam_school", "exam_type")
     search_fields = ("exam_name", "course_code", "exam_school")
-    list_filter = ("exam_school", "exam_type", "date_exam")
-    ordering = ("date_exam",)
+    list_filter = ("exam_school", "exam_type")
+    ordering = ("course_code",)
 
 
 @admin.register(Venue)
@@ -35,8 +35,8 @@ class StudentAdmin(admin.ModelAdmin):
 
 @admin.register(ExamVenue)
 class ExamVenueAdmin(admin.ModelAdmin):
-    list_display = ("exam", "venue", "adj_starttime")
-    list_filter = ("venue",)
+    list_display = ("exam", "venue", "start_time", "exam_length", "adj_starttime")
+    list_filter = ("venue", "core")
     search_fields = ("exam__exam_name", "venue__venue_name")
 
 
