@@ -13,8 +13,8 @@ import { AdminVenues } from "./pages/admin/Venues";
 import { AdminInvigilators } from "./pages/admin/Invigilators";
 
 // Import invigilator pages and layout
-// import { InvigilatorLayout } from "./components/invigilator/Layout";
-// import { InvigilatorDashboard } from "./pages/invigilator/Dashboard";
+import { InvigilatorLayout } from "./components/invigilator/Layout";
+import { InvigilatorDashboard } from "./pages/invigilator/Dashboard";
 // import { InvigilatorTimetable } from "./pages/invigilator/Timetable";
 // import { InvigilatorProfile } from "./pages/invigilator/Profile";
 
