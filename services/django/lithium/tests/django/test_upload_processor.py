@@ -53,12 +53,15 @@ class UploadProcessorTests(TestCase):
         self.assertEqual(summary["updated"], 0)
         exam = Exam.objects.get(course_code="ABC123")
         self.assertEqual(exam.exam_name, "Algorithms 101"[:30])
-        self.assertEqual(exam.exam_length, 120)
         self.assertEqual(exam.no_students, 150)
         self.assertEqual(UploadLog.objects.count(), 1)
         # Venue + ExamVenue created
-        self.assertTrue(Venue.objects.filter(venue_name="Main Hall").exists())
-        self.assertTrue(ExamVenue.objects.filter(exam=exam, venue__venue_name="Main Hall").exists())
+        venue = Venue.objects.get(venue_name="Main Hall")
+        self.assertTrue(ExamVenue.objects.filter(exam=exam, venue=venue).exists())
+        exam_venue = ExamVenue.objects.get(exam=exam, venue=venue)
+        self.assertEqual(exam_venue.exam_length, 120)
+        self.assertIsNotNone(exam_venue.start_time)
+        self.assertTrue(exam_venue.core)
 
         result["rows"][0]["exam_name"] = "Updated Algorithms"
         result["rows"][0]["main_venue"] = "Main Hall; Overflow Room"
@@ -75,14 +78,22 @@ class UploadProcessorTests(TestCase):
     def test_provision_rows_create_students_and_links(self):
         exam = Exam.objects.create(
             exam_name="Algorithms",
-            exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 7, 1, 9, 0)),
             course_code="ABC123",
             exam_type="Written",
             no_students=0,
             exam_school="Engineering",
-            date_exam=timezone.now().date(),
             school_contact="",
+        )
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=Venue.objects.create(
+                venue_name="Main Hall",
+                capacity=100,
+                venuetype=VenueType.MAIN_HALL,
+            ),
+            start_time=timezone.make_aware(datetime(2025, 7, 1, 9, 0)),
+            exam_length=120,
+            core=True,
         )
 
         result = {
@@ -111,14 +122,22 @@ class UploadProcessorTests(TestCase):
     def test_provision_values_map_to_enum_slugs(self):
         exam = Exam.objects.create(
             exam_name="Discrete Maths",
-            exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 7, 2, 9, 0)),
             course_code="MATH101",
             exam_type="Written",
             no_students=0,
             exam_school="Mathematics",
-            date_exam=timezone.now().date(),
             school_contact="",
+        )
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=Venue.objects.create(
+                venue_name="Purple Cluster",
+                capacity=50,
+                venuetype=VenueType.PURPLE_CLUSTER,
+            ),
+            start_time=timezone.make_aware(datetime(2025, 7, 2, 9, 0)),
+            exam_length=120,
+            core=True,
         )
 
         result = {
@@ -247,61 +266,14 @@ class UploadProcessorTests(TestCase):
         self.assertEqual(sorted(room.availability), ["2025-07-28", "2025-07-29"])
         self.assertEqual(room.capacity, 20)
 
-    def test_provision_values_map_to_enum_slugs(self):
-        exam = Exam.objects.create(
-            exam_name="Discrete Maths",
-            exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 7, 2, 9, 0)),
-            course_code="MATH101",
-            exam_type="Written",
-            no_students=0,
-            exam_school="Mathematics",
-            date_exam=timezone.now().date(),
-            school_contact="",
-        )
-
-        result = {
-            "status": "ok",
-            "type": "Provisions",
-            "rows": [
-                {
-                    "student_id": "S54321",
-                    "student_name": "Bob Example",
-                    "exam_code": exam.course_code,
-                    "provisions": (
-                        "Extra time 15 minutes every hour; "
-                        "Assisted evacuation required; "
-                        "Use of a computer"
-                    ),
-                }
-            ],
-        }
-
-        summary = ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
-        self.assertTrue(summary["handled"])
-        self.assertEqual(summary["created"], 1)
-        provision = Provisions.objects.get(student__student_id="S54321", exam=exam)
-        self.assertEqual(
-            provision.provisions,
-            [
-                "extra_time_15_per_hour",
-                "assisted_evacuation_required",
-                "use_computer",
-            ],
-        )
-        self.assertTrue(StudentExam.objects.filter(student__student_id="S54321", exam=exam).exists())
-
     def test_provisions_assign_existing_or_new_exam_venue(self):
         exam_date = datetime(2025, 7, 10).date()
         exam = Exam.objects.create(
             exam_name="Networks",
-            exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 7, 10, 9, 0)),
             course_code="NET101",
             exam_type="Written",
             no_students=0,
             exam_school="Engineering",
-            date_exam=exam_date,
             school_contact="",
         )
 
@@ -367,13 +339,10 @@ class UploadProcessorTests(TestCase):
         exam_date = datetime(2025, 8, 1).date()
         exam = Exam.objects.create(
             exam_name="Data Science",
-            exam_length=120,
-            start_time=timezone.make_aware(datetime(2025, 8, 1, 9, 0)),
             course_code="DS101",
             exam_type="Written",
             no_students=0,
             exam_school="Computing",
-            date_exam=exam_date,
             school_contact="",
         )
 

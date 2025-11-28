@@ -1,13 +1,40 @@
 from rest_framework import serializers
-from timetabling_system.models import Exam
+from timetabling_system.models import Exam, ExamVenue
+
+
+class ExamVenueSerializer(serializers.ModelSerializer):
+    venue_name = serializers.CharField(source="venue.venue_name", read_only=True)
+
+    class Meta:
+        model = ExamVenue
+        fields = (
+            "examvenue_id",
+            "venue_name",
+            "start_time",
+            "exam_length",
+            "adj_starttime",
+            "core",
+            "provision_capabilities",
+        )
 
 
 class ExamSerializer(serializers.ModelSerializer):
     venues = serializers.SerializerMethodField()
+    exam_venues = ExamVenueSerializer(source="examvenue_set", many=True, read_only=True)
 
     class Meta:
         model = Exam
-        fields = "__all__"
+        fields = (
+            "exam_id",
+            "exam_name",
+            "course_code",
+            "exam_type",
+            "no_students",
+            "exam_school",
+            "school_contact",
+            "venues",
+            "exam_venues",
+        )
 
     def get_venues(self, obj):
         """Return venue names associated with an exam via ExamVenue."""

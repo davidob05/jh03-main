@@ -33,19 +33,30 @@ import { apiBaseUrl } from '../utils/api';
 interface ExamData {
   exam_id: number;
   exam_name: string;
-  exam_length: number;
-  start_time: string;
   course_code: string;
   no_students: number;
   exam_school: string;
   school_contact: string;
   venues: string[];
+  exam_venues: ExamVenueData[];
+}
+
+interface ExamVenueData {
+  examvenue_id: number;
+  venue_name: string;
+  start_time: string | null;
+  exam_length: number | null;
+  adj_starttime: string | null;
+  core: boolean;
+  provision_capabilities: string[];
 }
 
 
 // Helper function to format datetime for display
 function formatDateTime(dateTime: string): string {
+  if (!dateTime) return 'N/A';
   const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return 'N/A';
   return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -55,8 +66,12 @@ function formatDateTime(dateTime: string): string {
 }
 
 function calculateDuration(startTime: string, endTime: string): string {
+  if (!startTime || !endTime) return 'N/A';
   const start = new Date(startTime);
   const end = new Date(endTime);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 'N/A';
+  }
   const diffMs = end.getTime() - start.getTime();
 
   if (!Number.isFinite(diffMs) || diffMs <= 0) {
@@ -82,6 +97,11 @@ const fetchExams = async (): Promise<ExamData[]> => {
   const response = await fetch(apiBaseUrl + "/exams/");
   if (!response.ok) throw new Error('Unable to load exams');
   return response.json();
+};
+
+const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
+  const venues = exam.exam_venues || [];
+  return venues.find((venue) => venue.core) || venues[0];
 };
 
 function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
@@ -312,9 +332,19 @@ export const AdminExams: React.FC = () => {
       id: exam.exam_id,
       code: exam.course_code,
       subject: exam.exam_name,
-      venues: exam.venues.join(', '),
-      startTime: exam.start_time,
-      endTime: new Date(new Date(exam.start_time).getTime() + exam.exam_length * 60000).toISOString(),
+      venues: (exam.venues || []).join(', '),
+      startTime: getPrimaryExamVenue(exam)?.start_time || '',
+      endTime: (() => {
+        const venue = getPrimaryExamVenue(exam);
+        if (!venue?.start_time || venue.exam_length == null) {
+          return '';
+        }
+        const start = new Date(venue.start_time);
+        if (Number.isNaN(start.getTime())) {
+          return '';
+        }
+        return new Date(start.getTime() + venue.exam_length * 60000).toISOString();
+      })(),
     }));
   }, [examsData]);
 
