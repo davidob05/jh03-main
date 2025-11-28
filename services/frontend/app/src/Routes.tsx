@@ -62,6 +62,16 @@ export const Routes: React.FC = () => {
           <RouterRoute path="/exams/:examId" element={<Layout />}>
             <RouterRoute index element={<Exam />} />
           </RouterRoute>
+
+          {/* Invigilator Pages */}
+          <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
+            <RouterRoute index element={<InvigilatorDashboard />} /> 
+            {/* <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
+            <RouterRoute path="profile" element={<InvigilatorProfile />} /> */}
+          </RouterRoute>
+
+          {/* 404 fallback */}
+          <RouterRoute path="*" element={<NotFound />} />
         </RouterRoutes>
       </BrowserRouter>
     </ThemeProvider>
