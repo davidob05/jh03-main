@@ -46,19 +46,19 @@ export const Routes: React.FC = () => {
           </RouterRoute>
           <RouterRoute path="/admin/exams" element={<AdminLayout />}>
           <RouterRoute path="/admin/exams" element={<AdminLayout />}>
-            <RouterRoute index element={<AdminExams />} />
+            <RouterRoute index element={<Exams />} />
           </RouterRoute>
           <RouterRoute path="/admin/venues" element={<AdminLayout />}>
           <RouterRoute path="/admin/venues" element={<AdminLayout />}>
-            <RouterRoute index element={<AdminVenues />} />
+            <RouterRoute index element={<Venues />} />
           </RouterRoute>
           <RouterRoute path="/admin/calendar" element={<AdminLayout />}>
           <RouterRoute path="/admin/calendar" element={<AdminLayout />}>
-            <RouterRoute index element={<AdminCalendar />} />
+            <RouterRoute index element={<Calendar />} />
           </RouterRoute>
           <RouterRoute path="/admin/profile" element={<AdminLayout />}>
           <RouterRoute path="/admin/profile" element={<AdminLayout />}>
-            <RouterRoute index element={<AdminProfile />} />
+            <RouterRoute index element={<Profile />} />
           </RouterRoute>
           <RouterRoute path="/admin/invigilators" element={<AdminLayout />}>
           <RouterRoute path="/admin/invigilators" element={<AdminLayout />}>
@@ -67,6 +67,16 @@ export const Routes: React.FC = () => {
           <RouterRoute path="/exams/:examId" element={<AdminLayout />}>
             <RouterRoute index element={<AdminExams />} />
           </RouterRoute>
+
+          {/* Invigilator Pages */}
+          <RouterRoute path="/invigilator" element={<InvigilatorAdminLayout />}>
+            <RouterRoute index element={<InvigilatorDashboard />} /> 
+            {/* <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
+            <RouterRoute path="profile" element={<InvigilatorProfile />} /> */}
+          </RouterRoute>
+
+          {/* 404 fallback */}
+          <RouterRoute path="*" element={<NotFound />} />
         </RouterRoutes>
       </BrowserRouter>
     </ThemeProvider>
