@@ -13,8 +13,8 @@ import { AdminVenues } from "./pages/admin/Venues";
 import { AdminInvigilators } from "./pages/admin/Invigilators";
 
 // Import invigilator pages and layout
-// import { InvigilatorLayout } from "./components/invigilator/Layout";
-// import { InvigilatorDashboard } from "./pages/invigilator/Dashboard";
+import { InvigilatorLayout } from "./components/invigilator/Layout";
+import { InvigilatorDashboard } from "./pages/invigilator/Dashboard";
 // import { InvigilatorTimetable } from "./pages/invigilator/Timetable";
 // import { InvigilatorProfile } from "./pages/invigilator/Profile";
 
@@ -44,11 +44,11 @@ export const Routes: React.FC = () => {
           </RouterRoute>
 
           {/* Invigilator Pages */}
-          {/* <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
+          <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
             <RouterRoute index element={<InvigilatorDashboard />} /> 
-            <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
-            <RouterRoute path="profile" element={<InvigilatorProfile />} />
-          </RouterRoute> */}
+            {/* <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
+            <RouterRoute path="profile" element={<InvigilatorProfile />} /> */}
+          </RouterRoute>
 
           {/* 404 fallback */}
           <RouterRoute path="*" element={<NotFound />} />
