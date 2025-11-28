@@ -9,7 +9,7 @@ TEST_FRONTEND_CMD := npm test -- --passWithNoTests
 TEST_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py test
 
 
-.PHONY: up down logs build reset-django-db makemigrations migrate django frontend test
+.PHONY: up down logs build reset-django-db makemigrations migrate superuser django frontend test
 up:
 	@echo "Installing frontend dependencies locally so the container can run tests without hitting the network..."
 	rm -rf $(FRONTEND_DIR)/node_modules
@@ -37,6 +37,14 @@ makemigrations:
 
 migrate: makemigrations
 	$(DJANGO_MANAGE) migrate
+
+superuser:
+	@echo "Ensuring Django service is running..."
+	docker compose -f $(DEV_COMPOSE) up -d --no-build django || true
+	@echo "Waiting for the Django virtualenv to be ready..."
+	docker compose -f $(DEV_COMPOSE) exec django bash -lc 'while [ ! -x /app/.venv/bin/python ]; do sleep 2; done'
+	@echo "Launching Django createsuperuser..."
+	docker compose -f $(DEV_COMPOSE) exec django bash -lc '. /app/.venv/bin/activate && python manage.py createsuperuser'
 
 django:
 	docker compose -f $(DEV_COMPOSE) up --build --no-deps django
