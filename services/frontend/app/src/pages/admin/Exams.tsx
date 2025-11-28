@@ -34,8 +34,6 @@ import { apiBaseUrl } from '../utils/api';
 interface ExamData {
   exam_id: number;
   exam_name: string;
-  exam_length: number;
-  start_time: string;
   course_code: string;
   no_students: number;
   exam_school: string;

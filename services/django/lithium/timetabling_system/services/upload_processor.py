@@ -769,10 +769,28 @@ def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
             venue_name=name,
             defaults=defaults,
         )
-        ExamVenue.objects.get_or_create(
+        exam_venue, created = ExamVenue.objects.get_or_create(
             exam=exam,
             venue=venue,
+            defaults={
+                "start_time": start_time,
+                "exam_length": exam_length,
+                "core": True,
+            },
         )
+
+        updates = []
+        if start_time and exam_venue.start_time != start_time:
+            exam_venue.start_time = start_time
+            updates.append("start_time")
+        if exam_length is not None and exam_venue.exam_length != exam_length:
+            exam_venue.exam_length = exam_length
+            updates.append("exam_length")
+        if created and exam_venue.core is not True:
+            exam_venue.core = True
+            updates.append("core")
+        if updates and not created:
+            exam_venue.save(update_fields=updates)
 
 
 @transaction.atomic
