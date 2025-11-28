@@ -35,7 +35,7 @@ class StudentAdmin(admin.ModelAdmin):
 
 @admin.register(ExamVenue)
 class ExamVenueAdmin(admin.ModelAdmin):
-    list_display = ("exam", "venue", "start_time", "exam_length", "adj_starttime")
+    list_display = ("exam", "venue", "start_time", "exam_length")
     list_filter = ("venue", "core")
     search_fields = ("exam__exam_name", "venue__venue_name")
 

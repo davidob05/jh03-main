@@ -46,7 +46,6 @@ interface ExamVenueData {
   venue_name: string;
   start_time: string | null;
   exam_length: number | null;
-  adj_starttime: string | null;
   core: boolean;
   provision_capabilities: string[];
 }

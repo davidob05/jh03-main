@@ -40,7 +40,6 @@ SELECT isnt_null('SELECT course_code FROM exam', 'Exam.course_code is NOT NULL')
 SELECT ok((SELECT COUNT(*) FROM examvenue WHERE exam_length <0) = 0, 'Exam length should not be negative');
 SELECT ok((SELECT COUNT(*) FROM venue WHERE capacity <0) = 0, 'Venue capacity should not be negative');
 SELECT ok((SELECT COUNT(*) FROM exam WHERE no_students <0) = 0, 'Exams should not contain a negative no of students');
-SELECT ok((SELECT COUNT(*) FROM examvenue WHERE adj_starttime IS NOT NULL AND EXTRACT(HOUR FROM adj_starttime)<0) = 0, 'Adjusted exam time should not be before 9am');
 SELECT ok((SELECT COUNT(*)
                 FROM studentexam AS se1
                 JOIN examvenue ev1 ON se1.exam_id = ev1.exam_id
