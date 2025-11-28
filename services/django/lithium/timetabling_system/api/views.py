@@ -9,7 +9,7 @@ from .serializers import ExamSerializer
 
 
 class ExamViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Exam.objects.all()
+    queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
     serializer_class = ExamSerializer
 
 

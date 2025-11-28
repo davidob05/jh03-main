@@ -284,7 +284,12 @@ def _import_exam_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         else:
             summary["updated"] += 1
 
-        _create_exam_venue_links(exam_obj, raw, start_dt=payload.get("start_dt"))
+        _create_exam_venue_links(
+            exam_obj,
+            raw,
+            start_time=payload.get("start_time"),
+            exam_length=payload.get("exam_length"),
+        )
 
     return summary
 
@@ -295,19 +300,13 @@ def _build_exam_payload(row: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("Missing exam_code / course_code.")
 
     exam_date = _coerce_date(row.get("exam_date"))
-    if not exam_date:
-        raise ValueError("Missing exam_date.")
-
     start_dt = _combine_start_datetime(row.get("exam_start"), exam_date)
-    if not start_dt:
-        raise ValueError("Missing exam_start or unable to parse start time.")
-
-    start_dt = _ensure_aware(start_dt)
+    start_dt = _ensure_aware(start_dt) if start_dt else None
     exam_length = _duration_in_minutes(row.get("exam_length"), row.get("exam_end"), start_dt)
+    exam_length = exam_length if exam_length > 0 else None
 
     defaults = {
         "exam_name": _clean_string(row.get("exam_name"), max_length=30) or course_code,
-        "exam_length": exam_length,
         "exam_type": _clean_string(row.get("exam_type"), max_length=30) or "Exam",
         "no_students": _coerce_int(row.get("no_students")) or 0,
         "exam_school": _clean_string(row.get("school"), max_length=30) or "Unassigned",
@@ -317,7 +316,8 @@ def _build_exam_payload(row: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "course_code": course_code,
         "defaults": defaults,
-        "start_dt": start_dt,
+        "start_time": start_dt,
+        "exam_length": exam_length,
     }
 
 
@@ -482,20 +482,20 @@ def _core_exam_datetime(exam: Exam) -> Optional[datetime]:
     if not exam:
         return None
     core_ev = (
-        ExamVenue.objects.filter(exam=exam, is_core_exam=True)
-        .exclude(adj_starttime__isnull=True)
+        ExamVenue.objects.filter(exam=exam, core=True)
+        .exclude(start_time__isnull=True)
         .order_by("examvenue_id")
         .first()
     )
     if core_ev:
-        return core_ev.adj_starttime
+        return core_ev.start_time
     fallback = (
         ExamVenue.objects.filter(exam=exam)
-        .exclude(adj_starttime__isnull=True)
+        .exclude(start_time__isnull=True)
         .order_by("examvenue_id")
         .first()
     )
-    return fallback.adj_starttime if fallback else None
+    return fallback.start_time if fallback else None
 
 
 def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamVenue]:
@@ -539,12 +539,18 @@ def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamV
         exam=exam,
         venue=selected,
         provision_capabilities=required_caps,
-        adj_starttime=core_dt,
-        is_core_exam=False,
+        start_time=core_dt,
+        core=False,
     )
 
 
-def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any], *, start_dt: Optional[datetime] = None) -> None:
+def _create_exam_venue_links(
+    exam: Exam,
+    raw_row: Dict[str, Any],
+    *,
+    start_time: Optional[datetime] = None,
+    exam_length: Optional[int] = None,
+) -> None:
     """
     Ensure Venue rows exist for each venue name in the exam upload,
     and create ExamVenue links to the associated exam. The first venue
@@ -557,7 +563,7 @@ def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any], *, start_dt: O
     if not venue_names:
         return
 
-    start_dt = _ensure_aware(start_dt) if start_dt else None
+    start_time = _ensure_aware(start_time) if start_time else None
     core_examvenue_id = None
     seen = set()
     for name in venue_names:
@@ -579,8 +585,9 @@ def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any], *, start_dt: O
         is_core = core_examvenue_id is None
         ev_defaults = {
             "provision_capabilities": [],
-            "is_core_exam": is_core,
-            "adj_starttime": start_dt,
+            "core": is_core,
+            "start_time": start_time,
+            "exam_length": exam_length,
         }
         exam_venue, created = ExamVenue.objects.get_or_create(
             exam=exam,
@@ -589,20 +596,23 @@ def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any], *, start_dt: O
         )
 
         updated_fields = []
-        if exam_venue.is_core_exam != is_core:
-            exam_venue.is_core_exam = is_core
-            updated_fields.append("is_core_exam")
-        if start_dt and exam_venue.adj_starttime != start_dt:
-            exam_venue.adj_starttime = start_dt
-            updated_fields.append("adj_starttime")
-        if updated_fields:
+        if exam_venue.core != is_core:
+            exam_venue.core = is_core
+            updated_fields.append("core")
+        if start_time and exam_venue.start_time != start_time:
+            exam_venue.start_time = start_time
+            updated_fields.append("start_time")
+        if exam_length is not None and exam_venue.exam_length != exam_length:
+            exam_venue.exam_length = exam_length
+            updated_fields.append("exam_length")
+        if updated_fields and not created:
             exam_venue.save(update_fields=updated_fields)
 
         if is_core:
             core_examvenue_id = exam_venue.pk
 
     if core_examvenue_id:
-        ExamVenue.objects.filter(exam=exam).exclude(pk=core_examvenue_id).update(is_core_exam=False)
+        ExamVenue.objects.filter(exam=exam).exclude(pk=core_examvenue_id).update(core=False)
 
 
 @transaction.atomic
