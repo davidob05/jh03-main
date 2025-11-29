@@ -1,5 +1,3 @@
-// src/pages/admin/Calendar.tsx
-
 import React, { useState } from "react";
 import {
   Box,
@@ -337,7 +335,7 @@ export const AdminCalendar: React.FC = () => {
               </Box>
             ))}
 
-            {/* Time ruler - fixed, always on one line, perfect alignment */}
+            {/* Time ruler */}
             <Box
               sx={{
                 display: "grid",
