@@ -161,7 +161,7 @@ export const AdminInvigilators: React.FC = () => {
       setInvigilators(fake);
       setFiltered(fake);
       setLoading(false);
-    }, 800);
+    }, 500);
   }, []);
 
   // Filtering logic
@@ -275,7 +275,7 @@ export const AdminInvigilators: React.FC = () => {
         {/* Header */}
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h4">Invigilators</Typography>
-          <ToggleButtonGroup value={viewMode} exclusive onChange={handleViewChange}>
+          <ToggleButtonGroup value={viewMode} exclusive onChange={handleViewChange} color="primary">
             <ToggleButton value="grid"><GridViewIcon /></ToggleButton>
             <ToggleButton value="list"><ViewListIcon /></ToggleButton>
             <ToggleButton value="calendar"><CalendarViewMonthIcon /></ToggleButton>
