@@ -198,6 +198,10 @@ ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = False
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_EMAIL_REQUIRED = True
+
+# Allow bulk admin actions (e.g., deleting many ExamVenue rows) without hitting the
+# default per-request field cap.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = int(os.getenv("DJANGO_DATA_UPLOAD_MAX_NUMBER_FIELDS", "50000"))
 ACCOUNT_UNIQUE_EMAIL = True
 
 # CORS setup for local frontend

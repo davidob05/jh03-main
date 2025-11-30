@@ -91,7 +91,7 @@ class Student(models.Model):
 class ExamVenue(models.Model):
     examvenue_id = models.AutoField(primary_key=True)
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
-    venue = models.ForeignKey(Venue, on_delete=models.CASCADE)
+    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, null=True, blank=True)
     start_time = models.DateTimeField(blank=True, null=True)
     exam_length = models.IntegerField(blank=True, null=True)
     core = models.BooleanField(default=False)

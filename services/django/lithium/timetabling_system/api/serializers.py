@@ -18,7 +18,8 @@ class ExamVenueSerializer(serializers.ModelSerializer):
             "provision_capabilities",
         )
 
-
+    def get_venue_name(self, obj):
+        return obj.venue.venue_name if obj.venue else None
 
 
 class ExamSerializer(serializers.ModelSerializer):
