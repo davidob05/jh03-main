@@ -382,3 +382,178 @@ class UploadProcessorTests(TestCase):
         student_exam = StudentExam.objects.get(student__student_id="S80001", exam=exam)
         self.assertIsNotNone(student_exam.exam_venue)
         self.assertEqual(student_exam.exam_venue.venue, computer_room)
+
+    def test_provisions_create_placeholder_exam_venue_when_no_matching_venue(self):
+        exam = Exam.objects.create(
+            exam_name="AI Ethics",
+            course_code="AI200",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S90001",
+                    "student_name": "Unplaced Student",
+                    "exam_code": exam.course_code,
+                    "provisions": "Use of a computer",
+                },
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        student_exam = StudentExam.objects.get(student__student_id="S90001", exam=exam)
+        self.assertIsNotNone(student_exam.exam_venue)
+        self.assertIsNone(student_exam.exam_venue.venue)
+        self.assertEqual(
+            student_exam.exam_venue.provision_capabilities,
+            [ExamVenueProvisionType.USE_COMPUTER],
+        )
+
+        # Additional students with the same need should reuse the placeholder
+        result["rows"].append(
+            {
+                "student_id": "S90002",
+                "student_name": "Second Student",
+                "exam_code": exam.course_code,
+                "provisions": "Use of a computer",
+            }
+        )
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        self.assertEqual(ExamVenue.objects.filter(exam=exam).count(), 1)
+
+    def test_placeholder_upgraded_to_real_venue_when_capability_added(self):
+        exam = Exam.objects.create(
+            exam_name="ML",
+            course_code="ML300",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+
+        # First upload creates placeholder because no venues are compatible
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S91001",
+                    "student_name": "Needs Computer",
+                    "exam_code": exam.course_code,
+                    "provisions": "Use of a computer",
+                }
+            ],
+        }
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        placeholder = ExamVenue.objects.get(exam=exam)
+        self.assertIsNone(placeholder.venue)
+
+        # Add a compatible venue and re-run upload; placeholder should be updated to use it
+        computer_lab = Venue.objects.create(
+            venue_name="Comp Lab 3",
+            capacity=20,
+            venuetype=VenueType.COMPUTER_CLUSTER,
+            is_accessible=True,
+            provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
+        )
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        placeholder.refresh_from_db()
+        self.assertEqual(placeholder.venue, computer_lab)
+        self.assertIn(ExamVenueProvisionType.USE_COMPUTER, placeholder.provision_capabilities)
+
+    def test_placeholder_auto_upgrades_when_venue_capabilities_added(self):
+        exam = Exam.objects.create(
+            exam_name="Security",
+            course_code="SEC101",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+
+        # Initial upload creates placeholder with no matching venue
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S92001",
+                    "student_name": "Late Match Student",
+                    "exam_code": exam.course_code,
+                    "provisions": "Use of a computer",
+                }
+            ],
+        }
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        placeholder = ExamVenue.objects.get(exam=exam)
+        student_exam = StudentExam.objects.get(student__student_id="S92001", exam=exam)
+        self.assertIsNone(placeholder.venue)
+        self.assertEqual(student_exam.exam_venue, placeholder)
+
+        # Create a new compatible venue; signal should attach placeholder automatically
+        computer_lab = Venue.objects.create(
+            venue_name="Comp Lab Auto",
+            capacity=15,
+            venuetype=VenueType.SCHOOL_TO_SORT,
+            is_accessible=True,
+            provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
+        )
+
+        placeholder.refresh_from_db()
+        student_exam.refresh_from_db()
+        self.assertEqual(placeholder.venue, computer_lab)
+        self.assertEqual(student_exam.exam_venue, placeholder)
+
+    def test_venue_capability_overrides_venuetype_requirement(self):
+        exam = Exam.objects.create(
+            exam_name="Databases",
+            course_code="DB101",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+
+        # Venue is not a computer cluster by type, but explicitly has the capability.
+        capable_room = Venue.objects.create(
+            venue_name="Any Room",
+            capacity=50,
+            venuetype=VenueType.SCHOOL_TO_SORT,
+            is_accessible=True,
+            provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S93001",
+                    "student_name": "Comp Need",
+                    "exam_code": exam.course_code,
+                    "provisions": "Use of a computer",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        student_exam = StudentExam.objects.get(student__student_id="S93001", exam=exam)
+        self.assertIsNotNone(student_exam.exam_venue)
+        self.assertEqual(student_exam.exam_venue.venue, capable_room)
+
+    def test_use_computer_capability_sets_venue_type(self):
+        venue = Venue.objects.create(
+            venue_name="Flexible Room",
+            capacity=40,
+            venuetype=VenueType.SCHOOL_TO_SORT,
+            is_accessible=True,
+            provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
+        )
+        self.assertEqual(venue.venuetype, VenueType.COMPUTER_CLUSTER)

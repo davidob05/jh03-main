@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin
 
 
@@ -9,7 +10,45 @@ from .models import (
     StudentExam,
     Provisions,
     UploadLog,
+    ProvisionType,
+    ExamVenueProvisionType,
 )
+
+
+class VenueAdminForm(forms.ModelForm):
+    provision_capabilities = forms.MultipleChoiceField(
+        required=False,
+        choices=ExamVenueProvisionType.choices,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = Venue
+        fields = "__all__"
+
+
+class ExamVenueAdminForm(forms.ModelForm):
+    provision_capabilities = forms.MultipleChoiceField(
+        required=False,
+        choices=ExamVenueProvisionType.choices,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = ExamVenue
+        fields = "__all__"
+
+
+class ProvisionsAdminForm(forms.ModelForm):
+    provisions = forms.MultipleChoiceField(
+        required=False,
+        choices=ProvisionType.choices,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = Provisions
+        fields = "__all__"
 
 
 @admin.register(Exam)
@@ -22,6 +61,7 @@ class ExamAdmin(admin.ModelAdmin):
 
 @admin.register(Venue)
 class VenueAdmin(admin.ModelAdmin):
+    form = VenueAdminForm
     list_display = ("venue_name", "capacity", "venuetype", "is_accessible")
     search_fields = ("venue_name",)
     list_filter = ("venuetype", "is_accessible")
@@ -35,6 +75,7 @@ class StudentAdmin(admin.ModelAdmin):
 
 @admin.register(ExamVenue)
 class ExamVenueAdmin(admin.ModelAdmin):
+    form = ExamVenueAdminForm
     list_display = ("exam", "venue", "start_time", "exam_length")
     list_filter = ("venue", "core")
     search_fields = ("exam__exam_name", "venue__venue_name")
@@ -48,6 +89,7 @@ class StudentExamAdmin(admin.ModelAdmin):
 
 @admin.register(Provisions)
 class ProvisionsAdmin(admin.ModelAdmin):
+    form = ProvisionsAdminForm
     list_display = ("student", "exam", "provisions", "notes")
     search_fields = ("student__student_name", "exam__exam_name", "notes")
     list_filter = ("exam",)

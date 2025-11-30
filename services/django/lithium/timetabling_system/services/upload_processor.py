@@ -19,6 +19,7 @@ from timetabling_system.models import (
     VenueType,
     UploadLog,
 )
+from timetabling_system.services.venue_matching import venue_supports_caps
 
 
 def ingest_upload_result(
@@ -468,12 +469,14 @@ def _required_capabilities(provisions: List[str]) -> List[str]:
 def _find_matching_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamVenue]:
     if not exam:
         return None
-    exam_venues = ExamVenue.objects.filter(exam=exam)
+    exam_venues = list(
+        ExamVenue.objects.filter(exam=exam, venue__isnull=False).select_related("venue")
+    )
     if not required_caps:
-        return exam_venues.first()
-    for ev in exam_venues.select_related("venue"):
-        venue_caps = ev.venue.provision_capabilities or []
-        if all(cap in venue_caps for cap in required_caps):
+        return exam_venues[0] if exam_venues else None
+
+    for ev in exam_venues:
+        if venue_supports_caps(ev.venue, required_caps):
             return ev
     return None
 
@@ -485,41 +488,54 @@ def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamV
     exam_date = getattr(exam, "date_exam", None)
     iso_date = exam_date.isoformat() if exam_date else None
 
-    def _compatible(venue: Venue) -> bool:
-        venue_caps = venue.provision_capabilities or []
-        if required_caps and not all(cap in venue_caps for cap in required_caps):
-            return False
-        if ExamVenueProvisionType.ACCESSIBLE_HALL in required_caps and not venue.is_accessible:
-            return False
-        if ExamVenueProvisionType.USE_COMPUTER in required_caps and venue.venuetype not in (
-            VenueType.COMPUTER_CLUSTER,
-            VenueType.PURPLE_CLUSTER,
-        ):
-            return False
-        if ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN in required_caps and venue.venuetype != VenueType.SEPARATE_ROOM:
-            return False
-        if ExamVenueProvisionType.SEPARATE_ROOM_NOT_ON_OWN in required_caps and venue.venuetype != VenueType.SEPARATE_ROOM:
-            return False
-        return True
-
     candidates = []
     for venue in Venue.objects.all():
-        if not _compatible(venue):
+        if not venue_supports_caps(venue, required_caps):
             continue
         availability = venue.availability or []
         if iso_date and availability and iso_date not in availability:
             continue
         candidates.append(venue)
 
+    placeholder = (
+        ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
+    )
+
     if not candidates:
-        return None
+        if placeholder:
+            existing_caps = placeholder.provision_capabilities or []
+            if required_caps and not all(cap in existing_caps for cap in required_caps):
+                merged = sorted(set(existing_caps + required_caps))
+                placeholder.provision_capabilities = merged
+                placeholder.save(update_fields=["provision_capabilities"])
+            return placeholder
+
+        return ExamVenue.objects.create(
+            exam=exam,
+            venue=None,
+            provision_capabilities=required_caps,
+        )
 
     selected = candidates[0]
-    return ExamVenue.objects.create(
+    if placeholder:
+        placeholder.venue = selected
+        existing_caps = placeholder.provision_capabilities or []
+        if required_caps and not all(cap in existing_caps for cap in required_caps):
+            placeholder.provision_capabilities = sorted(set(existing_caps + required_caps))
+        placeholder.save(update_fields=["venue", "provision_capabilities"])
+        return placeholder
+
+    exam_venue, _ = ExamVenue.objects.get_or_create(
         exam=exam,
         venue=selected,
-        provision_capabilities=required_caps,
+        defaults={"provision_capabilities": required_caps},
     )
+    existing_caps = exam_venue.provision_capabilities or []
+    if required_caps and not all(cap in existing_caps for cap in required_caps):
+        merged = sorted(set(existing_caps + required_caps))
+        exam_venue.provision_capabilities = merged
+        exam_venue.save(update_fields=["provision_capabilities"])
+    return exam_venue
 
 
 def _create_exam_venue_links(

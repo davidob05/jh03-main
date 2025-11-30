@@ -3,7 +3,7 @@ from timetabling_system.models import Exam, ExamVenue
 
 
 class ExamVenueSerializer(serializers.ModelSerializer):
-    venue_name = serializers.CharField(source="venue.venue_name", read_only=True)
+    venue_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ExamVenue
@@ -15,6 +15,9 @@ class ExamVenueSerializer(serializers.ModelSerializer):
             "core",
             "provision_capabilities",
         )
+
+    def get_venue_name(self, obj):
+        return obj.venue.venue_name if obj.venue else None
 
 
 class ExamSerializer(serializers.ModelSerializer):
@@ -38,5 +41,6 @@ class ExamSerializer(serializers.ModelSerializer):
     def get_venues(self, obj):
         """Return venue names associated with an exam via ExamVenue."""
         exam_venues = getattr(obj, "_prefetched_objects_cache", {}).get("examvenue_set")
-        if exam_venues is None: exam_venues = obj.examvenue_set.select_related("venue").all()
-        return [ev.venue.venue_name for ev in exam_venues]
+        if exam_venues is None:
+            exam_venues = obj.examvenue_set.select_related("venue").all()
+        return [ev.venue.venue_name for ev in exam_venues if ev.venue]
