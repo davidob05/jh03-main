@@ -12,6 +12,7 @@ import {
   Grid,
   Pagination,
   Divider,
+  Tooltip,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -48,6 +49,8 @@ const departmentColors: Record<string, string> = {
   Physics: "#ff9800",
   English: "#9c27b0",
   Chemistry: "#e91e63",
+  Law: "#3f51b5",
+  Biology: "#009688",
 };
 
 const examData: ExamDetails[] = [
@@ -105,6 +108,48 @@ const examData: ExamDetails[] = [
       { venue: "Joseph Black - A101", startTime: "2025-12-11T14:00", endTime: "2025-12-11T17:00", students: 280, invigilators: 9 },
       { venue: "Joseph Black - A102", startTime: "2025-12-11T14:00", endTime: "2025-12-11T17:00", students: 140, invigilators: 5 },
       { venue: "Purple Cluster - PC3", startTime: "2025-12-11T14:00", endTime: "2025-12-11T17:00", students: 35, invigilators: 3 },
+    ],
+  },
+  {
+    id: 5,
+    code: "ENG150",
+    subject: "English Literature",
+    department: "English",
+    mainVenue: "Boyd Orr - LT2",
+    mainStartTime: "2025-12-10T14:00",
+    mainEndTime: "2025-12-10T16:00",
+    venues: [
+      { venue: "Boyd Orr - LT2", startTime: "2025-12-10T14:00", endTime: "2025-12-10T16:30", students: 320, invigilators: 10 },
+      { venue: "Hunter Hall West", startTime: "2025-12-10T14:00", endTime: "2025-12-10T16:30", students: 120, invigilators: 5 },
+      { venue: "Purple Cluster - PC1", startTime: "2025-12-10T14:00", endTime: "2025-12-10T16:30", students: 48, invigilators: 3 },
+    ],
+  },
+  {
+    id: 6,
+    code: "LAW210",
+    subject: "Contract Law",
+    department: "Law",
+    mainVenue: "Hunter Hall East",
+    mainStartTime: "2025-12-10T10:00",
+    mainEndTime: "2025-12-10T12:30",
+    venues: [
+      { venue: "Hunter Hall East", startTime: "2025-12-10T10:00", endTime: "2025-12-10T12:30", students: 320, invigilators: 10 },
+      { venue: "Hunter Hall West", startTime: "2025-12-10T10:00", endTime: "2025-12-10T12:30", students: 120, invigilators: 5 },
+      { venue: "Hunter Hall West", startTime: "2025-12-10T09:30", endTime: "2025-12-10T13:00", students: 48, invigilators: 3 },
+    ],
+  },
+  {
+    id: 7,
+    code: "BIO330",
+    subject: "Molecular Biology",
+    department: "Biology",
+    mainVenue: "Joseph Black Building - B201",
+    mainStartTime: "2025-12-11T09:00",
+    mainEndTime: "2025-12-11T11:30",
+    venues: [
+      { venue: "Joseph Black - B201", startTime: "2025-12-11T09:00", endTime: "2025-12-11T11:30", students: 200, invigilators: 7 },
+      { venue: "Joseph Black - B202", startTime: "2025-12-11T09:00", endTime: "2025-12-11T11:30", students: 100, invigilators: 4 },
+      { venue: "Separate Room SR15 (Provisions)", startTime: "2025-12-11T09:00", endTime: "2025-12-11T12:00", students: 10, invigilators: 2 },
     ],
   },
 ];
@@ -210,59 +255,75 @@ export const AdminCalendar: React.FC = () => {
           <Grid container spacing={3}>
             {paginatedExams.map((exam) => (
               <Grid item xs={12} sm={6} lg={4} key={exam.id}>
-                <Paper
-                  elevation={3}
-                  onClick={() => handleExamClick(exam)}
-                  sx={{
-                    height: 200,
-                    width: 200,
-                    p: 3,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    "&:hover": { transform: "translateY(-6px)", boxShadow: 8 },
-                  }}
-                >
-                  <Box>
-                    <Stack direction="row" justifyContent="space-between" alignItems="start" mb={2}>
-                      <Box>
-                        <Typography variant="h6" fontWeight={700}>
-                          {exam.code}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {exam.subject}
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={exam.department}
-                        size="small"
-                        sx={{
-                          bgcolor: departmentColors[exam.department] || "#9e9e9e",
-                          color: "white",
-                          fontWeight: 600,
-                        }}
-                      />
-                    </Stack>
-
-                    <Typography variant="body2" sx={{ mb: 1 }}>
-                      <strong>Main:</strong> {exam.mainVenue}
-                    </Typography>
-                    <Typography variant="body2" sx={{ mb: 2 }}>
-                      {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
+                <Tooltip
+                  title={
+                    <>
+                      <strong>{exam.code} — {exam.subject}</strong><br/>
+                      {exam.mainVenue}<br/>
+                      {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – 
                       {new Date(exam.mainEndTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </Typography>
-                  </Box>
+                      <br/>
+                      {exam.venues.reduce((a, v) => a + v.students, 0)} students · 
+                      {exam.venues.length} venues
+                    </>
+                  }
+                  arrow
+                  placement="top"
+                >
+                  <Paper
+                    elevation={3}
+                    onClick={() => handleExamClick(exam)}
+                    sx={{
+                      height: 200,
+                      width: 200,
+                      p: 3,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      "&:hover": { transform: "translateY(-6px)", boxShadow: 8 },
+                    }}
+                  >
+                    <Box>
+                      <Stack direction="row" justifyContent="space-between" alignItems="start" mb={2}>
+                        <Box>
+                          <Typography variant="h6" fontWeight={700}>
+                            {exam.code}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {exam.subject}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={exam.department}
+                          size="small"
+                          sx={{
+                            bgcolor: departmentColors[exam.department] || "#9e9e9e",
+                            color: "white",
+                            fontWeight: 600,
+                          }}
+                        />
+                      </Stack>
 
-                  <Box>
-                    <Divider sx={{ mb: 1.5 }} />
-                    <Typography variant="body2" color="primary" fontWeight={600}>
-                      {exam.venues.length} venue{exam.venues.length > 1 ? "s" : ""} ·{" "}
-                      {exam.venues.reduce((a, v) => a + v.students, 0)} students
-                    </Typography>
-                  </Box>
-                </Paper>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Main:</strong> {exam.mainVenue}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 2 }}>
+                        {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
+                        {new Date(exam.mainEndTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Divider sx={{ mb: 1.5 }} />
+                      <Typography variant="body2" color="primary" fontWeight={600}>
+                        {exam.venues.length} venue{exam.venues.length > 1 ? "s" : ""} ·{" "}
+                        {exam.venues.reduce((a, v) => a + v.students, 0)} students
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Tooltip>
               </Grid>
             ))}
           </Grid>
@@ -277,101 +338,161 @@ export const AdminCalendar: React.FC = () => {
 
       {/* Timeline View */}
       {viewMode === "timeline" && (
-        <Box sx={{ overflowX: "auto", py: 2 }}>
-          <Stack direction="column" spacing={4} minWidth={1200}>
-            {Object.entries(examsByMainVenue).map(([mainVenue, exams]) => (
+      <Box sx={{ overflowX: "auto", py: 2 }}>
+        <Stack direction="column" spacing={5} minWidth={1200}>
+          {Object.entries(examsByMainVenue).map(([mainVenue, exams]) => {
+            // Sort exams by start time
+            const sortedExams = [...exams].sort(
+              (a, b) => new Date(a.mainStartTime).getTime() - new Date(b.mainStartTime).getTime()
+            );
+
+            // Build lanes to prevent overlap
+            const lanes: ExamDetails[][] = [];
+            sortedExams.forEach((exam) => {
+              let placed = false;
+              for (const lane of lanes) {
+                const lastInLane = lane[lane.length - 1];
+                if (new Date(lastInLane.mainEndTime) <= new Date(exam.mainStartTime)) {
+                  lane.push(exam);
+                  placed = true;
+                  break;
+                }
+              }
+              if (!placed) {
+                lanes.push([exam]);
+              }
+            });
+
+            const rowHeight = 40; // height per exam bar + spacing
+            const totalHeight = lanes.length * rowHeight + 20;
+
+            return (
               <Box key={mainVenue}>
                 <Typography variant="h6" fontWeight={700} mb={2} color="primary">
                   {mainVenue}
                 </Typography>
 
-                <Box sx={{ position: "relative", height: 60, bgcolor: "#f8f9fa", borderRadius: 1, mb: 3 }}>
-                  {exams.map((exam) => {
-                    const dayStart = 8 * 60;
-                    const dayEnd = 20 * 60;
-                    const startMins = new Date(exam.mainStartTime).getHours() * 60 + new Date(exam.mainStartTime).getMinutes();
-                    const endMins = new Date(exam.mainEndTime).getHours() * 60 + new Date(exam.mainEndTime).getMinutes();
-                    const left = ((startMins - dayStart) / (dayEnd - dayStart)) * 100;
-                    const width = ((endMins - startMins) / (dayEnd - dayStart)) * 100;
+                <Box
+                  sx={{
+                    position: "relative",
+                    height: totalHeight,
+                    bgcolor: "#f8f9fa",
+                    borderRadius: 2,
+                    mb: 4,
+                    border: "1px solid #e0e0e0",
+                  }}
+                >
+                  {lanes.flatMap((lane, laneIndex) =>
+                    lane.map((exam) => {
+                      const dayStart = 8 * 60;
+                      const dayEnd = 20 * 60;
+                      const startMins =
+                        new Date(exam.mainStartTime).getHours() * 60 +
+                        new Date(exam.mainStartTime).getMinutes();
+                      const endMins =
+                        new Date(exam.mainEndTime).getHours() * 60 +
+                        new Date(exam.mainEndTime).getMinutes();
+                      const left = ((startMins - dayStart) / (dayEnd - dayStart)) * 100;
+                      const width = ((endMins - startMins) / (dayEnd - dayStart)) * 100;
 
-                    const otherCount = exam.venues.length - 1;
-                    const venueLabel = otherCount > 0 ? `(${otherCount} other venue${otherCount > 1 ? "s" : ""})` : "";
+                      const otherCount = exam.venues.length - 1;
+                      const venueLabel =
+                        otherCount > 0
+                          ? `(${otherCount} other venue${otherCount > 1 ? "s" : ""})`
+                          : "";
 
-                    return (
-                      <Box
-                        key={exam.id}
-                        onClick={() => handleExamClick(exam)}
-                        sx={{
-                          position: "absolute",
-                          left: `${left}%`,
-                          width: `${width}%`,
-                          top: 14,
-                          height: 32,
-                          bgcolor: departmentColors[exam.department] || "#9e9e9e",
-                          color: "white",
-                          borderRadius: 1,
-                          px: 1.5,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer",
-                          fontWeight: 600,
-                          fontSize: "0.8125rem",
-                          fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif !important",
-                          letterSpacing: "0.01em",
-                          boxShadow: 3,
-                          transition: "all 0.2s",
-                          "&:hover": { transform: "scale(1.06)", boxShadow: 6 },
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {exam.code} {venueLabel}
-                      </Box>
-                    );
-                  })}
+                      return (
+                        <Tooltip
+                          title={
+                            <>
+                              <strong>{exam.code} — {exam.subject}</strong><br/>
+                              Main venue: {exam.mainVenue}<br/>
+                              {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – 
+                              {new Date(exam.mainEndTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              <br/>
+                              {exam.venues.length} venues · 
+                              {exam.venues.reduce((a, v) => a + v.students, 0)} students
+                            </>
+                          }
+                          arrow
+                          placement="top"
+                        >
+                          <Box
+                            key={exam.id}
+                            onClick={() => handleExamClick(exam)}
+                            sx={{
+                              position: "absolute",
+                              left: `${left}%`,
+                              width: `${width}%`,
+                              top: 10 + laneIndex * rowHeight,
+                              height: 34,
+                              bgcolor: departmentColors[exam.department] || "#9e9e9e",
+                              color: "white",
+                              borderRadius: 1,
+                              px: 1.5,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              fontWeight: 600,
+                              fontSize: "0.8125rem",
+                              fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif",
+                              letterSpacing: "0.01em",
+                              boxShadow: 3,
+                              transition: "all 0.2s",
+                              "&:hover": { transform: "scale(1.06)", boxShadow: 6, zIndex: 10 },
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {exam.code} {venueLabel}
+                          </Box>
+                        </Tooltip>
+                      );
+                    })
+                  )}
                 </Box>
               </Box>
-            ))}
+            );
+          })}
 
-            {/* Time ruler */}
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(25, 1fr)",
-                gap: 0,
-                mt: 4,
-                width: "100%",
-                overflow: "hidden",
-                pb: 1,
-              }}
-            >
-              {Array.from({ length: 25 }, (_, i) => {
-                const hour = 8 + Math.floor(i / 2);
-                const minute = i % 2 === 0 ? "00" : "30";
-                const timeLabel = i % 2 === 0 ? `${hour}:${minute}` : `${hour}:${minute}`;
+          {/* Perfect half-hour time ruler - always on one line */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(25, 1fr)",
+              gap: 0,
+              mt: 4,
+              width: "100%",
+              pb: 2,
+            }}
+          >
+            {Array.from({ length: 25 }, (_, i) => {
+              const hour = 8 + Math.floor(i / 2);
+              const minute = i % 2 === 0 ? "00" : "30";
+              const isHour = i % 2 === 0;
 
-                return (
-                  <Typography
-                    key={i}
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{
-                      textAlign: "left",
-                      fontSize: "0.75rem",
-                      fontWeight: 500,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {timeLabel}
-                  </Typography>
-                );
-              })}
-            </Box>
-          </Stack>
-        </Box>
-      )}
+              return (
+                <Typography
+                  key={i}
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    textAlign: "center",
+                    fontSize: "0.75rem",
+                    fontWeight: isHour ? 600 : 400,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {isHour ? `${hour}:${minute}` : `${hour}:${minute}`}
+                </Typography>
+              );
+            })}
+          </Box>
+        </Stack>
+      </Box>
+    )}
 
       <ExamDetailsPopup
         open={popupOpen}
