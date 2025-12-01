@@ -52,6 +52,21 @@ import {
 import {
 } from '@mui/material';
 import {
+  ViewList,
+  GridView,
+  CalendarViewMonth,
+  Pending,
+  Download,
+  Notifications,
+  PersonAddAlt1,
+  PersonRemove,
+  Search,
+  ArrowUpward,
+  ArrowDownward,
+  ArrowBack,
+  ArrowForward,
+} from '@mui/icons-material';
+import {
   StaticDatePicker,
 } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -311,7 +326,7 @@ export const AdminInvigilators: React.FC = () => {
                 py: 0.5,
               }}
             >
-            <SearchIcon sx={{ color: "action.active", mr: 1 }} />
+            <Search sx={{ color: "action.active", mr: 1 }} />
             <InputBase
               placeholder="Search invigilators..."
               value={searchQuery}
@@ -326,7 +341,7 @@ export const AdminInvigilators: React.FC = () => {
             size="medium"
             endIcon={
               sortField === 'firstName' ? (
-                sortOrder === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />
+                sortOrder === 'asc' ? <ArrowUpward /> : <ArrowDownward />
               ) : null
             }
             onClick={() => {
@@ -353,7 +368,7 @@ export const AdminInvigilators: React.FC = () => {
             size="medium"
             endIcon={
               sortField === 'lastName' ? (
-                sortOrder === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />
+                sortOrder === 'asc' ? <ArrowUpward /> : <ArrowDownward />
               ) : null
             }
             onClick={() => {
@@ -496,7 +511,7 @@ export const AdminInvigilators: React.FC = () => {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
               <Button
                 variant="contained"
-                startIcon={<ArrowBackIcon />}
+                startIcon={<ArrowBack />}
                 onClick={() => setCurrentMonthIndex(prev => prev - 1)}
                 size="large"
               >
@@ -504,7 +519,7 @@ export const AdminInvigilators: React.FC = () => {
               </Button>
               <Button
                 variant="contained"
-                endIcon={<ArrowForwardIcon />}
+                endIcon={<ArrowForward />}
                 onClick={() => setCurrentMonthIndex(prev => prev + 1)}
                 size="large"
               >
@@ -534,7 +549,7 @@ export const AdminInvigilators: React.FC = () => {
                       <Box>
                         <MUILink
                           component={RouterLink}
-                          to={`/admin/invigilator/${i.id}`}
+                          to={`/admin/invigilators/${i.id}`}
                           color="primary"
                           underline="none"
                           sx={{ fontWeight: 600, mr: 1 }}
@@ -593,7 +608,7 @@ export const AdminInvigilators: React.FC = () => {
                         <>
                           <MUILink
                             component={RouterLink}
-                            to={`/admin/invigilator/${i.id}`}
+                            to={`/admin/invigilators/${i.id}`}
                             color="primary"
                             underline="none"
                             sx={{
@@ -733,7 +748,7 @@ export const AdminInvigilators: React.FC = () => {
         {/* Pagination & Bulk Actions */}
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3} mt={4}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemoveIcon />) : (<PersonAddIconAlt1 />)} onClick={toggleSelectAll}>
+            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemove />) : (<PersonAddAlt1 />)} onClick={toggleSelectAll}>
               {selected.length === filtered.length
                 ? "Deselect all invigilators"
                 : `Select all ${filtered.length} invigilators`}
@@ -750,12 +765,12 @@ export const AdminInvigilators: React.FC = () => {
                 </MenuItem>
                 <MenuItem value="export">
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <DownloadIcon fontSize="small" /> Export timetable
+                    <Download fontSize="small" /> Export timetable
                   </Stack>
                 </MenuItem>
                 <MenuItem value="notify">
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <NotificationsIcon fontSize="small" /> Send notification
+                    <Notifications fontSize="small" /> Send notification
                   </Stack>
                 </MenuItem>
               </Select>
@@ -772,11 +787,11 @@ export const AdminInvigilators: React.FC = () => {
               }
             >
               {bulkAction === "export" ? (
-                <DownloadIcon color="action" />
+                <Download color="action" />
               ) : bulkAction === "notify" ? (
-                <NotificationsIcon color="action" />
+                <Notifications color="action" />
               ) : (
-                <PendingIcon color="disabled" /> // neutral icon before selection
+                <Pending color="disabled" /> // neutral icon before selection
               )}
             </Tooltip>
           </Stack>
