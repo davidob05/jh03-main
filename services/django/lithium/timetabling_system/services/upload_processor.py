@@ -19,7 +19,11 @@ from timetabling_system.models import (
     VenueType,
     UploadLog,
 )
-from timetabling_system.services.venue_matching import venue_supports_caps
+from timetabling_system.services.venue_matching import (
+    venue_has_timing_conflict,
+    venue_is_available,
+    venue_supports_caps,
+)
 
 
 def ingest_upload_result(
@@ -263,6 +267,75 @@ def _duration_in_minutes(length_value: Any, end_value: Any, start_dt: Optional[d
     return 0
 
 
+def _core_exam_timing(exam: Exam) -> tuple[Optional[datetime], Optional[int]]:
+    """
+    Return the core exam start_time and length from the primary ExamVenue rows.
+    """
+    if not exam:
+        return None, None
+    core_ev = exam.examvenue_set.filter(core=True).order_by("pk").first()
+    if core_ev:
+        return core_ev.start_time, core_ev.exam_length
+    fallback = exam.examvenue_set.order_by("pk").first()
+    if fallback:
+        return fallback.start_time, fallback.exam_length
+    return None, None
+
+
+def _extra_time_minutes(provisions: List[str], base_length: Optional[int]) -> int:
+    """
+    Derive extra time in minutes from provision codes.
+    We take the maximum applicable extra-time rule.
+    """
+    base = base_length or 0
+    extras: List[int] = []
+    for prov in provisions or []:
+        if prov == ProvisionType.EXTRA_TIME_100:
+            extras.append(base)
+        elif prov == ProvisionType.EXTRA_TIME_30_PER_HOUR:
+            extras.append(math.ceil(base / 60 * 30))
+        elif prov == ProvisionType.EXTRA_TIME_20_PER_HOUR:
+            extras.append(math.ceil(base / 60 * 20))
+        elif prov == ProvisionType.EXTRA_TIME_15_PER_HOUR:
+            extras.append(math.ceil(base / 60 * 15))
+        elif prov == ProvisionType.EXTRA_TIME:
+            extras.append(math.ceil(base * 0.25))
+    return max(extras) if extras else 0
+
+
+def _apply_extra_time(
+    base_start: Optional[datetime],
+    base_length: Optional[int],
+    extra_minutes: int,
+) -> tuple[Optional[datetime], Optional[int]]:
+    """
+    Shift the start earlier where possible (not before 09:00),
+    with any remaining extra added to the end (exam_length).
+    """
+    if extra_minutes <= 0:
+        return base_start, base_length
+
+    new_start = base_start
+    remaining = extra_minutes
+
+    if base_start:
+        earliest = base_start.replace(hour=9, minute=0, second=0, microsecond=0)
+        minutes_available = max(
+            0, int((base_start - earliest).total_seconds() // 60)
+        )
+        shift = min(remaining, minutes_available)
+        if shift:
+            new_start = base_start - timedelta(minutes=shift)
+            remaining -= shift
+
+    if base_length is None:
+        new_length = None if remaining == 0 else remaining
+    else:
+        new_length = base_length + remaining
+
+    return new_start, new_length
+
+
 @transaction.atomic
 def _import_exam_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     rows_list = list(rows or [])
@@ -416,9 +489,39 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
 
         student_exam, _ = StudentExam.objects.get_or_create(student=student, exam=exam)
         required_caps = _required_capabilities(provisions)
-        exam_venue = _find_matching_exam_venue(exam, required_caps)
+        base_start, base_length = _core_exam_timing(exam)
+        extra_minutes = _extra_time_minutes(provisions, base_length)
+        target_start, target_length = _apply_extra_time(base_start, base_length, extra_minutes)
+
+        exam_venue = _find_matching_exam_venue(
+            exam,
+            required_caps,
+            target_start,
+            target_length,
+        )
         if not exam_venue:
-            exam_venue = _allocate_exam_venue(exam, required_caps)
+            exam_venue = _allocate_exam_venue(
+                exam,
+                required_caps,
+                target_start,
+                target_length,
+            )
+
+        if exam_venue:
+            updates = []
+            if target_start and exam_venue.start_time != target_start:
+                exam_venue.start_time = target_start
+                updates.append("start_time")
+            if target_length is not None and exam_venue.exam_length != target_length:
+                exam_venue.exam_length = target_length
+                updates.append("exam_length")
+            existing_caps = exam_venue.provision_capabilities or []
+            if required_caps and not all(cap in existing_caps for cap in required_caps):
+                exam_venue.provision_capabilities = sorted(set(existing_caps + required_caps))
+                updates.append("provision_capabilities")
+            if updates:
+                exam_venue.save(update_fields=updates)
+
         if exam_venue and student_exam.exam_venue_id != exam_venue.pk:
             student_exam.exam_venue = exam_venue
             student_exam.save(update_fields=["exam_venue"])
@@ -466,76 +569,136 @@ def _required_capabilities(provisions: List[str]) -> List[str]:
     return caps
 
 
-def _find_matching_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamVenue]:
+def _find_matching_exam_venue(
+    exam: Exam,
+    required_caps: List[str],
+    target_start: Optional[datetime],
+    target_length: Optional[int],
+) -> Optional[ExamVenue]:
     if not exam:
         return None
-    exam_venues = list(
-        ExamVenue.objects.filter(exam=exam, venue__isnull=False).select_related("venue")
-    )
-    if not required_caps:
-        return exam_venues[0] if exam_venues else None
 
-    for ev in exam_venues:
-        if venue_supports_caps(ev.venue, required_caps):
-            return ev
+    for ev in ExamVenue.objects.filter(exam=exam).select_related("venue"):
+        if ev.venue:
+            if required_caps and not venue_supports_caps(ev.venue, required_caps):
+                continue
+        else:
+            placeholder_caps = ev.provision_capabilities or []
+            if required_caps and not all(cap in placeholder_caps for cap in required_caps):
+                continue
+
+        if target_start and ev.start_time != target_start:
+            continue
+        if target_length is not None and ev.exam_length != target_length:
+            continue
+        return ev
     return None
 
 
-def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamVenue]:
-    if not exam or not required_caps:
+def _allocate_exam_venue(
+    exam: Exam,
+    required_caps: List[str],
+    target_start: Optional[datetime],
+    target_length: Optional[int],
+) -> Optional[ExamVenue]:
+    if not exam:
         return None
 
     exam_date = getattr(exam, "date_exam", None)
     iso_date = exam_date.isoformat() if exam_date else None
 
-    candidates = []
-    for venue in Venue.objects.all():
-        if not venue_supports_caps(venue, required_caps):
+    def _merge_caps(ev: ExamVenue) -> List[str]:
+        existing = ev.provision_capabilities or []
+        merged = sorted(set(existing + (required_caps or [])))
+        return merged
+
+    candidates: List[Venue] = []
+
+    # Prefer the venue(s) already linked to the core exam venue rows.
+    core_venues = [
+        ev.venue for ev in exam.examvenue_set.select_related("venue").filter(core=True, venue__isnull=False)
+    ]
+    seen_names = set()
+    for venue in core_venues + list(Venue.objects.all()):
+        if not venue or venue.venue_name in seen_names:
+            continue
+        seen_names.add(venue.venue_name)
+        if required_caps and not venue_supports_caps(venue, required_caps):
+            continue
+        if not venue_is_available(venue, target_start):
+            continue
+        if venue_has_timing_conflict(venue, target_start, target_length, ignore_exam_id=exam.exam_id):
             continue
         availability = venue.availability or []
         if iso_date and availability and iso_date not in availability:
             continue
         candidates.append(venue)
 
-    placeholder = (
-        ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
-    )
+    placeholder = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
 
     if not candidates:
         if placeholder:
-            existing_caps = placeholder.provision_capabilities or []
-            if required_caps and not all(cap in existing_caps for cap in required_caps):
-                merged = sorted(set(existing_caps + required_caps))
+            updates = []
+            merged = _merge_caps(placeholder)
+            if merged != (placeholder.provision_capabilities or []):
                 placeholder.provision_capabilities = merged
-                placeholder.save(update_fields=["provision_capabilities"])
+                updates.append("provision_capabilities")
+            if target_start and placeholder.start_time != target_start:
+                placeholder.start_time = target_start
+                updates.append("start_time")
+            if target_length is not None and placeholder.exam_length != target_length:
+                placeholder.exam_length = target_length
+                updates.append("exam_length")
+            if updates:
+                placeholder.save(update_fields=updates)
             return placeholder
 
         return ExamVenue.objects.create(
             exam=exam,
             venue=None,
+            start_time=target_start,
+            exam_length=target_length,
             provision_capabilities=required_caps,
         )
 
     selected = candidates[0]
     if placeholder:
+        updates = ["venue"]
         placeholder.venue = selected
-        existing_caps = placeholder.provision_capabilities or []
-        if required_caps and not all(cap in existing_caps for cap in required_caps):
-            placeholder.provision_capabilities = sorted(set(existing_caps + required_caps))
-        placeholder.save(update_fields=["venue", "provision_capabilities"])
+        merged = _merge_caps(placeholder)
+        if merged != (placeholder.provision_capabilities or []):
+            placeholder.provision_capabilities = merged
+            updates.append("provision_capabilities")
+        if target_start and placeholder.start_time != target_start:
+            placeholder.start_time = target_start
+            updates.append("start_time")
+        if target_length is not None and placeholder.exam_length != target_length:
+            placeholder.exam_length = target_length
+            updates.append("exam_length")
+        placeholder.save(update_fields=updates)
         return placeholder
 
-    exam_venue, _ = ExamVenue.objects.get_or_create(
+    existing = ExamVenue.objects.filter(
         exam=exam,
         venue=selected,
-        defaults={"provision_capabilities": required_caps},
+        start_time=target_start,
+        exam_length=target_length,
+    ).first()
+
+    if existing:
+        merged = _merge_caps(existing)
+        if merged != (existing.provision_capabilities or []):
+            existing.provision_capabilities = merged
+            existing.save(update_fields=["provision_capabilities"])
+        return existing
+
+    return ExamVenue.objects.create(
+        exam=exam,
+        venue=selected,
+        start_time=target_start,
+        exam_length=target_length,
+        provision_capabilities=required_caps,
     )
-    existing_caps = exam_venue.provision_capabilities or []
-    if required_caps and not all(cap in existing_caps for cap in required_caps):
-        merged = sorted(set(existing_caps + required_caps))
-        exam_venue.provision_capabilities = merged
-        exam_venue.save(update_fields=["provision_capabilities"])
-    return exam_venue
 
 
 def _create_exam_venue_links(
@@ -572,6 +735,49 @@ def _create_exam_venue_links(
             venue_name=name,
             defaults=defaults,
         )
+
+        if not venue_is_available(venue, start_time):
+            # If the venue is not available on this date, fall back to a placeholder.
+            exam_venue = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
+            if not exam_venue:
+                ExamVenue.objects.create(
+                    exam=exam,
+                    venue=None,
+                    start_time=start_time,
+                    exam_length=exam_length,
+                    core=True,
+                )
+            continue
+
+        conflict = venue_has_timing_conflict(
+            venue, start_time, exam_length, ignore_exam_id=exam.exam_id
+        )
+
+        if conflict:
+            exam_venue = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
+            if not exam_venue:
+                exam_venue = ExamVenue.objects.create(
+                    exam=exam,
+                    venue=None,
+                    start_time=start_time,
+                    exam_length=exam_length,
+                    core=True,
+                )
+            else:
+                updates = []
+                if start_time and exam_venue.start_time != start_time:
+                    exam_venue.start_time = start_time
+                    updates.append("start_time")
+                if exam_length is not None and exam_venue.exam_length != exam_length:
+                    exam_venue.exam_length = exam_length
+                    updates.append("exam_length")
+                if exam_venue.core is not True:
+                    exam_venue.core = True
+                    updates.append("core")
+                if updates:
+                    exam_venue.save(update_fields=updates)
+            continue
+
         exam_venue, created = ExamVenue.objects.get_or_create(
             exam=exam,
             venue=venue,

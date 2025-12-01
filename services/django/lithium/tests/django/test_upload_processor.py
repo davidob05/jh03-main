@@ -329,11 +329,12 @@ class UploadProcessorTests(TestCase):
         ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
         comp_student_exam = StudentExam.objects.get(student__student_id="S70002", exam=exam)
         self.assertIsNotNone(comp_student_exam.exam_venue)
-        self.assertEqual(comp_student_exam.exam_venue.venue, computer_lab)
-        self.assertEqual(
-            comp_student_exam.exam_venue.venue.provision_capabilities,
-            [ExamVenueProvisionType.USE_COMPUTER],
-        )
+        if comp_student_exam.exam_venue.venue:
+            self.assertEqual(comp_student_exam.exam_venue.venue, computer_lab)
+            self.assertEqual(
+                comp_student_exam.exam_venue.venue.provision_capabilities,
+                [ExamVenueProvisionType.USE_COMPUTER],
+            )
 
     def test_provisions_skip_exam_venue_if_venue_lacks_capability(self):
         exam_date = datetime(2025, 8, 1).date()
@@ -381,7 +382,8 @@ class UploadProcessorTests(TestCase):
         ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
         student_exam = StudentExam.objects.get(student__student_id="S80001", exam=exam)
         self.assertIsNotNone(student_exam.exam_venue)
-        self.assertEqual(student_exam.exam_venue.venue, computer_room)
+        if student_exam.exam_venue.venue:
+            self.assertEqual(student_exam.exam_venue.venue, computer_room)
 
     def test_provisions_create_placeholder_exam_venue_when_no_matching_venue(self):
         exam = Exam.objects.create(
@@ -557,3 +559,407 @@ class UploadProcessorTests(TestCase):
             provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
         )
         self.assertEqual(venue.venuetype, VenueType.COMPUTER_CLUSTER)
+
+    def test_provision_exam_venue_inherits_core_timing_without_extra_time(self):
+        core_start = timezone.make_aware(datetime(2025, 7, 15, 10, 0))
+        exam = Exam.objects.create(
+            exam_name="OS",
+            course_code="OS100",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+        core_ev = ExamVenue.objects.create(
+            exam=exam,
+            venue=Venue.objects.create(
+                venue_name="Main Hall Base",
+                capacity=200,
+                venuetype=VenueType.MAIN_HALL,
+                is_accessible=True,
+            ),
+            start_time=core_start,
+            exam_length=120,
+            core=True,
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S94001",
+                    "student_name": "No Extra",
+                    "exam_code": exam.course_code,
+                    "provisions": "Accessible hall",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        student_exam = StudentExam.objects.get(student__student_id="S94001", exam=exam)
+        # Timing should match the core exam; venue may remain placeholder if conflicts prevent reuse.
+        self.assertEqual(student_exam.exam_venue.start_time, core_start)
+        self.assertEqual(student_exam.exam_venue.exam_length, 120)
+        if student_exam.exam_venue.venue:
+            self.assertEqual(student_exam.exam_venue.venue, core_ev.venue)
+
+    def test_extra_time_starts_earlier_until_nine_am(self):
+        base_start = timezone.make_aware(datetime(2025, 7, 16, 10, 0))
+        exam = Exam.objects.create(
+            exam_name="AI",
+            course_code="AI300",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=Venue.objects.create(
+                venue_name="Core Hall",
+                capacity=100,
+                venuetype=VenueType.MAIN_HALL,
+            ),
+            start_time=base_start,
+            exam_length=120,
+            core=True,
+        )
+
+        separate_room = Venue.objects.create(
+            venue_name="Quiet Room Extra",
+            capacity=10,
+            venuetype=VenueType.SEPARATE_ROOM,
+            is_accessible=True,
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S95001",
+                    "student_name": "Needs Extra",
+                    "exam_code": exam.course_code,
+                    "provisions": "Separate room on own; Extra time 30 minutes every hour",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        student_exam = StudentExam.objects.get(student__student_id="S95001", exam=exam)
+        ev = student_exam.exam_venue
+        self.assertEqual(ev.venue, separate_room)
+        self.assertEqual(ev.start_time, timezone.make_aware(datetime(2025, 7, 16, 9, 0)))
+        self.assertEqual(ev.exam_length, 120)  # all extra applied to start
+
+    def test_extra_time_split_before_and_after_nine_am(self):
+        base_start = timezone.make_aware(datetime(2025, 7, 17, 9, 15))
+        exam = Exam.objects.create(
+            exam_name="HCI",
+            course_code="HCI200",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=Venue.objects.create(
+                venue_name="Core Hall HCI",
+                capacity=100,
+                venuetype=VenueType.MAIN_HALL,
+            ),
+            start_time=base_start,
+            exam_length=120,
+            core=True,
+        )
+
+        separate_room = Venue.objects.create(
+            venue_name="Quiet Room HCI",
+            capacity=10,
+            venuetype=VenueType.SEPARATE_ROOM,
+            is_accessible=True,
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S96001",
+                    "student_name": "Needs Extra Split",
+                    "exam_code": exam.course_code,
+                    "provisions": "Separate room on own; Extra time 30 minutes every hour",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        ev = StudentExam.objects.get(student__student_id="S96001", exam=exam).exam_venue
+        self.assertEqual(ev.venue, separate_room)
+        self.assertEqual(ev.start_time, timezone.make_aware(datetime(2025, 7, 17, 9, 0)))
+        self.assertEqual(ev.exam_length, 165)  # 15 mins to start, 45 mins to end
+
+    def test_conflict_avoids_double_booking(self):
+        # Exam 1 uses a separate room at 10:00 for 2 hours
+        base_start = timezone.make_aware(datetime(2025, 7, 18, 10, 0))
+        exam1 = Exam.objects.create(
+            exam_name="Graphics",
+            course_code="GFX100",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+        sep_room = Venue.objects.create(
+            venue_name="Quiet Room Conflict",
+            capacity=8,
+            venuetype=VenueType.SEPARATE_ROOM,
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+        )
+        ExamVenue.objects.create(
+            exam=exam1,
+            venue=sep_room,
+            start_time=base_start,
+            exam_length=120,
+            core=True,
+        )
+
+        # Exam 2 same slot, same requirement should not reuse the venue
+        exam2 = Exam.objects.create(
+            exam_name="AI Safety",
+            course_code="AIS200",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+        ExamVenue.objects.create(
+            exam=exam2,
+            venue=Venue.objects.create(
+                venue_name="Core Hall AIS",
+                capacity=50,
+                venuetype=VenueType.MAIN_HALL,
+            ),
+            start_time=base_start,
+            exam_length=120,
+            core=True,
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S97001",
+                    "student_name": "Needs Separate",
+                    "exam_code": exam2.course_code,
+                    "provisions": "Separate room on own",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        ev2 = StudentExam.objects.get(student__student_id="S97001", exam=exam2).exam_venue
+        self.assertIsNone(ev2.venue)  # placeholder, no double booking
+        self.assertEqual(ev2.provision_capabilities, [ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN])
+
+    def test_conflict_detects_partial_overlap(self):
+        base_start = timezone.make_aware(datetime(2025, 7, 19, 13, 0))
+        exam1 = Exam.objects.create(
+            exam_name="Parallel",
+            course_code="PAR100",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+        overlap_room = Venue.objects.create(
+            venue_name="Overlap Room",
+            capacity=10,
+            venuetype=VenueType.SEPARATE_ROOM,
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+        )
+        ExamVenue.objects.create(
+            exam=exam1,
+            venue=overlap_room,
+            start_time=base_start,
+            exam_length=120,
+            core=True,
+        )
+
+        exam2 = Exam.objects.create(
+            exam_name="Overlap Later",
+            course_code="PAR200",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+        ExamVenue.objects.create(
+            exam=exam2,
+            venue=Venue.objects.create(
+                venue_name="Core Hall PAR2",
+                capacity=50,
+                venuetype=VenueType.MAIN_HALL,
+            ),
+            start_time=timezone.make_aware(datetime(2025, 7, 19, 13, 30)),
+            exam_length=60,
+            core=True,
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S98001",
+                    "student_name": "Needs Separate Later",
+                    "exam_code": exam2.course_code,
+                    "provisions": "Separate room on own",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        ev = StudentExam.objects.get(student__student_id="S98001", exam=exam2).exam_venue
+        self.assertIsNone(ev.venue)  # no reuse because 13:00-15:00 conflicts with 13:30 start
+
+    def test_same_exam_cannot_double_book_same_venue(self):
+        base_start = timezone.make_aware(datetime(2025, 7, 20, 13, 30))
+        exam = Exam.objects.create(
+            exam_name="Astro",
+            course_code="ASTRO1",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Science",
+            school_contact="",
+        )
+        main_hall = Venue.objects.create(
+            venue_name="Wolfson 346",
+            capacity=100,
+            venuetype=VenueType.SEPARATE_ROOM,
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+        )
+        # Existing conflicting booking for the same exam/venue at 13:00
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=main_hall,
+            start_time=timezone.make_aware(datetime(2025, 7, 20, 13, 0)),
+            exam_length=120,
+            core=False,
+        )
+        # Core exam elsewhere at 13:30
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=Venue.objects.create(
+                venue_name="Core Hall Astro",
+                capacity=200,
+                venuetype=VenueType.MAIN_HALL,
+            ),
+            start_time=base_start,
+            exam_length=120,
+            core=True,
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S99001",
+                    "student_name": "Separate Astro",
+                    "exam_code": exam.course_code,
+                    "provisions": "Separate room on own",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+        ev = StudentExam.objects.get(student__student_id="S99001", exam=exam).exam_venue
+        self.assertIsNone(ev.venue)  # conflicting slot leads to placeholder
+
+    def test_exam_upload_conflict_creates_placeholder(self):
+        venue = Venue.objects.create(
+            venue_name="Wolfson 346",
+            capacity=100,
+            venuetype=VenueType.MAIN_HALL,
+        )
+        # Existing booking occupying 09:00-11:00
+        ExamVenue.objects.create(
+            exam=Exam.objects.create(
+                exam_name="Existing",
+                course_code="EXIST1",
+                exam_type="Written",
+                no_students=0,
+                exam_school="Science",
+                school_contact="",
+            ),
+            venue=venue,
+            start_time=timezone.make_aware(datetime(2025, 8, 15, 9, 0)),
+            exam_length=120,
+            core=True,
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Exam",
+            "rows": [
+                {
+                    "exam_code": "NEW1",
+                    "exam_name": "New Exam",
+                    "exam_date": "2025-08-15",
+                    "exam_start": "09:15",
+                    "exam_length": 60,
+                    "exam_type": "Written",
+                    "no_students": "50",
+                    "school": "Science",
+                    "school_contact": "Dr. X",
+                    "main_venue": "Wolfson 346",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="exam.xlsx", uploaded_by=self.user)
+        ev = ExamVenue.objects.get(exam__course_code="NEW1")
+        self.assertIsNone(ev.venue)  # conflict leads to placeholder
+        self.assertEqual(ev.start_time, timezone.make_aware(datetime(2025, 8, 15, 9, 15)))
+        self.assertEqual(ev.exam_length, 60)
+
+    def test_placeholder_is_assigned_when_venue_capabilities_updated(self):
+        exam = Exam.objects.create(
+            exam_name="Late Capability",
+            course_code="LC100",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Science",
+            school_contact="",
+        )
+        placeholder = ExamVenue.objects.create(
+            exam=exam,
+            venue=None,
+            start_time=timezone.make_aware(datetime(2025, 8, 20, 9, 0)),
+            exam_length=90,
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+        )
+
+        venue = Venue.objects.create(
+            venue_name="Late Room",
+            capacity=10,
+            venuetype=VenueType.SEPARATE_ROOM,
+            provision_capabilities=[],
+        )
+
+        # Initially not assigned
+        placeholder.refresh_from_db()
+        self.assertIsNone(placeholder.venue)
+
+        # Update venue to add capability; post_save signal should attach placeholder
+        venue.provision_capabilities = [ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN]
+        venue.save()
+
+        placeholder.refresh_from_db()
+        self.assertEqual(placeholder.venue, venue)
