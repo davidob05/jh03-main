@@ -639,7 +639,7 @@ export const AdminInvigilators: React.FC = () => {
         {/* Pagination & Bulk Actions */}
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3} mt={4}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemoveIcon />) : (<PersonAddIconAlt1 />)} onClick={toggleSelectAll}>
+            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemove />) : (<PersonAddAlt1 />)} onClick={toggleSelectAll}>
               {selected.length === filtered.length
                 ? "Deselect all invigilators"
                 : `Select all ${filtered.length} invigilators`}
@@ -682,7 +682,7 @@ export const AdminInvigilators: React.FC = () => {
               ) : bulkAction === "notify" ? (
                 <Notifications color="action" />
               ) : (
-                <PendingIcon color="disabled" /> // neutral icon before selection
+                <Pending color="disabled" /> // neutral icon before selection
               )}
             </Tooltip>
           </Stack>
