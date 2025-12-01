@@ -50,6 +50,7 @@ import {
   ArrowForward,
 } from '@mui/icons-material';
 import {
+<<<<<<< HEAD
 } from '@mui/material';
 import {
   ViewList,
@@ -67,6 +68,8 @@ import {
   ArrowForward,
 } from '@mui/icons-material';
 import {
+=======
+>>>>>>> 2b80b6bd (Added invigilator profile (admin view))
   StaticDatePicker,
 } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -75,6 +78,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { Link as RouterLink } from 'react-router-dom';
 import { Link as MUILink } from '@mui/material';
 import { InvigilatorAvailabilityModal } from "../../components/admin/InvigilatorAvailabilityModal";
+<<<<<<< HEAD
 import ViewListIcon from '@mui/icons-material/ViewList';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
@@ -88,6 +92,8 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+=======
+>>>>>>> 2b80b6bd (Added invigilator profile (admin view))
 
 interface Invigilator {
   id: number;
