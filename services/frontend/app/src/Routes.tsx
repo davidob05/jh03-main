@@ -42,6 +42,7 @@ export const Routes: React.FC = () => {
             <RouterRoute path="calendar" element={<AdminCalendar />} />
             <RouterRoute path="profile" element={<AdminProfile />} />
             <RouterRoute path="invigilators" element={<AdminInvigilators />} />
+            <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
           </RouterRoute>
           <RouterRoute path="/admin/exams" element={<AdminLayout />}>
             <RouterRoute index element={<AdminExams />} />
