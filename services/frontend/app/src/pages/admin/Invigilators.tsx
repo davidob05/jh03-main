@@ -669,7 +669,7 @@ export const AdminInvigilators: React.FC = () => {
               ) : bulkAction === "notify" ? (
                 <Notifications color="action" />
               ) : (
-                <PendingIcon color="disabled" /> // neutral icon before selection
+                <Pending color="disabled" /> // neutral icon before selection
               )}
             </Tooltip>
           </Stack>
