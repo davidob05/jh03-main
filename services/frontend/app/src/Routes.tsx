@@ -11,6 +11,7 @@ import { AdminProfile } from "./pages/admin/Profile";
 import { AdminExams } from "./pages/admin/Exams";
 import { AdminVenues } from "./pages/admin/Venues";
 import { AdminInvigilators } from "./pages/admin/Invigilators";
+import { AdminInvigilatorProfile } from "./pages/admin/Invigilator";
 
 // Import invigilator pages and layout
 import { InvigilatorLayout } from "./components/invigilator/Layout";
@@ -41,6 +42,7 @@ export const Routes: React.FC = () => {
             <RouterRoute path="calendar" element={<AdminCalendar />} />
             <RouterRoute path="profile" element={<AdminProfile />} />
             <RouterRoute path="invigilators" element={<AdminInvigilators />} />
+            <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
           </RouterRoute>
           <RouterRoute path="/admin/exams" element={<Layout />}>
             <RouterRoute index element={<Exams />} />

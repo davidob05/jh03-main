@@ -28,34 +28,35 @@ import {
   Tooltip,
   InputBase,
   Checkbox,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
+import {
+  ViewList,
+  GridView,
+  CalendarViewMonth,
+  Pending,
+  Download,
+  Notifications,
+  PersonAddAlt1,
+  PersonRemove,
+  Search,
+  ArrowUpward,
+  ArrowDownward,
+  ArrowBack,
+  ArrowForward,
+} from '@mui/icons-material';
 import {
   StaticDatePicker,
 } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs, { Dayjs } from 'dayjs';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-} from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { Link as MUILink } from '@mui/material';
-import ViewListIcon from '@mui/icons-material/ViewList';
-import GridViewIcon from '@mui/icons-material/GridView';
-import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
-import PendingIcon from '@mui/icons-material/Pending';
-import DownloadIcon from '@mui/icons-material/Download';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import PersonAddIconAlt1 from '@mui/icons-material/PersonAddAlt1';
-import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
-import SearchIcon from '@mui/icons-material/Search';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import { InvigilatorAvailabilityModal } from "../../components/admin/InvigilatorAvailabilityModal";
 
 interface Invigilator {
   id: number;
@@ -128,7 +129,7 @@ export const AdminInvigilators: React.FC = () => {
     return { main: i.preferred_name || i.full_name || `Invigilator #${i.id}`, sub: '' };
   };
 
-  // FAKE DATA — replace later with real API
+  // Fake data for demonstration purposes
   useEffect(() => {
     const fake: Invigilator[] = [
       { id: 1, preferred_name: 'Alex', full_name: 'Alexandra Chen', email: 'a.chen@university.edu', availableDates: ['2025-11-15', '2025-11-20'], availableSlots: ['2025-11-15T09:00','2025-11-15T14;00' , '2025-11-20T14:00'] },
@@ -276,9 +277,9 @@ export const AdminInvigilators: React.FC = () => {
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h4">Invigilators</Typography>
           <ToggleButtonGroup value={viewMode} exclusive onChange={handleViewChange} color="primary">
-            <ToggleButton value="grid"><GridViewIcon /></ToggleButton>
-            <ToggleButton value="list"><ViewListIcon /></ToggleButton>
-            <ToggleButton value="calendar"><CalendarViewMonthIcon /></ToggleButton>
+            <ToggleButton value="grid"><GridView /></ToggleButton>
+            <ToggleButton value="list"><ViewList /></ToggleButton>
+            <ToggleButton value="calendar"><CalendarViewMonth /></ToggleButton>
           </ToggleButtonGroup>
         </Stack>
 
@@ -294,7 +295,7 @@ export const AdminInvigilators: React.FC = () => {
                 py: 0.5,
               }}
             >
-            <SearchIcon sx={{ color: "action.active", mr: 1 }} />
+            <Search sx={{ color: "action.active", mr: 1 }} />
             <InputBase
               placeholder="Search invigilators..."
               value={searchQuery}
@@ -309,7 +310,7 @@ export const AdminInvigilators: React.FC = () => {
             size="medium"
             endIcon={
               sortField === 'firstName' ? (
-                sortOrder === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />
+                sortOrder === 'asc' ? <ArrowUpward /> : <ArrowDownward />
               ) : null
             }
             onClick={() => {
@@ -336,7 +337,7 @@ export const AdminInvigilators: React.FC = () => {
             size="medium"
             endIcon={
               sortField === 'lastName' ? (
-                sortOrder === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />
+                sortOrder === 'asc' ? <ArrowUpward /> : <ArrowDownward />
               ) : null
             }
             onClick={() => {
@@ -479,7 +480,7 @@ export const AdminInvigilators: React.FC = () => {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
               <Button
                 variant="contained"
-                startIcon={<ArrowBackIcon />}
+                startIcon={<ArrowBack />}
                 onClick={() => setCurrentMonthIndex(prev => prev - 1)}
                 size="large"
               >
@@ -487,7 +488,7 @@ export const AdminInvigilators: React.FC = () => {
               </Button>
               <Button
                 variant="contained"
-                endIcon={<ArrowForwardIcon />}
+                endIcon={<ArrowForward />}
                 onClick={() => setCurrentMonthIndex(prev => prev + 1)}
                 size="large"
               >
@@ -517,7 +518,7 @@ export const AdminInvigilators: React.FC = () => {
                       <Box>
                         <MUILink
                           component={RouterLink}
-                          to={`/admin/invigilator/${i.id}`}
+                          to={`/admin/invigilators/${i.id}`}
                           color="primary"
                           underline="none"
                           sx={{ fontWeight: 600, mr: 1 }}
@@ -576,7 +577,7 @@ export const AdminInvigilators: React.FC = () => {
                         <>
                           <MUILink
                             component={RouterLink}
-                            to={`/admin/invigilator/${i.id}`}
+                            to={`/admin/invigilators/${i.id}`}
                             color="primary"
                             underline="none"
                             sx={{
@@ -615,102 +616,17 @@ export const AdminInvigilators: React.FC = () => {
         )}
 
         {/* Calendar Modal */}
-        <Dialog open={calendarModalOpen} onClose={() => setCalendarModalOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>
-            Available on {selectedDate?.format('D MMMM YYYY')}
-          </DialogTitle>
-          <DialogContent dividers>
-            {selectedDate && getAvailableOnDate(selectedDate).length === 0 ? (
-              <Typography color="text.secondary" align="center" py={4}>
-                No invigilators available on {selectedDate.format('D MMMM YYYY')}
-              </Typography>
-            ) : (
-              <List>
-                {selectedDate && getAvailableOnDate(selectedDate).map((i) => {
-                  // Get slots for this exact date
-                  const dateStr = selectedDate.format('YYYY-MM-DD');
-                  const slotsOnDate = i.availableSlots
-                    ?.filter(slot => slot.startsWith(dateStr))
-                    ?.map(slot => {
-                      const time = slot.split('T')[1].slice(0, 5);
-                      const hour = parseInt(time.split(':')[0]);
-                      if (hour < 12) return `Morning (${time})`;
-                      if (hour < 13) return `Noon (${time})`;
-                      if (hour < 16) return `Afternoon (${time})`;
-                      return `Evening (${time})`;
-                    }) || [];
-
-                  return (
-                    <ListItem key={i.id} divider>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          {getInitials(i)}
-                        </Avatar>
-                      </ListItemAvatar>
-
-                      <ListItemText
-                        primary={
-                          <Box>
-                            <MUILink
-                              component={RouterLink}
-                              to={`/admin/invigilator/${i.id}`}
-                              color="primary"
-                              underline="none"
-                              sx={{ fontWeight: 600, mr: 1 }}
-                            >
-                              {displayPreferredAndFull(i).main}
-                            </MUILink>
-                            {displayPreferredAndFull(i).sub && (
-                              <Typography component="span" variant="body2" color="text.secondary">
-                                ({displayPreferredAndFull(i).sub})
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                        secondary={
-                          <Box sx={{ mt: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              {i.email || 'No email'}
-                            </Typography>
-                            {slotsOnDate.length > 0 ? (
-                              <Box sx={{ mt: 1 }}>
-                                <Typography variant="subtitle2" color="primary">
-                                  Available slots:
-                                </Typography>
-                                {slotsOnDate.map((slot, idx) => (
-                                  <Chip
-                                    key={idx}
-                                    label={slot}
-                                    size="small"
-                                    color="success"
-                                    variant="outlined"
-                                    sx={{ mr: 1, mt: 0.5 }}
-                                  />
-                                ))}
-                              </Box>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                Available (no specific time slots recorded)
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                  );
-                })}
-              </List>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setCalendarModalOpen(false)}>Close</Button>
-          </DialogActions>
-        </Dialog>
+        <InvigilatorAvailabilityModal
+          open={calendarModalOpen}
+          onClose={() => setCalendarModalOpen(false)}
+          date={selectedDate}
+          invigilators={invigilators}
+        />
 
         {/* Pagination & Bulk Actions */}
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3} mt={4}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemoveIcon />) : (<PersonAddIconAlt1 />)} onClick={toggleSelectAll}>
+            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemove />) : (<PersonAddAlt1 />)} onClick={toggleSelectAll}>
               {selected.length === filtered.length
                 ? "Deselect all invigilators"
                 : `Select all ${filtered.length} invigilators`}
@@ -727,12 +643,12 @@ export const AdminInvigilators: React.FC = () => {
                 </MenuItem>
                 <MenuItem value="export">
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <DownloadIcon fontSize="small" /> Export timetable
+                    <Download fontSize="small" /> Export timetable
                   </Stack>
                 </MenuItem>
                 <MenuItem value="notify">
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <NotificationsIcon fontSize="small" /> Send notification
+                    <Notifications fontSize="small" /> Send notification
                   </Stack>
                 </MenuItem>
               </Select>
@@ -749,11 +665,11 @@ export const AdminInvigilators: React.FC = () => {
               }
             >
               {bulkAction === "export" ? (
-                <DownloadIcon color="action" />
+                <Download color="action" />
               ) : bulkAction === "notify" ? (
-                <NotificationsIcon color="action" />
+                <Notifications color="action" />
               ) : (
-                <PendingIcon color="disabled" /> // neutral icon before selection
+                <Pending color="disabled" /> // neutral icon before selection
               )}
             </Tooltip>
           </Stack>
