@@ -30,6 +30,7 @@ import { Link } from 'react-router-dom';
 import { apiBaseUrl } from '../utils/api';
 import { LineWeight } from '@mui/icons-material';
 import { apiBaseUrl } from '../utils/api';
+import { LineWeight } from '@mui/icons-material';
 
 interface ExamData {
   exam_id: number;
