@@ -10,7 +10,7 @@ class HomePageTests(TestCase):
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "exams/home.html")
+        self.assertTemplateUsed(response, "timetabling_system/home.html")
 
 
 class AboutPageTests(TestCase):
@@ -18,7 +18,7 @@ class AboutPageTests(TestCase):
         response = self.client.get(reverse("about"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "exams/about.html")
+        self.assertTemplateUsed(response, "timetabling_system/about.html")
 
 
 class HealthTests(TestCase):
@@ -35,7 +35,7 @@ class HealthTests(TestCase):
         cursor_mock = mock.MagicMock()
         cursor_mock.__enter__.side_effect = DatabaseError("boom")
 
-        with mock.patch("exams.views.connection") as mocked_connection:
+        with mock.patch("timetabling_system.views.connection") as mocked_connection:
             mocked_connection.cursor.return_value = cursor_mock
 
             response = self.client.get(reverse("healthz"))

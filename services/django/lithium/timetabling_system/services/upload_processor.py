@@ -741,58 +741,6 @@ def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamV
     )
 
 
-def _create_exam_venue_links(exam: Exam, raw_row: Dict[str, Any]) -> None:
-    """
-    Ensure Venue rows exist for each venue name in the exam upload,
-    and create ExamVenue links to the associated exam.
-    """
-    if not exam:
-        return
-
-    venue_names = _extract_venue_names(raw_row)
-    if not venue_names:
-        return
-
-    seen = set()
-    for name in venue_names:
-        if name in seen:
-            continue
-        seen.add(name)
-
-        defaults = {
-            "capacity": 0,
-            "venuetype": VenueType.SCHOOL_TO_SORT,
-            "is_accessible": True,
-            "qualifications": [],
-        }
-        venue, _ = Venue.objects.get_or_create(
-            venue_name=name,
-            defaults=defaults,
-        )
-        exam_venue, created = ExamVenue.objects.get_or_create(
-            exam=exam,
-            venue=venue,
-            defaults={
-                "start_time": start_time,
-                "exam_length": exam_length,
-                "core": True,
-            },
-        )
-
-        updates = []
-        if start_time and exam_venue.start_time != start_time:
-            exam_venue.start_time = start_time
-            updates.append("start_time")
-        if exam_length is not None and exam_venue.exam_length != exam_length:
-            exam_venue.exam_length = exam_length
-            updates.append("exam_length")
-        if created and exam_venue.core is not True:
-            exam_venue.core = True
-            updates.append("core")
-        if updates and not created:
-            exam_venue.save(update_fields=updates)
-
-
 @transaction.atomic
 def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     """
