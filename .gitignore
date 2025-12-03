@@ -44,6 +44,9 @@ services/django/lithium/.local/
 services/django/lithium/timetabling_system/migrations/*
 
 *.sqlite3
+*.tsbuildinfo
+coverage/
+.nyc_output/
 
 # OS / editors
 .DS_Store
