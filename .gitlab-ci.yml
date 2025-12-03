@@ -66,6 +66,18 @@ test_frontend:
   stage: test
   # Mirror of the official Python image hosted on Amazon ECR Public
   image: public.ecr.aws/docker/library/python:3.12-slim
+  services:
+    - name: public.ecr.aws/docker/library/postgres:16-alpine
+      alias: postgres
+  variables:
+    DJANGO_DB_NAME: postgres
+    DJANGO_DB_USER: postgres
+    DJANGO_DB_PASSWORD: postgres
+    DJANGO_DB_HOST: postgres
+    DJANGO_DB_PORT: "5432"
+    POSTGRES_DB: postgres
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
   script:
     - set -eu
     - cd "$SERVICE_PATH"
@@ -76,6 +88,29 @@ test_frontend:
     - . .venv/bin/activate
     - pip install --upgrade pip
     - pip install --no-input -r requirements.txt
+    - python - <<'PY'
+import os
+import time
+import psycopg
+
+dsn = "dbname={db} user={user} password={pwd} host={host} port={port}".format(
+    db=os.getenv("DJANGO_DB_NAME", "postgres"),
+    user=os.getenv("DJANGO_DB_USER", "postgres"),
+    pwd=os.getenv("DJANGO_DB_PASSWORD", "postgres"),
+    host=os.getenv("DJANGO_DB_HOST", "postgres"),
+    port=os.getenv("DJANGO_DB_PORT", "5432"),
+)
+
+for attempt in range(30):
+    try:
+        with psycopg.connect(dsn, connect_timeout=1):
+            break
+    except Exception as exc:
+        print(f"Database not ready yet ({exc}); retrying...")
+        time.sleep(1)
+else:
+    raise SystemExit("Database not ready after waiting")
+PY
     - python manage.py migrate --noinput
     - python manage.py test
 
