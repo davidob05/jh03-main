@@ -88,7 +88,7 @@ test_frontend:
     - . .venv/bin/activate
     - pip install --upgrade pip
     - pip install --no-input -r requirements.txt
-    - python manage.py makemigrations accounts timetabling_system pages --noinput
+    - python manage.py makemigrations accounts timetabling_system --noinput
     - |
         python - <<'PY'
         import os
