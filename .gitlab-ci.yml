@@ -54,8 +54,7 @@ build_with_kaniko:
     - set -eu
     - cd "$SERVICE_PATH"
     - if [ -f package-lock.json ]; then npm ci; else npm install; fi
-    # Smoke tests (aligned with `make up`)
-    - npm test -- --passWithNoTests --testNamePattern "smoke|health"
+    - npm test
 
 test_frontend:
   extends: .test_job_template
@@ -67,14 +66,6 @@ test_frontend:
   stage: test
   # Mirror of the official Python image hosted on Amazon ECR Public
   image: public.ecr.aws/docker/library/python:3.12-slim
-  services:
-    - name: public.ecr.aws/docker/library/postgres:16-alpine
-      alias: db
-      variables:
-        POSTGRES_DB: postgres
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: postgres
-        POSTGRES_HOST_AUTH_METHOD: trust
   script:
     - set -eu
     - cd "$SERVICE_PATH"
@@ -85,19 +76,11 @@ test_frontend:
     - . .venv/bin/activate
     - pip install --upgrade pip
     - pip install --no-input -r requirements.txt
-    # Regenerate migrations on the fly because app migrations are git-ignored
-    - find timetabling_system/migrations -type f ! -name "__init__.py" -delete
-    - python manage.py makemigrations timetabling_system --noinput
     - python manage.py migrate --noinput
-    # Smoke tests (aligned with `make up`)
-    - python manage.py test timetabling_system.utils
+    - python manage.py test
 
 test_django:
   extends: .django_test_template
   needs: ["build_with_kaniko"]
   variables:
     SERVICE_PATH: services/django/lithium
-    DJANGO_DB_HOST: db
-    DJANGO_DB_NAME: postgres
-    DJANGO_DB_USER: postgres
-    DJANGO_DB_PASSWORD: postgres
