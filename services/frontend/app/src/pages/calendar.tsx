@@ -128,7 +128,7 @@ const items: ExamItem[] = examData.map((exam) => ({
     style: {
       background: "#1976d2",
       color: "#ffffff",
-      border: "1px solid #1565c0",
+      border: "1px solid #1976d2",
       borderRadius: "4px",
     },
   },
@@ -252,6 +252,19 @@ export const Calendar: React.FC = () => {
       </Paper>
 
       <Paper sx={{ p: 0, overflow: "hidden" }}>
+        <div
+          style={{
+            textAlign: "center",
+            fontWeight: "normal",
+            fontSize: "18px",
+            fontFamily: "arial",
+            padding: "16 px",
+            borderBottom: "1px solid #ccc",
+            background: "#fafafa",
+          }}
+          >
+            {formatDate(currentDate)}
+          </div>
         <Timeline
           groups={groups}
           items={currentDayItems}

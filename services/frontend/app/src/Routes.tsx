@@ -17,7 +17,7 @@ export const Routes: React.FC = () => {
       palette: {
         primary: { main: "#005399" },
         secondary: { main: "#7bc653" }
-      }
+      },
     }), []
   );
 

@@ -28,6 +28,7 @@ import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { apiBaseUrl } from '../utils/api';
+import { LineWeight } from '@mui/icons-material';
 
 interface ExamData {
   exam_id: number;
@@ -482,7 +483,10 @@ export const Exams: React.FC = () => {
                     tabIndex={-1}
                     key={row.id}
                     selected={isItemSelected}
-                  >
+                    sx={{
+                      '&:hover .hover-bold': { fontWeight: 'bold' },
+                    }}
+                  >                    
                     <TableCell padding="checkbox">
                       <Checkbox
                         color="primary"
@@ -501,7 +505,7 @@ export const Exams: React.FC = () => {
                     >
                       <Link to={`/exams/${row.code}`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
                     </TableCell>
-                    <TableCell>{row.subject}</TableCell>
+                    <TableCell className='hover-bold'>{row.subject}</TableCell>
                     <TableCell>{row.venues}</TableCell>
                     <TableCell>{formatDateTime(row.startTime)}</TableCell>
                     <TableCell>{formatDateTime(row.endTime)}</TableCell>
