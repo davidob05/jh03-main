@@ -89,27 +89,27 @@ test_frontend:
     - pip install --upgrade pip
     - pip install --no-input -r requirements.txt
     - python - <<'PY'
-import os
-import time
-import psycopg
+        import os
+        import time
+        import psycopg
 
-dsn = "dbname={db} user={user} password={pwd} host={host} port={port}".format(
-    db=os.getenv("DJANGO_DB_NAME", "postgres"),
-    user=os.getenv("DJANGO_DB_USER", "postgres"),
-    pwd=os.getenv("DJANGO_DB_PASSWORD", "postgres"),
-    host=os.getenv("DJANGO_DB_HOST", "postgres"),
-    port=os.getenv("DJANGO_DB_PORT", "5432"),
-)
+        dsn = "dbname={db} user={user} password={pwd} host={host} port={port}".format(
+            db=os.getenv("DJANGO_DB_NAME", "postgres"),
+            user=os.getenv("DJANGO_DB_USER", "postgres"),
+            pwd=os.getenv("DJANGO_DB_PASSWORD", "postgres"),
+            host=os.getenv("DJANGO_DB_HOST", "postgres"),
+            port=os.getenv("DJANGO_DB_PORT", "5432"),
+        )
 
-for attempt in range(30):
-    try:
-        with psycopg.connect(dsn, connect_timeout=1):
-            break
-    except Exception as exc:
-        print(f"Database not ready yet ({exc}); retrying...")
-        time.sleep(1)
-else:
-    raise SystemExit("Database not ready after waiting")
+        for attempt in range(30):
+            try:
+                with psycopg.connect(dsn, connect_timeout=1):
+                    break
+            except Exception as exc:
+                print(f"Database not ready yet ({exc}); retrying...")
+                time.sleep(1)
+        else:
+            raise SystemExit("Database not ready after waiting")
 PY
     - python manage.py migrate --noinput
     - python manage.py test
