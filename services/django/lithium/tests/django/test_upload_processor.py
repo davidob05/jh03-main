@@ -17,6 +17,7 @@ from timetabling_system.models import (
     VenueType,
 )
 from timetabling_system.services import ingest_upload_result
+from timetabling_system.services.venue_stats import examvenue_student_counts, core_exam_size
 
 
 class UploadProcessorTests(TestCase):
@@ -469,6 +470,68 @@ class UploadProcessorTests(TestCase):
             student_exam.exam_venue.start_time,
             timezone.make_aware(datetime(2025, 7, 7, 9, 30)),
         )
+
+    def test_examvenue_student_counts_and_core_exam_size(self):
+        exam = Exam.objects.create(
+            exam_name="Biology",
+            course_code="BIO1",
+            exam_type="Written",
+            no_students=100,
+            exam_school="Science",
+            school_contact="",
+        )
+        core_venue = Venue.objects.create(
+            venue_name="Main Bio Hall",
+            capacity=200,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+        )
+        core_ev = ExamVenue.objects.create(
+            exam=exam,
+            venue=core_venue,
+            start_time=timezone.make_aware(datetime(2025, 7, 8, 9, 0)),
+            exam_length=120,
+            core=True,
+        )
+        alt_venue = Venue.objects.create(
+            venue_name="Overflow Bio",
+            capacity=50,
+            venuetype=VenueType.SEPARATE_ROOM,
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+            is_accessible=True,
+        )
+        alt_ev = ExamVenue.objects.create(
+            exam=exam,
+            venue=alt_venue,
+            start_time=timezone.make_aware(datetime(2025, 7, 8, 9, 0)),
+            exam_length=120,
+            core=False,
+        )
+        # Small extra-time alternative in same physical room as core
+        small_extra_ev = ExamVenue.objects.create(
+            exam=exam,
+            venue=core_venue,
+            start_time=timezone.make_aware(datetime(2025, 7, 8, 8, 45)),
+            exam_length=135,
+            core=False,
+        )
+
+        # Assign students
+        for idx in range(10):
+            student = Student.objects.create(student_id=f"SALT{idx}", student_name=f"Alt {idx}")
+            StudentExam.objects.create(student=student, exam=exam, exam_venue=alt_ev)
+        for idx in range(5):
+            student = Student.objects.create(student_id=f"SET{idx}", student_name=f"Extra {idx}")
+            StudentExam.objects.create(student=student, exam=exam, exam_venue=small_extra_ev)
+        # Remaining 85 implicitly in core (no StudentExam assignment to core)
+
+        counts = examvenue_student_counts(exam)
+        self.assertEqual(counts.get(alt_ev.pk), 10)
+        self.assertEqual(counts.get(small_extra_ev.pk), 5)
+        self.assertIsNone(counts.get(core_ev.pk))
+
+        # Core size should subtract the 10 students in the other venue, but not the 5 in the same venue.
+        self.assertEqual(core_exam_size(exam), 90)
 
     def test_unsupported_file_type_returns_summary(self):
         result = {"status": "ok", "type": "Unknown", "days": []}
