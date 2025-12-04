@@ -8,6 +8,7 @@ from timetabling_system.models import (
     Exam,
     ExamVenue,
     ExamVenueProvisionType,
+    ProvisionType,
     Provisions,
     Student,
     StudentExam,
@@ -269,6 +270,61 @@ class UploadProcessorTests(TestCase):
             ExamVenueProvisionType.USE_COMPUTER,
             student_exam.exam_venue.provision_capabilities,
         )
+        provision = Provisions.objects.get(student__student_id="S888", exam=exam)
+        self.assertIn(ProvisionType.USE_COMPUTER, provision.provisions)
+
+    def test_use_computer_requires_computer_cluster_or_separate_room(self):
+        exam = Exam.objects.create(
+            exam_name="Programming 2",
+            course_code="CS201",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Computing",
+            school_contact="",
+        )
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=Venue.objects.create(
+                venue_name="Main Hall With PCs",
+                capacity=200,
+                venuetype=VenueType.MAIN_HALL,
+                is_accessible=True,
+                provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
+            ),
+            start_time=timezone.make_aware(datetime(2025, 7, 4, 9, 0)),
+            exam_length=120,
+            core=True,
+        )
+        preferred = Venue.objects.create(
+            venue_name="Computer SR",
+            capacity=20,
+            venuetype=VenueType.SEPARATE_ROOM,
+            provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
+            is_accessible=True,
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S8888",
+                    "student_name": "Casey Device",
+                    "exam_code": exam.course_code,
+                    "provisions": "Use of a computer",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+
+        provision = Provisions.objects.get(student__student_id="S8888", exam=exam)
+        self.assertIn(ProvisionType.USE_COMPUTER, provision.provisions)
+        student_exam = StudentExam.objects.get(student__student_id="S8888", exam=exam)
+        self.assertIn(
+            student_exam.exam_venue.venue.venuetype,
+            {VenueType.SEPARATE_ROOM, VenueType.COMPUTER_CLUSTER, VenueType.PURPLE_CLUSTER},
+        )
 
     def test_assisted_evac_requires_accessible_venue(self):
         exam = Exam.objects.create(
@@ -317,6 +373,102 @@ class UploadProcessorTests(TestCase):
         student_exam = StudentExam.objects.get(student__student_id="S999", exam=exam)
         self.assertEqual(student_exam.exam_venue.venue, accessible_room)
         self.assertTrue(student_exam.exam_venue.venue.is_accessible)
+
+    def test_separate_room_on_own_allocates_different_venue(self):
+        exam = Exam.objects.create(
+            exam_name="Chemistry",
+            course_code="CHEM1",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Science",
+            school_contact="",
+        )
+        core_venue = Venue.objects.create(
+            venue_name="Big Hall",
+            capacity=300,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+        )
+        ExamVenue.objects.create(
+            exam=exam,
+            venue=core_venue,
+            start_time=timezone.make_aware(datetime(2025, 7, 6, 9, 0)),
+            exam_length=120,
+            core=True,
+        )
+        separate_room = Venue.objects.create(
+            venue_name="Quiet Room 1",
+            capacity=5,
+            venuetype=VenueType.SEPARATE_ROOM,
+            provision_capabilities=[ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+            is_accessible=True,
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S300",
+                    "student_name": "Solo Space",
+                    "exam_code": exam.course_code,
+                    "provisions": "Separate room on own",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+
+        student_exam = StudentExam.objects.get(student__student_id="S300", exam=exam)
+        self.assertEqual(student_exam.exam_venue.venue, separate_room)
+        self.assertNotEqual(student_exam.exam_venue.venue, core_venue)
+
+    def test_small_extra_time_reuses_core_venue_despite_overlap(self):
+        exam = Exam.objects.create(
+            exam_name="History",
+            course_code="HIST1",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Arts",
+            school_contact="",
+        )
+        core_start = timezone.make_aware(datetime(2025, 7, 7, 10, 0))
+        core_venue = Venue.objects.create(
+            venue_name="Heritage Hall",
+            capacity=120,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+        )
+        core_ev = ExamVenue.objects.create(
+            exam=exam,
+            venue=core_venue,
+            start_time=core_start,
+            exam_length=120,
+            core=True,
+        )
+
+        result = {
+            "status": "ok",
+            "type": "Provisions",
+            "rows": [
+                {
+                    "student_id": "S301",
+                    "student_name": "Extra Early",
+                    "exam_code": exam.course_code,
+                    "provisions": "Extra time 15 minutes every hour",
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+
+        student_exam = StudentExam.objects.get(student__student_id="S301", exam=exam)
+        self.assertEqual(student_exam.exam_venue.venue, core_venue)
+        self.assertNotEqual(student_exam.exam_venue_id, core_ev.pk)
+        self.assertEqual(
+            student_exam.exam_venue.start_time,
+            timezone.make_aware(datetime(2025, 7, 7, 9, 30)),
+        )
 
     def test_unsupported_file_type_returns_summary(self):
         result = {"status": "ok", "type": "Unknown", "days": []}

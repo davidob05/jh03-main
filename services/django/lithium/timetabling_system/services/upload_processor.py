@@ -492,6 +492,7 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         needs_accessible = _needs_accessible_venue(provisions)
         requires_separate_room = _needs_separate_room(provisions)
         needs_computer = _needs_computer(provisions)
+        allowed_venue_types = _allowed_venue_types(needs_computer, requires_separate_room)
         core_ev = (
             exam.examvenue_set.select_related("venue")
             .filter(core=True, venue__isnull=False)
@@ -517,7 +518,15 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             target_length,
             require_accessible=needs_accessible,
             preferred_venue=preferred_venue,
+            allowed_venue_types=allowed_venue_types,
         )
+        if (
+            allowed_venue_types is not None
+            and exam_venue
+            and exam_venue.venue
+            and exam_venue.venue.venuetype not in allowed_venue_types
+        ):
+            exam_venue = None
         if not exam_venue:
             exam_venue = _allocate_exam_venue(
                 exam,
@@ -527,6 +536,7 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
                 require_accessible=needs_accessible,
                 preferred_venue=preferred_venue,
                 allow_same_exam_overlap=allow_same_exam_overlap,
+                allowed_venue_types=allowed_venue_types,
             )
 
         if exam_venue:
@@ -623,6 +633,19 @@ def _has_small_extra_time(extra_minutes: int, base_length: Optional[int]) -> boo
     return per_hour <= 15
 
 
+def _allowed_venue_types(needs_computer: bool, requires_separate_room: bool) -> Optional[set]:
+    if needs_computer:
+        types = {
+            VenueType.COMPUTER_CLUSTER.value,
+            VenueType.PURPLE_CLUSTER.value,
+            VenueType.SEPARATE_ROOM.value,
+        }
+        return types
+    if requires_separate_room:
+        return {VenueType.SEPARATE_ROOM.value}
+    return None
+
+
 def _find_matching_exam_venue(
     exam: Exam,
     required_caps: List[str],
@@ -631,6 +654,7 @@ def _find_matching_exam_venue(
     *,
     require_accessible: bool = False,
     preferred_venue: Optional[Venue] = None,
+    allowed_venue_types: Optional[set] = None,
 ) -> Optional[ExamVenue]:
     if not exam:
         return None
@@ -642,6 +666,8 @@ def _find_matching_exam_venue(
             if required_caps and not venue_supports_caps(ev.venue, required_caps):
                 return False
             if require_accessible and not ev.venue.is_accessible:
+                return False
+            if allowed_venue_types is not None and ev.venue.venuetype not in allowed_venue_types:
                 return False
         else:
             placeholder_caps = ev.provision_capabilities or []
@@ -674,6 +700,7 @@ def _allocate_exam_venue(
     require_accessible: bool = False,
     preferred_venue: Optional[Venue] = None,
     allow_same_exam_overlap: bool = False,
+    allowed_venue_types: Optional[set] = None,
 ) -> Optional[ExamVenue]:
     if not exam:
         return None
@@ -687,17 +714,6 @@ def _allocate_exam_venue(
             ExamVenueProvisionType.SEPARATE_ROOM_NOT_ON_OWN,
         )
     )
-    needs_computer = ExamVenueProvisionType.USE_COMPUTER in required_caps
-
-    allowed_types = None
-    if needs_computer:
-        allowed_types = {
-            VenueType.COMPUTER_CLUSTER,
-            VenueType.PURPLE_CLUSTER,
-            VenueType.SEPARATE_ROOM,
-        }
-    elif requires_separate_room:
-        allowed_types = {VenueType.SEPARATE_ROOM}
 
     def _merge_caps(ev: ExamVenue) -> List[str]:
         existing = ev.provision_capabilities or []
@@ -722,7 +738,7 @@ def _allocate_exam_venue(
         if not venue or venue.venue_name in seen_names:
             continue
         seen_names.add(venue.venue_name)
-        if allowed_types and venue.venuetype not in allowed_types:
+        if allowed_venue_types is not None and venue.venuetype not in allowed_venue_types:
             continue
         if required_caps and not venue_supports_caps(venue, required_caps):
             continue
