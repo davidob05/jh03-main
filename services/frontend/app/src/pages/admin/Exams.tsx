@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Table from '@mui/material/Table';
@@ -27,38 +26,55 @@ import MenuItem from '@mui/material/MenuItem';
 import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { apiBaseUrl } from '../utils/api';
 import { LineWeight } from '@mui/icons-material';
-import { apiBaseUrl } from '../utils/api';
-import { LineWeight } from '@mui/icons-material';
-import { apiBaseUrl } from '../utils/api';
 
 interface ExamData {
-  exam_id: number;
-  exam_name: string;
-  course_code: string;
-  no_students: number;
-  exam_school: string;
-  school_contact: string;
-  venues: string[];
-  exam_venues: ExamVenueData[];
+  id: number;
+  code: string;
+  subject: string;
+  venue: string;
+  startTime: string;
+  endTime: string;
 }
 
-interface ExamVenueData {
-  examvenue_id: number;
-  venue_name: string;
-  start_time: string | null;
-  exam_length: number | null;
-  core: boolean;
-  provision_capabilities: string[];
+function createExamData(
+  id: number,
+  code: string,
+  subject: string,
+  venue: string,
+  startTime: string,
+  endTime: string,
+): ExamData {
+  return {
+    id,
+    code,
+    subject,
+    venue,
+    startTime,
+    endTime,
+  };
 }
 
+// Helper function to calculate duration in hours and minutes
+function calculateDuration(startTime: string, endTime: string): string {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const durationMs = end.getTime() - start.getTime();
+  const hours = Math.floor(durationMs / (1000 * 60 * 60));
+  const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (hours > 0) {
+    return `${hours}h`;
+  } else {
+    return `${minutes}m`;
+  }
+}
 
 // Helper function to format datetime for display
 function formatDateTime(dateTime: string): string {
-  if (!dateTime) return 'N/A';
   const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return 'N/A';
   return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -67,44 +83,13 @@ function formatDateTime(dateTime: string): string {
   });
 }
 
-function calculateDuration(startTime: string, endTime: string): string {
-  if (!startTime || !endTime) return 'N/A';
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return 'N/A';
-  }
-  const diffMs = end.getTime() - start.getTime();
-
-  if (!Number.isFinite(diffMs) || diffMs <= 0) {
-    return 'N/A';
-  }
-
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const minutes = Math.round((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  const parts = [];
-
-  if (hours) {
-    parts.push(`${hours}h`);
-  }
-
-  if (minutes) {
-    parts.push(`${minutes}m`);
-  }
-
-  return parts.length ? parts.join(' ') : '0m';
-}
-
-const fetchExams = async (): Promise<ExamData[]> => {
-  const response = await fetch(apiBaseUrl + "/exams/");
-  if (!response.ok) throw new Error('Unable to load exams');
-  return response.json();
-};
-
-const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
-  const venues = exam.exam_venues || [];
-  return venues.find((venue) => venue.core) || venues[0];
-};
+const rows = [
+  createExamData(1, 'CS101', 'Introduction to Computer Science', 'Room A101', '2025-11-15T09:00', '2025-11-15T11:00'),
+  createExamData(2, 'MATH201', 'Calculus II', 'Room B205', '2025-11-16T14:00', '2025-11-16T16:30'),
+  createExamData(3, 'PHY301', 'Quantum Mechanics', 'Lab Building 3', '2025-11-17T09:00', '2025-11-17T12:00'),
+  createExamData(4, 'ENG102', 'English Literature', 'Hall C', '2025-11-18T10:00', '2025-11-18T12:00'),
+  createExamData(5, 'CHEM202', 'Organic Chemistry', 'Science Block 2', '2025-11-19T13:00', '2025-11-19T15:30'),
+];
 
 function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
   if (b[orderBy] < a[orderBy]) {
@@ -118,10 +103,13 @@ function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
 
 type Order = 'asc' | 'desc';
 
-function getComparator<Key extends keyof RowData>(
+function getComparator<Key extends keyof any>(
   order: Order,
   orderBy: Key,
-): ((a: RowData, b: RowData) => number) {
+): (
+  a: { [key in Key]: number | string },
+  b: { [key in Key]: number | string },
+) => number {
   return order === 'desc'
     ? (a, b) => descendingComparator(a, b, orderBy)
     : (a, b) => -descendingComparator(a, b, orderBy);
@@ -129,18 +117,9 @@ function getComparator<Key extends keyof RowData>(
 
 interface HeadCell {
   disablePadding: boolean;
-  id: keyof RowData;
+  id: keyof ExamData;
   label: string;
   numeric: boolean;
-}
-
-interface RowData {
-  id: number;
-  code: string;
-  subject: string;
-  venues: string;
-  startTime: string;
-  endTime: string;
 }
 
 const headCells: readonly HeadCell[] = [
@@ -157,10 +136,10 @@ const headCells: readonly HeadCell[] = [
     label: 'Subject',
   },
   {
-    id: 'venues',
+    id: 'venue',
     numeric: false,
     disablePadding: false,
-    label: 'Venues',
+    label: 'Venue',
   },
   {
     id: 'startTime',
@@ -168,14 +147,20 @@ const headCells: readonly HeadCell[] = [
     disablePadding: false,
     label: 'Start Time',
   },
+  {
+    id: 'endTime',
+    numeric: false,
+    disablePadding: false,
+    label: 'End Time',
+  },
 ];
 
 interface EnhancedTableProps {
   numSelected: number;
-  onRequestSort: (event: React.MouseEvent<unknown>, property: keyof RowData) => void;
+  onRequestSort: (event: React.MouseEvent<unknown>, property: keyof ExamData) => void;
   onSelectAllClick: (event: React.ChangeEvent<HTMLInputElement>) => void;
   order: Order;
-  orderBy: keyof RowData;
+  orderBy: string;
   rowCount: number;
 }
 
@@ -183,7 +168,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
   const { onSelectAllClick, order, orderBy, numSelected, rowCount, onRequestSort } =
     props;
   const createSortHandler =
-    (property: keyof RowData) => (event: React.MouseEvent<unknown>) => {
+    (property: keyof ExamData) => (event: React.MouseEvent<unknown>) => {
       onRequestSort(event, property);
     };
 
@@ -311,63 +296,30 @@ function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
 
 export const AdminExams: React.FC = () => {
   const [order, setOrder] = React.useState<Order>('asc');
-  const [orderBy, setOrderBy] = React.useState<keyof RowData>('code');
+  const [orderBy, setOrderBy] = React.useState<keyof ExamData>('code');
   const [selected, setSelected] = React.useState<readonly number[]>([]);
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [sortBy, setSortBy] = React.useState('code');
 
-  const {
-    data: examsData = [],
-    isLoading,
-    isError,
-    error,
-  } = useQuery<ExamData[], Error>({
-    queryKey: ['exams'],
-    queryFn: fetchExams,
-  });
-
-
-  const rows = React.useMemo<RowData[]>(() => {
-    return examsData.map((exam) => ({
-      id: exam.exam_id,
-      code: exam.course_code,
-      subject: exam.exam_name,
-      venues: (exam.venues || []).join(', '),
-      startTime: getPrimaryExamVenue(exam)?.start_time || '',
-      endTime: (() => {
-        const venue = getPrimaryExamVenue(exam);
-        if (!venue?.start_time || venue.exam_length == null) {
-          return '';
-        }
-        const start = new Date(venue.start_time);
-        if (Number.isNaN(start.getTime())) {
-          return '';
-        }
-        return new Date(start.getTime() + venue.exam_length * 60000).toISOString();
-      })(),
-    }));
-  }, [examsData]);
-
-  const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked) {
-      const newSelecteds = rows.map((n) => n.id);
-      setSelected(newSelecteds);
-      return;
-    }
-    setSelected([]);
-  };
-
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
-    property: keyof RowData,
+    property: keyof ExamData,
   ) => {
     const isAsc = orderBy === property && order === 'asc';
     setOrder(isAsc ? 'desc' : 'asc');
     setOrderBy(property);
   };
 
+  const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const newSelected = rows.map((n) => n.id);
+      setSelected(newSelected);
+      return;
+    }
+    setSelected([]);
+  };
 
   const handleClick = (event: React.MouseEvent<unknown>, id: number) => {
     const selectedIndex = selected.indexOf(id);
@@ -410,12 +362,11 @@ export const AdminExams: React.FC = () => {
       (row) =>
         row.code.toLowerCase().includes(lowerQuery) ||
         row.subject.toLowerCase().includes(lowerQuery) ||
-        row.venues.toLowerCase().includes(lowerQuery) ||
+        row.venue.toLowerCase().includes(lowerQuery) ||
         formatDateTime(row.startTime).toLowerCase().includes(lowerQuery) ||
         formatDateTime(row.endTime).toLowerCase().includes(lowerQuery)
     );
-  }, [rows, searchQuery]);
-  
+  }, [searchQuery]);
 
   const emptyRows =
     page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredRows.length) : 0;
@@ -427,28 +378,6 @@ export const AdminExams: React.FC = () => {
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [order, orderBy, page, rowsPerPage, filteredRows],
   );
-
-  if (isLoading) {
-    return (
-      <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}>
-        <Paper sx={{ width: '100%', p: 4, textAlign: 'center' }}>
-          <Typography variant="h6">Loading exams...</Typography>
-        </Paper>
-      </Box>
-    );
-  }
-
-  if (isError) {
-    return (
-      <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}>
-        <Paper sx={{ width: '100%', p: 4, textAlign: 'center' }}>
-          <Typography color="error" variant="h6">
-            {error?.message || 'Failed to load exams'}
-          </Typography>
-        </Paper>
-      </Box>
-    );
-  }
 
   return (
     <Box sx={{ width: "100%", maxWidth: 1050, p: 3, mx: "auto" }}>
@@ -509,7 +438,7 @@ export const AdminExams: React.FC = () => {
                       <Link to={`/exams/${row.code}`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
                     </TableCell>
                     <TableCell className='hover-bold'>{row.subject}</TableCell>
-                    <TableCell>{row.venues}</TableCell>
+                    <TableCell>{row.venue}</TableCell>
                     <TableCell>{formatDateTime(row.startTime)}</TableCell>
                     <TableCell>{formatDateTime(row.endTime)}</TableCell>
                     <TableCell>{calculateDuration(row.startTime, row.endTime)}</TableCell>

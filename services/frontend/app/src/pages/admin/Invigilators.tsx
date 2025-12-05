@@ -1,11 +1,6 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from "react-router-dom";
-import Avatar from "@mui/material/Avatar";
-import Stack from "@mui/material/Stack";
-import { styled } from '@mui/material/styles';
-import Divider from '@mui/material/Divider';
-import Chip from '@mui/material/Chip';
 import {
   Box,
   Typography,
@@ -19,13 +14,17 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   CircularProgress,
+  Avatar,
   ListItemAvatar,
+  Stack,
   Button,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Pagination,
+  Chip,
+  Divider,
   Tooltip,
   InputBase,
   Checkbox,
@@ -50,26 +49,6 @@ import {
   ArrowForward,
 } from '@mui/icons-material';
 import {
-<<<<<<< HEAD
-} from '@mui/material';
-import {
-  ViewList,
-  GridView,
-  CalendarViewMonth,
-  Pending,
-  Download,
-  Notifications,
-  PersonAddAlt1,
-  PersonRemove,
-  Search,
-  ArrowUpward,
-  ArrowDownward,
-  ArrowBack,
-  ArrowForward,
-} from '@mui/icons-material';
-import {
-=======
->>>>>>> 2b80b6bd (Added invigilator profile (admin view))
   StaticDatePicker,
 } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -78,22 +57,6 @@ import dayjs, { Dayjs } from 'dayjs';
 import { Link as RouterLink } from 'react-router-dom';
 import { Link as MUILink } from '@mui/material';
 import { InvigilatorAvailabilityModal } from "../../components/admin/InvigilatorAvailabilityModal";
-<<<<<<< HEAD
-import ViewListIcon from '@mui/icons-material/ViewList';
-import GridViewIcon from '@mui/icons-material/GridView';
-import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
-import PendingIcon from '@mui/icons-material/Pending';
-import DownloadIcon from '@mui/icons-material/Download';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import PersonAddIconAlt1 from '@mui/icons-material/PersonAddAlt1';
-import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
-import SearchIcon from '@mui/icons-material/Search';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-=======
->>>>>>> 2b80b6bd (Added invigilator profile (admin view))
 
 interface Invigilator {
   id: number;
@@ -199,7 +162,7 @@ export const AdminInvigilators: React.FC = () => {
       setInvigilators(fake);
       setFiltered(fake);
       setLoading(false);
-    }, 800);
+    }, 500);
   }, []);
 
   // Filtering logic
@@ -659,97 +622,6 @@ export const AdminInvigilators: React.FC = () => {
           date={selectedDate}
           invigilators={invigilators}
         />
-        <Dialog open={calendarModalOpen} onClose={() => setCalendarModalOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>
-            Available on {selectedDate?.format('D MMMM YYYY')}
-          </DialogTitle>
-          <DialogContent dividers>
-            {selectedDate && getAvailableOnDate(selectedDate).length === 0 ? (
-              <Typography color="text.secondary" align="center" py={4}>
-                No invigilators available on {selectedDate.format('D MMMM YYYY')}
-              </Typography>
-            ) : (
-              <List>
-                {selectedDate && getAvailableOnDate(selectedDate).map((i) => {
-                  // Get slots for this exact date
-                  const dateStr = selectedDate.format('YYYY-MM-DD');
-                  const slotsOnDate = i.availableSlots
-                    ?.filter(slot => slot.startsWith(dateStr))
-                    ?.map(slot => {
-                      const time = slot.split('T')[1].slice(0, 5);
-                      const hour = parseInt(time.split(':')[0]);
-                      if (hour < 12) return `Morning (${time})`;
-                      if (hour < 13) return `Noon (${time})`;
-                      if (hour < 16) return `Afternoon (${time})`;
-                      return `Evening (${time})`;
-                    }) || [];
-
-                  return (
-                    <ListItem key={i.id} divider>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          {getInitials(i)}
-                        </Avatar>
-                      </ListItemAvatar>
-
-                      <ListItemText
-                        primary={
-                          <Box>
-                            <MUILink
-                              component={RouterLink}
-                              to={`/admin/invigilator/${i.id}`}
-                              color="primary"
-                              underline="none"
-                              sx={{ fontWeight: 600, mr: 1 }}
-                            >
-                              {displayPreferredAndFull(i).main}
-                            </MUILink>
-                            {displayPreferredAndFull(i).sub && (
-                              <Typography component="span" variant="body2" color="text.secondary">
-                                ({displayPreferredAndFull(i).sub})
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                        secondary={
-                          <Box sx={{ mt: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              {i.email || 'No email'}
-                            </Typography>
-                            {slotsOnDate.length > 0 ? (
-                              <Box sx={{ mt: 1 }}>
-                                <Typography variant="subtitle2" color="primary">
-                                  Available slots:
-                                </Typography>
-                                {slotsOnDate.map((slot, idx) => (
-                                  <Chip
-                                    key={idx}
-                                    label={slot}
-                                    size="small"
-                                    color="success"
-                                    variant="outlined"
-                                    sx={{ mr: 1, mt: 0.5 }}
-                                  />
-                                ))}
-                              </Box>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                Available (no specific time slots recorded)
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                  );
-                })}
-              </List>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setCalendarModalOpen(false)}>Close</Button>
-          </DialogActions>
-        </Dialog>
 
         {/* Pagination & Bulk Actions */}
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3} mt={4}>
