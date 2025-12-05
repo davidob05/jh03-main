@@ -53,7 +53,7 @@ const departmentColors: Record<string, string> = {
   Biology: "#009688",
 };
 
-const examData: ExamDetails[] = [
+export const examData: ExamDetails[] = [
   {
     id: 1,
     code: "CS101",
@@ -231,10 +231,10 @@ export const AdminCalendar: React.FC = () => {
         </Stack>
 
         <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && setViewMode(v)} color="primary">
-          <ToggleButton value="grid">
+          <ToggleButton value="grid" data-testid="grid-btn">
             <GridView/>
           </ToggleButton>
-          <ToggleButton value="timeline">
+          <ToggleButton value="timeline" data-testid="timeline-btn">
             <Timeline/>
           </ToggleButton>
         </ToggleButtonGroup>
@@ -254,7 +254,7 @@ export const AdminCalendar: React.FC = () => {
         <>
           <Grid container spacing={3}>
             {paginatedExams.map((exam) => (
-              <Grid item xs={12} sm={6} lg={4} key={exam.id}>
+              <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={exam.id}>
                 <Tooltip
                   title={
                     <>
