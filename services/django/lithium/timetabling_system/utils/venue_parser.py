@@ -25,19 +25,17 @@ def _cell_to_date_text(cell):
 
 def parse_venue_file(file):
     print("Parsing venue file...")
+    print(type(file))
     wb = load_workbook(file)
     ws = wb.active
-
     results = []
     venue_index = {}  # venue_name -> accessibility flag (False if any instance is inaccessible)
-
     # Find the first non-empty row; some templates start with a blank row.
     header_row = None
     for row in range(1, ws.max_row + 1):
         if any(ws.cell(row, col).value for col in range(1, ws.max_column + 1)):
             header_row = row
             break
-
     if header_row is None or header_row + 1 > ws.max_row:
         return {
             "status": "error",
