@@ -17,8 +17,8 @@ import { AdminInvigilatorProfile } from "./pages/admin/Invigilator";
 // Import invigilator pages and layout
 import { InvigilatorLayout } from "./components/invigilator/Layout";
 import { InvigilatorDashboard } from "./pages/invigilator/Dashboard";
-// import { InvigilatorTimetable } from "./pages/invigilator/Timetable";
-// import { InvigilatorProfile } from "./pages/invigilator/Profile";
+import { InvigilatorTimetable } from "./pages/invigilator/Timetable";
+import { InvigilatorProfile } from "./pages/invigilator/Profile";
 
 export const Routes: React.FC = () => {
 
@@ -50,8 +50,8 @@ export const Routes: React.FC = () => {
           {/* Invigilator Pages */}
           <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
             <RouterRoute index element={<InvigilatorDashboard />} /> 
-            {/* <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
-            <RouterRoute path="profile" element={<InvigilatorProfile />} /> */}
+            <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
+            <RouterRoute path="profile" element={<InvigilatorProfile />} />
           </RouterRoute>
 
           {/* Fallback Route */}
