@@ -60,5 +60,6 @@ Thumbs.db
 # Misc
 *.tar
 *.log
+.~lock.*
 
 *.sqlite3
