@@ -5,7 +5,7 @@ type ExamRouteParams = {
   examId?: string;
 };
 
-export const Exam: React.FC = () => {
+export const AdminExamDetail: React.FC = () => {
   const { examId } = useParams<ExamRouteParams>();
 
   return (

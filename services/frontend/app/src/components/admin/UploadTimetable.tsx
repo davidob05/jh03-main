@@ -6,7 +6,7 @@ import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import React, { useState } from "react";
 import { Upload as UploadIcon } from "@mui/icons-material";
-import { apiBaseUrl } from "../utils/api";
+import { apiBaseUrl } from "../../utils/api";
 
 export const UploadTimetable: React.FC = () => {
 
