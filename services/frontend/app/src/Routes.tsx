@@ -44,23 +44,15 @@ export const Routes: React.FC = () => {
             <RouterRoute path="invigilators" element={<AdminInvigilators />} />
             <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
           </RouterRoute>
-          <RouterRoute path="/admin/exams" element={<Layout />}>
-            <RouterRoute index element={<Exams />} />
+
+          {/* Invigilator Pages */}
+          <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
+            <RouterRoute index element={<InvigilatorDashboard />} /> 
+            {/* <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
+            <RouterRoute path="profile" element={<InvigilatorProfile />} /> */}
           </RouterRoute>
-          <RouterRoute path="/admin/venues" element={<Layout />}>
-            <RouterRoute index element={<Venues />} />
-          </RouterRoute>
-          <RouterRoute path="/admin/calendar" element={<Layout />}>
-            <RouterRoute index element={<Calendar />} />
-          </RouterRoute>
-          <RouterRoute path="/admin/profile" element={<Layout />}>
-            <RouterRoute index element={<Profile />} />
-          </RouterRoute>
-          <RouterRoute path="/admin/invigilators" element={<Layout />}>
-            <RouterRoute index element={<Invigilators />} />
-          </RouterRoute>
-          <RouterRoute path="/exams/:examId" element={<Layout />}>
-            <RouterRoute index element={<Exam />} />
+          <RouterRoute path="/exams/:examId" element={<AdminLayout />}>
+            <RouterRoute index element={<AdminExams />} />
           </RouterRoute>
         </RouterRoutes>
       </BrowserRouter>

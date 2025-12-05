@@ -42,7 +42,7 @@ for service in "${SERVICE_LIST[@]}"; do
   fi
 
   case "$service" in
-    frontend)
+    frontend
       echo ">>> ($service) Installing dependencies"
       run_compose exec -T "$service" sh -lc 'if [ -f package-lock.json ]; then npm ci; else npm install; fi'
 
