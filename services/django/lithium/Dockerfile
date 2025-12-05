@@ -27,9 +27,9 @@ RUN apt-get update \
        gosu \
        libffi-dev \
        libpq-dev \
-       postgresql \
-       postgresql-client \
-       postgresql-contrib \
+       postgresql-15 \
+       postgresql-client-15 \
+       postgresql-contrib-15 \
        python3-dev \
     && rm -rf /var/lib/apt/lists/*
 

@@ -31,7 +31,7 @@ CI builds each service image with Kaniko and runs the frontend Vitest suite plus
 ## Tech Stack
 
 - React 19 + Vite + Material UI (frontend)
-- Django 5 + django-allauth + PostgreSQL (backend)
+- Django 5 + django-allauth + PostgreSQL 15 (backend)
 - Docker / Docker Compose v2 for local orchestration
 - Vitest and Django’s test runner for automated tests
 

@@ -879,19 +879,25 @@ def _create_exam_venue_links(
         )
 
         if conflict:
-            # Still record the venue from the upload so the timetable reflects the sheet,
-            # even if it clashes with another exam. Conflict resolution happens downstream.
-            exam_venue, created = ExamVenue.objects.get_or_create(
-                exam=exam,
-                venue=venue,
-                defaults={
-                    "start_time": start_time,
-                    "exam_length": exam_length,
-                    "core": True,
-                },
+            # Conflict: create or update a placeholder so we do not double-book the room.
+            exam_venue = (
+                ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
+                or ExamVenue.objects.filter(exam=exam, venue=venue).first()
             )
-
+            created = False
+            if not exam_venue:
+                exam_venue = ExamVenue.objects.create(
+                    exam=exam,
+                    venue=None,
+                    start_time=start_time,
+                    exam_length=exam_length,
+                    core=True,
+                )
+                created = True
             updates = []
+            if exam_venue.venue is not None:
+                exam_venue.venue = None
+                updates.append("venue")
             if start_time and exam_venue.start_time != start_time:
                 exam_venue.start_time = start_time
                 updates.append("start_time")
@@ -903,8 +909,6 @@ def _create_exam_venue_links(
                 updates.append("core")
             if updates and not created:
                 exam_venue.save(update_fields=updates)
-            # Remove any placeholders for this exam now that we have a concrete venue.
-            ExamVenue.objects.filter(exam=exam, venue__isnull=True).delete()
             continue
 
         exam_venue, created = ExamVenue.objects.get_or_create(
