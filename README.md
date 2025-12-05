@@ -161,7 +161,7 @@ CI mirrors these commands via `.gitlab-ci.yml`.
 ## Health & Endpoints
 
 - `/healthz` (served from Django) returns `{status: "ok"}` when `SELECT 1` succeeds against PostgreSQL and `503` otherwise. Tests live in `services/django/lithium/pages/tests.py`.
-- Frontend API calls should target `http://django:8000` inside Compose; the Vite client uses `VITE_API_URL` which defaults to that URL through Compose env vars.
+- Frontend API calls read `VITE_API_URL` (set to `http://localhost:8000` in Compose) and fall back to the current browser origin; the helper always appends `/api` if it is missing.
 
 ---
 
