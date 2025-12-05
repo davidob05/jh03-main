@@ -2,16 +2,21 @@ from rest_framework import status, viewsets
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from timetabling_system.models import Exam
+from timetabling_system.models import Exam, Venue
 from timetabling_system.services import ingest_upload_result
 from timetabling_system.utils.excel_parser import parse_excel_file
 from timetabling_system.utils.venue_ingest import upsert_venues
-from .serializers import ExamSerializer
+from .serializers import ExamSerializer, VenueSerializer
 
 
 class ExamViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
     serializer_class = ExamSerializer
+
+
+class VenueViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Venue.objects.all().prefetch_related("examvenue_set__exam")
+    serializer_class = VenueSerializer
 
 
 class TimetableUploadView(APIView):

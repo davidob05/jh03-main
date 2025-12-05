@@ -11,6 +11,7 @@ import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import Collapse from '@mui/material/Collapse';
 import Paper from '@mui/material/Paper';
 import Checkbox from '@mui/material/Checkbox';
 import IconButton from '@mui/material/IconButton';
@@ -20,9 +21,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
 import InputBase from '@mui/material/InputBase';
-import FormControl from '@mui/material/FormControl';
-import Select, { SelectChangeEvent } from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
@@ -122,6 +120,26 @@ interface HeadCell {
   numeric: boolean;
 }
 
+interface RowData {
+  id: number;
+  code: string;
+  subject: string;
+  coreVenue: string;
+  startTime: string;
+  endTime: string;
+  duration: string;
+  otherVenues: OtherVenueRow[];
+  searchIndex: string;
+}
+
+interface OtherVenueRow {
+  id: number;
+  venue: string;
+  startTime: string;
+  endTime: string;
+  duration: string;
+}
+
 const headCells: readonly HeadCell[] = [
   {
     id: 'code',
@@ -136,9 +154,10 @@ const headCells: readonly HeadCell[] = [
     label: 'Subject',
   },
   {
-    id: 'venue',
+    id: 'coreVenue',
     numeric: false,
     disablePadding: false,
+    label: 'Venue',
     label: 'Venue',
   },
   {
@@ -146,6 +165,12 @@ const headCells: readonly HeadCell[] = [
     numeric: false,
     disablePadding: false,
     label: 'Start Time',
+  },
+  {
+    id: 'endTime',
+    numeric: false,
+    disablePadding: false,
+    label: 'End Time',
   },
   {
     id: 'endTime',
@@ -208,6 +233,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
           </TableCell>
         ))}
         <TableCell align="left">Duration</TableCell>
+        <TableCell align="center">Details</TableCell>
       </TableRow>
     </TableHead>
   );
@@ -217,11 +243,10 @@ interface EnhancedTableToolbarProps {
   numSelected: number;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  sortBy: string;
 }
 
 function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
-  const { numSelected, searchQuery, onSearchChange, sortBy } = props;
+  const { numSelected, searchQuery, onSearchChange } = props;
 
   return (
     <Toolbar
@@ -301,7 +326,76 @@ export const AdminExams: React.FC = () => {
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [sortBy, setSortBy] = React.useState('code');
+  const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
+
+  const {
+    data: examsData = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<ExamData[], Error>({
+    queryKey: ['exams'],
+    queryFn: fetchExams,
+  });
+
+
+  const rows = React.useMemo<RowData[]>(() => {
+    return examsData.map((exam) => {
+      const coreVenue = getPrimaryExamVenue(exam);
+      const otherVenues = (exam.exam_venues || []).filter(
+        (venue) => !coreVenue || venue.examvenue_id !== coreVenue.examvenue_id
+      );
+
+      const coreEndTime = (() => {
+        if (!coreVenue?.start_time || coreVenue.exam_length == null) return '';
+        const start = new Date(coreVenue.start_time);
+        if (Number.isNaN(start.getTime())) return '';
+        return new Date(start.getTime() + coreVenue.exam_length * 60000).toISOString();
+      })();
+
+      return {
+        id: exam.exam_id,
+        code: exam.course_code,
+        subject: exam.exam_name,
+        coreVenue: coreVenue?.venue_name || '—',
+        startTime: coreVenue?.start_time || '',
+        endTime: coreEndTime,
+        duration: calculateDuration(coreVenue?.start_time || '', coreEndTime),
+        otherVenues: otherVenues.map((venue) => {
+          const endTime = (() => {
+            if (!venue.start_time || venue.exam_length == null) return '';
+            const start = new Date(venue.start_time);
+            if (Number.isNaN(start.getTime())) return '';
+            return new Date(start.getTime() + venue.exam_length * 60000).toISOString();
+          })();
+          return {
+            id: venue.examvenue_id,
+            venue: venue.venue_name,
+            startTime: venue.start_time || '',
+            endTime,
+            duration: calculateDuration(venue.start_time || '', endTime),
+          };
+        }),
+        searchIndex: [
+          exam.course_code,
+          exam.exam_name,
+          coreVenue?.venue_name || '',
+          ...(otherVenues.map((v) => v.venue_name)),
+        ]
+          .join(' ')
+          .toLowerCase(),
+      };
+    });
+  }, [examsData]);
+
+  const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const newSelecteds = rows.map((n) => n.id);
+      setSelected(newSelecteds);
+      return;
+    }
+    setSelected([]);
+  };
 
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
@@ -362,7 +456,8 @@ export const AdminExams: React.FC = () => {
       (row) =>
         row.code.toLowerCase().includes(lowerQuery) ||
         row.subject.toLowerCase().includes(lowerQuery) ||
-        row.venue.toLowerCase().includes(lowerQuery) ||
+        row.coreVenue.toLowerCase().includes(lowerQuery) ||
+        row.searchIndex.includes(lowerQuery) ||
         formatDateTime(row.startTime).toLowerCase().includes(lowerQuery) ||
         formatDateTime(row.endTime).toLowerCase().includes(lowerQuery)
     );
@@ -386,7 +481,6 @@ export const AdminExams: React.FC = () => {
           numSelected={selected.length}
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
-          sortBy={sortBy}
         />
         <TableContainer>
           <Table
@@ -406,43 +500,100 @@ export const AdminExams: React.FC = () => {
               {visibleRows.map((row, index) => {
                 const isItemSelected = selected.includes(row.id);
                 const labelId = `enhanced-table-checkbox-${index}`;
+                const isOpen = openRows[row.id] || false;
 
                 return (
-                  <TableRow
-                    hover
-                    role="checkbox"
-                    aria-checked={isItemSelected}
-                    tabIndex={-1}
-                    key={row.id}
-                    selected={isItemSelected}
-                    sx={{
+                  <React.Fragment key={row.id}>
+                    <TableRow
+                      hover
+                      role="checkbox"
+                      aria-checked={isItemSelected}
+                      tabIndex={-1}
+                      selected={isItemSelected}
+                      sx={{
                       '&:hover .hover-bold': { fontWeight: 'bold' },
                     }}
-                  >                    
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        color="primary"
-                        checked={isItemSelected}
-                        onClick={(event) => handleClick(event, row.id)}
-                        inputProps={{
-                          'aria-labelledby': labelId,
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell
-                      component="th"
-                      id={labelId}
-                      scope="row"
-                      padding="none"
                     >
-                      <Link to={`/exams/${row.code}`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
-                    </TableCell>
-                    <TableCell className='hover-bold'>{row.subject}</TableCell>
-                    <TableCell>{row.venue}</TableCell>
-                    <TableCell>{formatDateTime(row.startTime)}</TableCell>
-                    <TableCell>{formatDateTime(row.endTime)}</TableCell>
-                    <TableCell>{calculateDuration(row.startTime, row.endTime)}</TableCell>
-                  </TableRow>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          color="primary"
+                          checked={isItemSelected}
+                          onClick={(event) => handleClick(event, row.id)}
+                          inputProps={{
+                            'aria-labelledby': labelId,
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell
+                        component="th"
+                        id={labelId}
+                        scope="row"
+                        padding="none"
+                      >
+                        <Link to={`/exams/${row.code}`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
+                      </TableCell>
+                      <TableCell>{row.subject}</TableCell>
+                      <TableCell>{row.coreVenue}</TableCell>
+                      <TableCell>{formatDateTime(row.startTime)}</TableCell>
+                      <TableCell>{formatDateTime(row.endTime)}</TableCell>
+                      <TableCell>{row.duration}</TableCell>
+                      <TableCell align="center">
+                        <IconButton
+                          aria-label={isOpen ? 'Collapse exam venues' : 'Expand exam venues'}
+                          onClick={() =>
+                            setOpenRows((prev) => ({
+                              ...prev,
+                              [row.id]: !prev[row.id],
+                            }))
+                          }
+                        >
+                          <ExpandMoreIcon
+                            sx={{
+                              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s ease',
+                            }}
+                          />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={headCells.length + 3}>
+                        <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                          <Box sx={{ margin: 2 }}>
+                            <Typography variant="subtitle1" gutterBottom>
+                              Other venues for this exam
+                            </Typography>
+                            {row.otherVenues.length ? (
+                              <Table size="small" aria-label="other venues">
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell>Venue</TableCell>
+                                    <TableCell>Start</TableCell>
+                                    <TableCell>End</TableCell>
+                                    <TableCell>Duration</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {row.otherVenues.map((venue) => (
+                                    <TableRow key={venue.id}>
+                                      <TableCell>{venue.venue}</TableCell>
+                                      <TableCell>{formatDateTime(venue.startTime)}</TableCell>
+                                      <TableCell>{formatDateTime(venue.endTime)}</TableCell>
+                                      <TableCell>{venue.duration}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                No additional venues for this exam.
+                              </Typography>
+                            )}
+                          </Box>
+                        </Collapse>
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
                 );
               })}
               {emptyRows > 0 && (

@@ -3,14 +3,13 @@ from rest_framework.routers import DefaultRouter
 
 from timetabling_system.views import upload_timetable_file
 
-from .views import ExamViewSet, TimetableUploadView
+from .views import ExamViewSet, TimetableUploadView, VenueViewSet
 
 router = DefaultRouter()
 router.register("exams", ExamViewSet, basename="exam")
+router.register("venues", VenueViewSet, basename="venue")
 
 urlpatterns = [
-    path("exams/upload/", upload_timetable_file, name="upload-exams"),
-    path("exams/upload", upload_timetable_file),
     path("exams-upload", TimetableUploadView.as_view(), name="api-exam-upload"),
 ]
 
