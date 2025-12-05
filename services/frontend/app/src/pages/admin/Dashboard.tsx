@@ -1,30 +1,17 @@
 import React, { useState } from "react";
 import {
   Box,
-  Button,
-  Paper,
-  Typography,
-  Alert,
-  CircularProgress,
   Grid,
   Card,
-  MenuItem,
-  Select,
-  InputLabel,
-  FormControl,
+  Typography,
+  Paper,
+  Button,
 } from "@mui/material";
-import {
-  Upload as UploadIcon,
-  CalendarToday as CalendarIcon,
-  People as PeopleIcon,
-  EventNote as ExamsIcon,
-  LocationOn as VenuesIcon,
-  AccountCircle as ProfileIcon,
-} from "@mui/icons-material";
+import { UploadFile } from "../../components/admin/UploadFile";
 
 interface Notification {
   id: number;
-  type: 
+  type:
     | "availability"
     | "cancellation"
     | "shiftPickup"
@@ -100,65 +87,11 @@ const mockNotifications: Notification[] = [
     type: "availability",
     message: "Invigilator Carlos Martinez submitted availability for 2025-11-25",
     timestamp: "2025-11-09T10:50:00Z",
-  }
+  },
 ];
 
 export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4); // show 4 by default
-  const [uploadType, setUploadType] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<{
-    type: "success" | "error" | null;
-    message: string;
-  }>({ type: null, message: "" });
-
-  const apiMap: Record<string, string> = {
-    exam: "/api/exams/upload",
-    provisions: "/api/provisions/upload",
-    invigilators: "/api/invigilators/upload",
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setUploadStatus({ type: null, message: "" });
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      setUploadStatus({ type: "error", message: "Please select a file first" });
-      return;
-    }
-
-    setUploading(true);
-    setUploadStatus({ type: null, message: "" });
-
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-
-      const response = await fetch(apiMap[uploadType], {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error("Upload failed");
-
-      const result = await response.json();
-      setUploadStatus({ type: "success", message: `Successfully uploaded ${selectedFile.name}. ${result.count || 0} records added.` });
-      setSelectedFile(null);
-
-      const fileInput = document.getElementById("file-upload") as HTMLInputElement;
-      if (fileInput) fileInput.value = "";
-    } catch (err) {
-      setUploadStatus({ type: "error", message: err instanceof Error ? err.message : "Failed to upload file" });
-    } finally {
-      setUploading(false);
-    }
-  };
 
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
@@ -166,62 +99,8 @@ export const AdminDashboard: React.FC = () => {
         Dashboard
       </Typography>
 
-      {/* Upload files */}
-      <Paper
-        elevation={2}
-        sx={{
-          p: 3,
-          mb: 3,
-        }}
-      >
-        <Typography variant="h6" gutterBottom>
-          Upload data
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Select the type of file to upload, choose it then submit.
-        </Typography>
-
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Select upload type...</InputLabel>
-            <Select
-              label="Select upload type..."
-              value={uploadType}
-              onChange={(e) => setUploadType(e.target.value)}
-            >
-              <MenuItem value=""><em>Choose...</em></MenuItem>
-              <MenuItem value="exam">Exam Timetable</MenuItem>
-              <MenuItem value="provisions">Student Provisions</MenuItem>
-              <MenuItem value="invigilators">Invigilator Data</MenuItem>
-            </Select>
-          </FormControl>
-
-          <Button variant="outlined" component="label" disabled={!uploadType}>
-            Choose File
-            <input
-              id="file-upload"
-              type="file"
-              hidden
-              accept=".csv,.xlsx,.xls"
-              onChange={handleFileChange}
-            />
-          </Button>
-
-          {selectedFile && <Typography variant="body2">{selectedFile.name}</Typography>}
-
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleUpload}
-            disabled={!selectedFile || uploading}
-            startIcon={uploading ? <CircularProgress size={20} /> : <UploadIcon />}
-          >
-            {uploading ? "Uploading..." : "Upload"}
-          </Button>
-
-          {uploadStatus.type && <Alert severity={uploadStatus.type}>{uploadStatus.message}</Alert>}
-        </Box>
-      </Paper>
+      {/* UploadTimetable Component */}
+      <UploadFile />
 
       {/* Statistics */}
       <Typography variant="h6" sx={{ mb: 2 }}>
@@ -240,7 +119,7 @@ export const AdminDashboard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%"  }}>
+          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
             <Typography variant="subtitle2" color="text.secondary">
               Total Invigilators
             </Typography>
@@ -251,7 +130,7 @@ export const AdminDashboard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%"  }}>
+          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
             <Typography variant="subtitle2" color="text.secondary">
               Active Venues
             </Typography>
@@ -262,7 +141,7 @@ export const AdminDashboard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%"  }}>
+          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
             <Typography variant="subtitle2" color="text.secondary">
               Upcoming Exams
             </Typography>
@@ -273,7 +152,7 @@ export const AdminDashboard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%"  }}>
+          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
             <Typography variant="subtitle2" color="text.secondary">
               Exams for Allocation
             </Typography>
@@ -284,7 +163,7 @@ export const AdminDashboard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%"  }}>
+          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
             <Typography variant="subtitle2" color="text.secondary">
               Slots to Allocate
             </Typography>
@@ -295,7 +174,7 @@ export const AdminDashboard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%"  }}>
+          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
             <Typography variant="subtitle2" color="text.secondary">
               Contracts Fulfilled
             </Typography>
