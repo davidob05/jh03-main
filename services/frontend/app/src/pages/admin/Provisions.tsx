@@ -1,6 +1,6 @@
 import React from "react";
 
-export const Provisions: React.FC = () => {
+export const AdminProvisions: React.FC = () => {
   return <div>
     
   </div>;

@@ -1,33 +1,37 @@
 import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
-import Box from '@mui/material/Box';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TablePagination from '@mui/material/TablePagination';
-import TableRow from '@mui/material/TableRow';
-import TableSortLabel from '@mui/material/TableSortLabel';
-import Toolbar from '@mui/material/Toolbar';
-import Typography from '@mui/material/Typography';
-import Collapse from '@mui/material/Collapse';
-import Paper from '@mui/material/Paper';
-import Checkbox from '@mui/material/Checkbox';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import SearchIcon from '@mui/icons-material/Search';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import InputBase from '@mui/material/InputBase';
+import {
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  TableSortLabel,
+  Toolbar,
+  Typography,
+  Collapse,
+  Paper,
+  Checkbox,
+  IconButton,
+  Tooltip,
+  InputBase,
+} from '@mui/material';
+import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { LineWeight } from '@mui/icons-material';
 
-import { apiBaseUrl } from '../utils/api';
+import { apiBaseUrl } from '../../utils/api';
+
+interface ExamVenueData {
+  exam_name: string;
+  start_time: string | null;
+  exam_length: number | null;
+}
 
 interface VenueData {
   venue_name: string;
@@ -40,26 +44,11 @@ interface VenueData {
   exam_venues: ExamVenueData[];
 }
 
-interface RowData {
-  id: string;
+interface VenueExamDetail {
   name: string;
-  capacity: number;
-  type: string;
-  accessibility: string;
-  provisionCapabilities: string;
-  examDetails: VenueExamDetail[];
-  examSearch: string;
-}
-
-interface VenueData {
-  venue_name: string;
-  capacity: number;
-  venuetype: string;
-  is_accessible: boolean;
-  qualifications: string[];
-  availability: unknown[];
-  provision_capabilities: string[];
-  exam_venues: ExamVenueData[];
+  start: string;
+  end: string;
+  duration: string;
 }
 
 interface RowData {
@@ -96,128 +85,76 @@ const fetchVenues = async (): Promise<VenueData[]> => {
   return response.json();
 };
 
-function formatLabel(text?: string): string {
+const formatLabel = (text?: string): string => {
   if (!text) return 'Unknown';
   const spaced = text.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
+};
 
-function formatDateTime(dateTime?: string): string {
+const formatDateTime = (dateTime?: string): string => {
   if (!dateTime) return 'N/A';
   const date = new Date(dateTime);
   if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleString('en-US', {
+  return date.toLocaleString('en-GB', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   });
-}
+};
 
-function formatDurationFromLength(length: number | null | undefined): string {
+const formatDurationFromLength = (length: number | null | undefined): string => {
   if (length == null) return 'N/A';
   const hours = Math.floor(length / 60);
   const minutes = Math.round(length % 60);
   const parts = [];
   if (hours) parts.push(`${hours}h`);
   if (minutes) parts.push(`${minutes}m`);
-  return parts.length ? parts.join(' ') : '0m';
-}
+  return parts.join(' ') || '0m';
+};
 
-function calculateEndTime(startTime: string | null, examLength: number | null): string {
-  if (!startTime || examLength == null) return '';
-  const start = new Date(startTime);
-  if (Number.isNaN(start.getTime())) return '';
-  const end = new Date(start.getTime() + examLength * 60000);
+const calculateEndTime = (start: string | null, length: number | null): string => {
+  if (!start || length == null) return '';
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return '';
+  const end = new Date(startDate.getTime() + length * 60000);
   return end.toISOString();
-}
+};
 
-function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
-  if (b[orderBy] < a[orderBy]) {
-    return -1;
-  }
-  if (b[orderBy] > a[orderBy]) {
-    return 1;
-  }
+const descendingComparator = <T,>(a: T, b: T, orderBy: keyof T) => {
+  if (b[orderBy] < a[orderBy]) return -1;
+  if (b[orderBy] > a[orderBy]) return 1;
   return 0;
-}
+};
 
-function getComparator<Key extends keyof RowData>(
+const getComparator = <Key extends keyof RowData>(
   order: Order,
   orderBy: Key,
-): ((a: RowData, b: RowData) => number) {
-  return order === 'desc'
+): ((a: RowData, b: RowData) => number) =>
+  order === 'desc'
     ? (a, b) => descendingComparator(a, b, orderBy)
     : (a, b) => -descendingComparator(a, b, orderBy);
-}
-
-interface HeadCell {
-  disablePadding: boolean;
-  id: keyof VenueData;
-  id: keyof VenueData;
-  label: string;
-  numeric: boolean;
-}
-
-const headCells: readonly HeadCell[] = [
-  {
-    id: 'code',
-    numeric: false,
-    disablePadding: true,
-    label: 'Venue Code',
-    label: 'Venue Code',
-  },
-  {
-    id: 'name',
-    id: 'name',
-    numeric: false,
-    disablePadding: false,
-    label: 'Name',
-    label: 'Name',
-  },
-  {
-    id: 'building',
-    id: 'building',
-    numeric: false,
-    disablePadding: false,
-    label: 'Building',
-    label: 'Building',
-  },
-  {
-    id: 'capacity',
-    numeric: true,
-    id: 'capacity',
-    numeric: true,
-    disablePadding: false,
-    label: 'Capacity',
-    label: 'Capacity',
-  },
-  {
-    id: 'type',
-    id: 'type',
-    numeric: false,
-    disablePadding: false,
-    label: 'Type',
-    label: 'Type',
-  },
-];
 
 interface EnhancedTableProps {
   numSelected: number;
-  onRequestSort: (event: React.MouseEvent<unknown>, property: keyof RowData) => void;
-  onSelectAllClick: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRequestSort: (e: React.MouseEvent<unknown>, p: keyof RowData) => void;
+  onSelectAllClick: (e: React.ChangeEvent<HTMLInputElement>) => void;
   order: Order;
   orderBy: keyof RowData;
   rowCount: number;
 }
 
-function EnhancedTableHead(props: EnhancedTableProps) {
-  const { onSelectAllClick, order, orderBy, numSelected, rowCount, onRequestSort } =
-    props;
+const EnhancedTableHead = ({
+  numSelected,
+  onRequestSort,
+  onSelectAllClick,
+  order,
+  orderBy,
+  rowCount,
+}: EnhancedTableProps) => {
   const createSortHandler =
-    (property: keyof RowData) => (event: React.MouseEvent<unknown>) => {
+    (property: keyof RowData) => (event: React.MouseEvent<unknown>) =>
       onRequestSort(event, property);
-    };
 
   return (
     <TableHead>
@@ -225,15 +162,12 @@ function EnhancedTableHead(props: EnhancedTableProps) {
         <TableCell padding="checkbox">
           <Checkbox
             color="primary"
-            indeterminate={numSelected > 0 && numSelected < rowCount}
             checked={rowCount > 0 && numSelected === rowCount}
+            indeterminate={numSelected > 0 && numSelected < rowCount}
             onChange={onSelectAllClick}
-            inputProps={{
-              'aria-label': 'select all venues',
-              'aria-label': 'select all venues',
-            }}
           />
         </TableCell>
+
         {headCells.map((headCell) => (
           <TableCell
             key={headCell.id}
@@ -255,11 +189,12 @@ function EnhancedTableHead(props: EnhancedTableProps) {
             </TableSortLabel>
           </TableCell>
         ))}
+
         <TableCell align="center">Details</TableCell>
       </TableRow>
     </TableHead>
   );
-}
+};
 
 interface EnhancedTableToolbarProps {
   numSelected: number;
@@ -267,17 +202,11 @@ interface EnhancedTableToolbarProps {
   onSearchChange: (query: string) => void;
 }
 
-function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
-  const { numSelected, searchQuery, onSearchChange } = props;
-  const { numSelected, searchQuery, onSearchChange } = props;
-
+const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange }: EnhancedTableToolbarProps) => {
   return (
     <Toolbar
       sx={[
-        {
-          pl: { sm: 2 },
-          pr: { xs: 1, sm: 1 },
-        },
+        { pl: { sm: 2 }, pr: { xs: 1, sm: 1 } },
         numSelected > 0 && {
           bgcolor: (theme) =>
             alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity),
@@ -285,24 +214,13 @@ function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
       ]}
     >
       {numSelected > 0 ? (
-        <Typography
-          sx={{ flex: '1 1 100%' }}
-          color="inherit"
-          variant="subtitle1"
-          component="div"
-        >
+        <Typography sx={{ flex: '1 1 100%' }} color="inherit" variant="subtitle1">
           {numSelected} selected
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 100%' }}>
-          <Typography
-            variant="h6"
-            id="tableTitle"
-            component="div"
-          >
-            Venues
-            Venues
-          </Typography>
+          <Typography variant="h6">Venues</Typography>
+
           <Box
             sx={{
               display: 'flex',
@@ -315,8 +233,7 @@ function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
           >
             <SearchIcon sx={{ color: 'action.active', mr: 1 }} />
             <InputBase
-              placeholder="Search venues..."
-              placeholder="Search venues..."
+              placeholder="Search venues…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               sx={{ width: 250 }}
@@ -324,25 +241,26 @@ function EnhancedTableToolbar(props: EnhancedTableToolbarProps) {
           </Box>
         </Box>
       )}
-      {numSelected > 0 ? (
+
+      {numSelected > 0 && (
         <Box sx={{ display: 'flex', gap: 1 }}>
-          {numSelected === 1 ? (
+          {numSelected === 1 && (
             <Tooltip title="Edit">
               <IconButton>
                 <EditIcon />
               </IconButton>
             </Tooltip>
-          ) : null}
+          )}
           <Tooltip title="Delete">
             <IconButton>
               <DeleteIcon />
             </IconButton>
           </Tooltip>
         </Box>
-      ) : null}
+      )}
     </Toolbar>
   );
-}
+};
 
 export const AdminVenues: React.FC = () => {
   const [order, setOrder] = React.useState<Order>('asc');
@@ -363,40 +281,35 @@ export const AdminVenues: React.FC = () => {
     queryFn: fetchVenues,
   });
 
-  const rows = React.useMemo<RowData[]>(() => {
-    return venuesData.map((venue) => ({
-      id: venue.venue_name,
-      name: venue.venue_name,
-      capacity: venue.capacity,
-      type: formatLabel(venue.venuetype),
-      accessibility: venue.is_accessible ? 'Yes' : 'No',
-      provisionCapabilities: (venue.provision_capabilities || []).join(', '),
-      examDetails: (venue.exam_venues || []).map((examVenue) => {
-        const endTime = calculateEndTime(examVenue.start_time, examVenue.exam_length);
-        return {
-          name: examVenue.exam_name,
-          start: examVenue.start_time || '',
-          end: endTime,
-          duration: formatDurationFromLength(examVenue.exam_length),
-        };
-      }),
-      examSearch: (venue.exam_venues || []).map((ev) => ev.exam_name).join(', '),
-    }));
-  }, [venuesData]);
+  const rows = React.useMemo<RowData[]>(
+    () =>
+      venuesData.map((venue) => ({
+        id: venue.venue_name,
+        name: venue.venue_name,
+        capacity: venue.capacity,
+        type: formatLabel(venue.venuetype),
+        accessibility: venue.is_accessible ? 'Yes' : 'No',
+        provisionCapabilities: (venue.provision_capabilities || []).join(', '),
+        examDetails: (venue.exam_venues || []).map((ex) => ({
+          name: ex.exam_name,
+          start: ex.start_time || '',
+          end: calculateEndTime(ex.start_time, ex.exam_length),
+          duration: formatDurationFromLength(ex.exam_length),
+        })),
+        examSearch: (venue.exam_venues || []).map((ev) => ev.exam_name).join(', '),
+      })),
+    [venuesData],
+  );
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      const newSelecteds = rows.map((n) => n.id);
-      setSelected(newSelecteds);
+      setSelected(rows.map((n) => n.id));
       return;
     }
     setSelected([]);
   };
 
-  const handleRequestSort = (
-    event: React.MouseEvent<unknown>,
-    property: keyof RowData,
-  ) => {
+  const handleRequestSort = (event: React.MouseEvent<unknown>, property: keyof RowData) => {
     const isAsc = orderBy === property && order === 'asc';
     setOrder(isAsc ? 'desc' : 'asc');
     setOrderBy(property);
@@ -406,63 +319,40 @@ export const AdminVenues: React.FC = () => {
     const selectedIndex = selected.indexOf(id);
     let newSelected: readonly string[] = [];
 
-    if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selected, id);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selected.slice(1));
-    } else if (selectedIndex === selected.length - 1) {
+    if (selectedIndex === -1) newSelected = newSelected.concat(selected, id);
+    else if (selectedIndex === 0) newSelected = newSelected.concat(selected.slice(1));
+    else if (selectedIndex === selected.length - 1)
       newSelected = newSelected.concat(selected.slice(0, -1));
-    } else if (selectedIndex > 0) {
+    else if (selectedIndex > 0)
       newSelected = newSelected.concat(
         selected.slice(0, selectedIndex),
-
-} from "@mui/material";
-import { Container, Table, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { C  selected.slice(selectedIndex + 1),
+        selected.slice(selectedIndex + 1),
       );
-    }
+
     setSelected(newSelected);
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q);
     setPage(0);
   };
 
   const filteredRows = React.useMemo(() => {
     if (!searchQuery) return rows;
+    const q = searchQuery.toLowerCase();
 
-    const lowerQuery = searchQuery.toLowerCase();
     return rows.filter(
       (row) =>
-        row.name.toLowerCase().includes(lowerQuery) ||
-        row.type.toLowerCase().includes(lowerQuery) ||
-        row.accessibility.toLowerCase().includes(lowerQuery) ||
-        row.examSearch.toLowerCase().includes(lowerQuery) ||
-        row.provisionCapabilities.toLowerCase().includes(lowerQuery) ||
-        row.capacity.toString().includes(lowerQuery)
-        row.name.toLowerCase().includes(lowerQuery) ||
-        row.type.toLowerCase().includes(lowerQuery) ||
-        row.accessibility.toLowerCase().includes(lowerQuery) ||
-        row.examSearch.toLowerCase().includes(lowerQuery) ||
-        row.provisionCapabilities.toLowerCase().includes(lowerQuery) ||
-        row.capacity.toString().includes(lowerQuery)
+        row.name.toLowerCase().includes(q) ||
+        row.type.toLowerCase().includes(q) ||
+        row.accessibility.toLowerCase().includes(q) ||
+        row.examSearch.toLowerCase().includes(q) ||
+        row.provisionCapabilities.toLowerCase().includes(q) ||
+        row.capacity.toString().includes(q),
     );
   }, [rows, searchQuery]);
 
-  const emptyRows =
-    page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredRows.length) : 0;
+  const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredRows.length) : 0;
 
   const visibleRows = React.useMemo(
     () =>
@@ -472,42 +362,37 @@ import { C  selected.slice(selectedIndex + 1),
     [order, orderBy, page, rowsPerPage, filteredRows],
   );
 
-  if (isLoading) {
+  if (isLoading)
     return (
-      <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}>
-        <Paper sx={{ width: '100%', p: 4, textAlign: 'center' }}>
-          <Typography variant="h6">Loading venues...</Typography>
+      <Box sx={{ width: '100%', maxWidth: 1050, mx: 'auto', p: 3 }}>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6">Loading venues…</Typography>
         </Paper>
       </Box>
     );
-  }
 
-  if (isError) {
+  if (isError)
     return (
-      <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}>
-        <Paper sx={{ width: '100%', p: 4, textAlign: 'center' }}>
+      <Box sx={{ width: '100%', maxWidth: 1050, mx: 'auto', p: 3 }}>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography color="error" variant="h6">
             {error?.message || 'Failed to load venues'}
           </Typography>
         </Paper>
       </Box>
     );
-  }
 
   return (
-    <Box sx={{ width: "100%", maxWidth: 1050, p: 3, mx: "auto" }}>
+    <Box sx={{ width: '100%', maxWidth: 1050, mx: 'auto', p: 3 }}>
       <Paper sx={{ width: '100%', mb: 2 }}>
         <EnhancedTableToolbar
           numSelected={selected.length}
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
         />
+
         <TableContainer>
-          <Table
-            sx={{ minWidth: 750 }}
-            aria-labelledby="tableTitle"
-            size="medium"
-          >
+          <Table sx={{ minWidth: 750 }} size="medium">
             <EnhancedTableHead
               numSelected={selected.length}
               order={order}
@@ -516,6 +401,7 @@ import { C  selected.slice(selectedIndex + 1),
               onRequestSort={handleRequestSort}
               rowCount={filteredRows.length}
             />
+
             <TableBody>
               {visibleRows.map((row, index) => {
                 const isItemSelected = selected.includes(row.id);
@@ -524,38 +410,29 @@ import { C  selected.slice(selectedIndex + 1),
 
                 return (
                   <React.Fragment key={row.id}>
-                    <TableRow
-                      hover
-                      role="checkbox"
-                      aria-checked={isItemSelected}
-                      tabIndex={-1}
-                      selected={isItemSelected}
-                    >
+                    <TableRow hover role="checkbox" aria-checked={isItemSelected} selected={isItemSelected}>
                       <TableCell padding="checkbox">
                         <Checkbox
                           color="primary"
                           checked={isItemSelected}
                           onClick={(event) => handleClick(event, row.id)}
-                          inputProps={{
-                            'aria-labelledby': labelId,
-                          }}
+                          inputProps={{ 'aria-labelledby': labelId }}
                         />
                       </TableCell>
-                      <TableCell
-                        component="th"
-                        id={labelId}
-                        scope="row"
-                        padding="none"
-                      >
-                        <Link to={`/venues/${row.id}`}><MUILink style={{ cursor: 'pointer' }}>{row.name}</MUILink></Link>
+
+                      <TableCell id={labelId} component="th" scope="row" padding="none">
+                        <Link to={`/venues/${row.id}`}>
+                          <MUILink sx={{ cursor: 'pointer' }}>{row.name}</MUILink>
+                        </Link>
                       </TableCell>
+
                       <TableCell align="right">{row.capacity}</TableCell>
                       <TableCell>{row.type}</TableCell>
                       <TableCell>{row.accessibility}</TableCell>
                       <TableCell>{row.provisionCapabilities || '—'}</TableCell>
+
                       <TableCell align="center">
                         <IconButton
-                          aria-label={isOpen ? 'Collapse venue details' : 'Expand venue details'}
                           onClick={() =>
                             setOpenRows((prev) => ({
                               ...prev,
@@ -572,15 +449,17 @@ import { C  selected.slice(selectedIndex + 1),
                         </IconButton>
                       </TableCell>
                     </TableRow>
+
                     <TableRow>
-                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={headCells.length + 2}>
-                        <Collapse in={isOpen} timeout="auto" unmountOnExit>
-                          <Box sx={{ margin: 2 }}>
+                      <TableCell colSpan={headCells.length + 2} sx={{ py: 0 }}>
+                        <Collapse in={isOpen} unmountOnExit>
+                          <Box sx={{ m: 2 }}>
                             <Typography variant="subtitle1" gutterBottom>
                               Exams in this venue
                             </Typography>
-                            {row.examDetails.length ? (
-                              <Table size="small" aria-label="exams">
+
+                            {row.examDetails.length > 0 ? (
+                              <Table size="small">
                                 <TableHead>
                                   <TableRow>
                                     <TableCell>Exam</TableCell>
@@ -592,7 +471,7 @@ import { C  selected.slice(selectedIndex + 1),
                                 <TableBody>
                                   {row.examDetails.map((exam) => (
                                     <TableRow key={`${row.id}-${exam.name}-${exam.start}`}>
-                                      <TableCell>{exam.name || 'Untitled exam'}</TableCell>
+                                      <TableCell>{exam.name}</TableCell>
                                       <TableCell>{formatDateTime(exam.start)}</TableCell>
                                       <TableCell>{formatDateTime(exam.end)}</TableCell>
                                       <TableCell>{exam.duration}</TableCell>
@@ -612,30 +491,29 @@ import { C  selected.slice(selectedIndex + 1),
                   </React.Fragment>
                 );
               })}
+
               {emptyRows > 0 && (
-                <TableRow
-                  style={{
-                    height: 53 * emptyRows,
-                  }}
-                >
-                  <TableCell colSpan={7} />
-                  <TableCell colSpan={7} />
+                <TableRow style={{ height: 53 * emptyRows }}>
+                  <TableCell colSpan={headCells.length + 2} />
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
+
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
           count={filteredRows.length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
+          onPageChange={(e, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
         />
       </Paper>
     </Box>
   );
-};
 };

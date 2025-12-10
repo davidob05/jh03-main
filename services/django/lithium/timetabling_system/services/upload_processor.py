@@ -879,7 +879,12 @@ def _create_exam_venue_links(
         )
 
         if conflict:
-            exam_venue = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
+            # Conflict: create or update a placeholder so we do not double-book the room.
+            exam_venue = (
+                ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
+                or ExamVenue.objects.filter(exam=exam, venue=venue).first()
+            )
+            created = False
             if not exam_venue:
                 exam_venue = ExamVenue.objects.create(
                     exam=exam,
@@ -888,19 +893,22 @@ def _create_exam_venue_links(
                     exam_length=exam_length,
                     core=True,
                 )
-            else:
-                updates = []
-                if start_time and exam_venue.start_time != start_time:
-                    exam_venue.start_time = start_time
-                    updates.append("start_time")
-                if exam_length is not None and exam_venue.exam_length != exam_length:
-                    exam_venue.exam_length = exam_length
-                    updates.append("exam_length")
-                if exam_venue.core is not True:
-                    exam_venue.core = True
-                    updates.append("core")
-                if updates:
-                    exam_venue.save(update_fields=updates)
+                created = True
+            updates = []
+            if exam_venue.venue is not None:
+                exam_venue.venue = None
+                updates.append("venue")
+            if start_time and exam_venue.start_time != start_time:
+                exam_venue.start_time = start_time
+                updates.append("start_time")
+            if exam_length is not None and exam_venue.exam_length != exam_length:
+                exam_venue.exam_length = exam_length
+                updates.append("exam_length")
+            if exam_venue.core is not True:
+                exam_venue.core = True
+                updates.append("core")
+            if updates and not created:
+                exam_venue.save(update_fields=updates)
             continue
 
         exam_venue, created = ExamVenue.objects.get_or_create(
@@ -1029,63 +1037,6 @@ def _required_capabilities(provisions: List[str]) -> List[str]:
         if cap and cap not in caps:
             caps.append(cap)
     return caps
-
-
-def _find_matching_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamVenue]:
-    if not exam:
-        return None
-    exam_venues = ExamVenue.objects.filter(exam=exam)
-    if not required_caps:
-        return exam_venues.first()
-    for ev in exam_venues:
-        current = ev.provision_capabilities or []
-        if all(cap in current for cap in required_caps):
-            return ev
-    return None
-
-
-def _allocate_exam_venue(exam: Exam, required_caps: List[str]) -> Optional[ExamVenue]:
-    if not exam or not required_caps:
-        return None
-
-    exam_date = getattr(exam, "date_exam", None)
-    iso_date = exam_date.isoformat() if exam_date else None
-
-    def _compatible(venue: Venue) -> bool:
-        venue_caps = venue.provision_capabilities or []
-        if required_caps and not all(cap in venue_caps for cap in required_caps):
-            return False
-        if ExamVenueProvisionType.ACCESSIBLE_HALL in required_caps and not venue.is_accessible:
-            return False
-        if ExamVenueProvisionType.USE_COMPUTER in required_caps and venue.venuetype not in (
-            VenueType.COMPUTER_CLUSTER,
-            VenueType.PURPLE_CLUSTER,
-        ):
-            return False
-        if ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN in required_caps and venue.venuetype != VenueType.SEPARATE_ROOM:
-            return False
-        if ExamVenueProvisionType.SEPARATE_ROOM_NOT_ON_OWN in required_caps and venue.venuetype != VenueType.SEPARATE_ROOM:
-            return False
-        return True
-
-    candidates = []
-    for venue in Venue.objects.all():
-        if not _compatible(venue):
-            continue
-        availability = venue.availability or []
-        if iso_date and availability and iso_date not in availability:
-            continue
-        candidates.append(venue)
-
-    if not candidates:
-        return None
-
-    selected = candidates[0]
-    return ExamVenue.objects.create(
-        exam=exam,
-        venue=selected,
-        provision_capabilities=required_caps,
-    )
 
 
 @transaction.atomic
