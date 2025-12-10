@@ -201,7 +201,7 @@ export const AdminCalendar: React.FC = () => {
         <Typography variant="h4" fontWeight={700}>
           Exams Calendar
         </Typography>
-        <Typography variant="h6" color="text.secondary">
+        <Typography variant="h6" color="text.secondary" data-testid="date-header">
           {formatDate(currentDate)}
         </Typography>
       </Stack>
@@ -271,6 +271,7 @@ export const AdminCalendar: React.FC = () => {
                   placement="top"
                 >
                   <Paper
+                    data-testid={`exam-${exam.id}`}
                     elevation={3}
                     onClick={() => handleExamClick(exam)}
                     sx={{
@@ -419,6 +420,7 @@ export const AdminCalendar: React.FC = () => {
                         >
                           <Box
                             key={exam.id}
+                            data-testid={`exam-${exam.id}`}
                             onClick={() => handleExamClick(exam)}
                             sx={{
                               position: "absolute",
