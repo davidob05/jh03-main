@@ -159,5 +159,70 @@ class UploadLog(models.Model):  # this lets us view upload history
     records_created = models.IntegerField(default=0)
     records_updated = models.IntegerField(default=0)
 
+
+
     def __str__(self):
         return f"{self.file_name} by {self.uploaded_by} on {self.uploaded_at:%Y-%m-%d %H:%M}"
+
+
+class Invigilator(models.Model):
+    preferred_name = models.CharField(max_length=255)
+    full_name = models.CharField(max_length=255)
+
+    mobile = models.CharField(max_length=30, blank=True, null=True)
+    mobile_text_only = models.CharField(max_length=30, blank=True, null=True)
+    alt_phone = models.CharField(max_length=30, blank=True, null=True)
+
+    university_email = models.EmailField(blank=True, null=True)
+    personal_email = models.EmailField(blank=True, null=True)
+
+    notes = models.TextField(blank=True, null=True)
+
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.preferred_name or self.full_name
+
+
+class InvigilatorAssignment(models.Model):
+    invigilator = models.ForeignKey(
+        Invigilator,
+        on_delete=models.CASCADE,
+        related_name="assignments"
+    )
+
+    exam = models.ForeignKey(
+        Exam,
+        on_delete=models.CASCADE,
+        related_name="invigilator_assignments"
+    )
+
+    venue = models.ForeignKey(
+        Venue,
+        on_delete=models.CASCADE,
+        related_name="invigilator_assignments"
+    )
+
+    role = models.CharField(
+        max_length=50,
+        choices=[
+            ("lead", "Lead Invigilator"),
+            ("assistant", "Assistant Invigilator"),
+            ("support", "Support Invigilator"),
+        ],
+        default="assistant"
+    )
+
+    assigned_start = models.DateTimeField()
+    assigned_end = models.DateTimeField()
+
+    notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        unique_together = ("invigilator", "exam", "venue")
+
+    def __str__(self):
+        return f"{self.invigilator} → {self.exam} @ {self.venue}"
+
+
+
