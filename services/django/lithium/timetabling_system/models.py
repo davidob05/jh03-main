@@ -191,14 +191,8 @@ class InvigilatorAssignment(models.Model):
         related_name="assignments"
     )
 
-    exam = models.ForeignKey(
-        Exam,
-        on_delete=models.CASCADE,
-        related_name="invigilator_assignments"
-    )
-
-    venue = models.ForeignKey(
-        Venue,
+    exam_venue = models.ForeignKey(
+        ExamVenue,
         on_delete=models.CASCADE,
         related_name="invigilator_assignments"
     )
@@ -219,10 +213,9 @@ class InvigilatorAssignment(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     class Meta:
-        unique_together = ("invigilator", "exam", "venue")
+        unique_together = ("invigilator", "exam_venue")
 
     def __str__(self):
-        return f"{self.invigilator} → {self.exam} @ {self.venue}"
-
+        return f"{self.invigilator} → {self.exam_venue}"
 
 
