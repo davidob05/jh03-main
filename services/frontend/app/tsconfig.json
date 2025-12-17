@@ -7,7 +7,13 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": true,
-    "types": ["vitest", "vite/client", "jest", "node"]
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
+    "types": ["vitest/globals", "@testing-library/jest-dom", "vite/client", "node"]
   },
-  "include": ["src", "tests"]
+  "include": ["src", "tests", "vitest.d.ts", "setupTests.ts"]
 }
