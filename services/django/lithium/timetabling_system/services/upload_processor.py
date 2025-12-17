@@ -879,32 +879,32 @@ def _create_exam_venue_links(
         )
 
         if conflict:
-            # Still record the venue from the upload so the timetable reflects the sheet,
-            # even if it clashes with another exam. Conflict resolution happens downstream.
-            exam_venue, created = ExamVenue.objects.get_or_create(
-                exam=exam,
-                venue=venue,
-                defaults={
-                    "start_time": start_time,
-                    "exam_length": exam_length,
-                    "core": True,
-                },
-            )
-
-            updates = []
-            if start_time and exam_venue.start_time != start_time:
-                exam_venue.start_time = start_time
-                updates.append("start_time")
-            if exam_length is not None and exam_venue.exam_length != exam_length:
-                exam_venue.exam_length = exam_length
-                updates.append("exam_length")
-            if exam_venue.core is not True:
-                exam_venue.core = True
-                updates.append("core")
-            if updates and not created:
-                exam_venue.save(update_fields=updates)
-            # Remove any placeholders for this exam now that we have a concrete venue.
-            ExamVenue.objects.filter(exam=exam, venue__isnull=True).delete()
+            # If the requested venue clashes with an existing booking, fall back to a placeholder
+            # so downstream allocation can pick an alternative without tying the exam to a busy room.
+            exam_venue = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
+            if not exam_venue:
+                exam_venue = ExamVenue.objects.create(
+                    exam=exam,
+                    venue=None,
+                    start_time=start_time,
+                    exam_length=exam_length,
+                    core=True,
+                )
+            else:
+                updates = []
+                if start_time and exam_venue.start_time != start_time:
+                    exam_venue.start_time = start_time
+                    updates.append("start_time")
+                if exam_length is not None and exam_venue.exam_length != exam_length:
+                    exam_venue.exam_length = exam_length
+                    updates.append("exam_length")
+                if exam_venue.core is not True:
+                    exam_venue.core = True
+                    updates.append("core")
+                if updates:
+                    exam_venue.save(update_fields=updates)
+            # Make sure no conflicting venue link lingers for this exam.
+            ExamVenue.objects.filter(exam=exam, venue=venue).exclude(pk=exam_venue.pk).delete()
             continue
 
         exam_venue, created = ExamVenue.objects.get_or_create(
