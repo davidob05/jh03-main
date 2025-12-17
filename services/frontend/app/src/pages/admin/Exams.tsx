@@ -20,6 +20,7 @@ import {
   Tooltip,
   InputBase,
   Link as MUILink,
+  CircularProgress,
 } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
 import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
@@ -283,7 +284,13 @@ export const AdminExams: React.FC = () => {
   const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredRows.length) : 0;
   const visibleRows = React.useMemo(() => [...filteredRows].sort(getComparator(order, orderBy)).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage), [order, orderBy, page, rowsPerPage, filteredRows]);
 
-  if (isLoading) return <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}><Paper sx={{ width: '100%', p: 4, textAlign: 'center' }}><Typography variant="h6">Loading exams...</Typography></Paper></Box>;
+  if (isLoading) 
+    return (
+      <Box sx={{ p: 6, textAlign: 'center' }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }}>Loading exams…</Typography>
+      </Box>
+    );
   if (isError) return <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}><Paper sx={{ width: '100%', p: 4, textAlign: 'center' }}><Typography color="error" variant="h6">{error?.message || 'Failed to load exams'}</Typography></Paper></Box>;
 
   return (
