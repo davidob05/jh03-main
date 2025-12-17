@@ -3,11 +3,24 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from timetabling_system.models import Exam, ExamVenue, Venue
+from timetabling_system.models import (
+    Exam,
+    ExamVenue,
+    Invigilator,
+    InvigilatorAssignment,
+    Venue,
+)
 from timetabling_system.services import ingest_upload_result
 from timetabling_system.utils.excel_parser import parse_excel_file
 from timetabling_system.utils.venue_ingest import upsert_venues
-from .serializers import ExamSerializer, ExamVenueSerializer, ExamVenueWriteSerializer, VenueSerializer
+from .serializers import (
+    ExamSerializer,
+    ExamVenueSerializer,
+    ExamVenueWriteSerializer,
+    InvigilatorAssignmentSerializer,
+    InvigilatorSerializer,
+    VenueSerializer,
+)
 
 
 class ExamViewSet(viewsets.ReadOnlyModelViewSet):
@@ -38,6 +51,23 @@ class ExamVenueViewSet(viewsets.ModelViewSet):
         if instance.core:
             raise ValidationError("Core exam venues cannot be deleted.")
         return super().perform_destroy(instance)
+
+
+class InvigilatorViewSet(viewsets.ModelViewSet):
+    queryset = Invigilator.objects.all().prefetch_related(
+        "assignments__exam_venue__exam",
+        "assignments__exam_venue__venue",
+    )
+    serializer_class = InvigilatorSerializer
+
+
+class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
+    queryset = InvigilatorAssignment.objects.select_related(
+        "invigilator",
+        "exam_venue__exam",
+        "exam_venue__venue",
+    ).all()
+    serializer_class = InvigilatorAssignmentSerializer
 
 
 class TimetableUploadView(APIView):

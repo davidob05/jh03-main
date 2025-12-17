@@ -1,5 +1,11 @@
 from rest_framework import serializers
-from timetabling_system.models import Exam, ExamVenue, Venue
+from timetabling_system.models import (
+    Exam,
+    ExamVenue,
+    Invigilator,
+    InvigilatorAssignment,
+    Venue,
+)
 
 
 class ExamVenueSerializer(serializers.ModelSerializer):
@@ -122,3 +128,56 @@ class VenueSerializer(serializers.ModelSerializer):
         exam_venues = getattr(obj, "_prefetched_objects_cache", {}).get("examvenue_set")
         if exam_venues is None: exam_venues = obj.examvenue_set.select_related("exam").all()
         return [ev.exam.exam_name for ev in exam_venues]
+
+
+class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
+    invigilator_name = serializers.SerializerMethodField()
+    exam_name = serializers.CharField(source="exam_venue.exam.exam_name", read_only=True)
+    venue_name = serializers.SerializerMethodField()
+    exam_start = serializers.DateTimeField(source="exam_venue.start_time", read_only=True)
+    exam_length = serializers.IntegerField(source="exam_venue.exam_length", read_only=True)
+
+    class Meta:
+        model = InvigilatorAssignment
+        fields = (
+            "id",
+            "invigilator",
+            "invigilator_name",
+            "exam_venue",
+            "exam_name",
+            "venue_name",
+            "exam_start",
+            "exam_length",
+            "role",
+            "assigned_start",
+            "assigned_end",
+            "notes",
+        )
+
+    def get_invigilator_name(self, obj):
+        invigilator = obj.invigilator
+        return invigilator.preferred_name or invigilator.full_name
+
+    def get_venue_name(self, obj):
+        venue = getattr(obj.exam_venue, "venue", None)
+        return venue.venue_name if venue else None
+
+
+class InvigilatorSerializer(serializers.ModelSerializer):
+    assignments = InvigilatorAssignmentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Invigilator
+        fields = (
+            "id",
+            "preferred_name",
+            "full_name",
+            "mobile",
+            "mobile_text_only",
+            "alt_phone",
+            "university_email",
+            "personal_email",
+            "notes",
+            "is_active",
+            "assignments",
+        )
