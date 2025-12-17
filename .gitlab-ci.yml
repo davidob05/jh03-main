@@ -88,7 +88,8 @@ test_frontend:
     - . .venv/bin/activate
     - pip install --upgrade pip
     - pip install --no-input -r requirements.txt
-    - python manage.py makemigrations --noinput
+    - mkdir -p timetabling_system/migrations
+    - python manage.py makemigrations timetabling_system --noinput
     - |
         python - <<'PY'
         import os
@@ -113,7 +114,7 @@ test_frontend:
         else:
             raise SystemExit("Database not ready after waiting")
         PY
-    - python manage.py migrate --noinput
+    - python manage.py migrate --noinput --run-syncdb
     - python manage.py test
 
 test_django:
