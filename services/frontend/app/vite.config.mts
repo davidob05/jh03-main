@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import path from "path";
 
 // Polyfill new ArrayBuffer/SharedArrayBuffer accessors when running under Node 18.
 if (typeof ArrayBuffer !== "undefined") {
@@ -31,10 +32,5 @@ export default defineConfig({
   preview: {
     host: "0.0.0.0",
     port: 3000
-  },
-  test: {
-    globals: true,
-    environment: "jsdom",
-    setupFiles: "./setupTests.ts"
   }
 });
