@@ -19,6 +19,7 @@ import {
   IconButton,
   Tooltip,
   InputBase,
+  CircularProgress,
 } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
@@ -364,10 +365,9 @@ export const AdminVenues: React.FC = () => {
 
   if (isLoading)
     return (
-      <Box sx={{ width: '100%', maxWidth: 1050, mx: 'auto', p: 3 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h6">Loading venues…</Typography>
-        </Paper>
+      <Box sx={{ p: 6, textAlign: 'center' }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }}>Loading venues…</Typography>
       </Box>
     );
 
