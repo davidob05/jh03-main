@@ -879,6 +879,8 @@ def _create_exam_venue_links(
         )
 
         if conflict:
+            # If the requested venue clashes with an existing booking, fall back to a placeholder
+            # so downstream allocation can pick an alternative without tying the exam to a busy room.
             exam_venue = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
             if not exam_venue:
                 exam_venue = ExamVenue.objects.create(
@@ -901,6 +903,8 @@ def _create_exam_venue_links(
                     updates.append("core")
                 if updates:
                     exam_venue.save(update_fields=updates)
+            # Make sure no conflicting venue link lingers for this exam.
+            ExamVenue.objects.filter(exam=exam, venue=venue).exclude(pk=exam_venue.pk).delete()
             continue
 
         exam_venue, created = ExamVenue.objects.get_or_create(
