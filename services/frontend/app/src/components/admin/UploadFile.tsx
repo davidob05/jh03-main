@@ -104,6 +104,7 @@ export const UploadFile: React.FC = () => {
         <FormControl fullWidth size="small">
           <InputLabel>Select file type...</InputLabel>
           <Select
+            data-testid="upload-type-select"
             value={uploadType}
             onChange={(e) => setUploadType(e.target.value)}
             label="Select file type..."
@@ -122,6 +123,7 @@ export const UploadFile: React.FC = () => {
             Choose File
             <input
               id="file-upload"
+              data-testid="file-upload"
               type="file"
               hidden
               accept=".csv,.xlsx,.xls"

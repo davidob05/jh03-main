@@ -63,6 +63,19 @@ describe("Components - InvigilatorAvailabilityModal", () => {
         });
         expect(screen.queryByText("John")).not.toBeInTheDocument();
     });
+    it ("displays the invigilator email if provided", () => {
+        const invigilators = [
+            {
+            id: 5,
+            preferred_name: "Sam",
+            email: "sam@example.com",
+            availableDates: ["2025-01-10"],
+            availableSlots: []
+            }
+        ];
+        renderComponent({ date: dayjs("2025-01-10"), invigilators });
+        expect(screen.getByText("sam@example.com")).toBeInTheDocument();
+    });
     it ("shows fallback when no availableSlots exist", () => {
         const invigilators = [
             {
