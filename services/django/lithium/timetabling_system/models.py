@@ -221,6 +221,13 @@ class UploadLog(models.Model):  # This gives a view of upload history
 
 
 class Invigilator(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invigilator_profile",
+    )
     preferred_name = models.CharField(max_length=255)
     full_name = models.CharField(max_length=255)
 
