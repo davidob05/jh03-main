@@ -107,7 +107,9 @@ class InvigilatorAdmin(admin.ModelAdmin):
         "full_name",
         "university_email",
         "contracted_hours",
+        "resigned",
     )
+    list_filter = ("resigned",)
     search_fields = (
         "preferred_name",
         "full_name",

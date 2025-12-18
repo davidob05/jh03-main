@@ -88,7 +88,6 @@ class InvigilatorRestrictionType(models.TextChoices):
     OSCE_GOLDEN_JUBILEE = "osce_golden_jubilee", "OSCE - Golden Jubilee"
     OSCE_WOLFSON = "osce_wolfson", "OSCE - Wolfson"
     OSCE_QUEEN_ELIZABETH = "osce_queen_elizabeth", "OSCE - Queen Elizabeth"
-    RESIGNED = "resigned", "Resigned"
     APPROVED_EXEMPTION = "approved_exemption", "Approved exemption"
 
 
@@ -236,6 +235,7 @@ class Invigilator(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     contracted_hours = models.FloatField(default=0)
+    resigned = models.BooleanField(default=False)
 
     def __str__(self):
         return self.preferred_name or self.full_name
