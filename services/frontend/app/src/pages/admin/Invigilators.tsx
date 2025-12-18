@@ -30,6 +30,9 @@ import {
   Tooltip,
   InputBase,
   Checkbox,
+  Fab,
+  Snackbar,
+  Alert,
   Link as MUILink,
 } from '@mui/material';
 import {
@@ -46,6 +49,8 @@ import {
   ArrowDownward,
   ArrowBack,
   ArrowForward,
+  Clear,
+  Done,
 } from '@mui/icons-material';
 import {
   StaticDatePicker,
@@ -63,11 +68,12 @@ interface Invigilator {
   full_name: string | null;
   mobile: string | null;
   mobile_text_only: string | null;
+  janet_txt: string | null;
   alt_phone: string | null;
   university_email: string | null;
   personal_email: string | null;
   notes: string | null;
-  is_active: boolean;
+  resigned: boolean;
   availableDates?: string[]; // Optional, as in original
   availableSlots?: string[]; // Optional, as in original
 }
@@ -86,7 +92,11 @@ export const AdminInvigilators: React.FC = () => {
   const { data: invigilatorsData = [], isLoading, isError, error } = useQuery<Invigilator[], Error>({ queryKey: ['invigilators'], queryFn: fetchInvigilators });
   const [invigilators, setInvigilators] = useState<Invigilator[]>([]);
   const [filtered, setFiltered] = useState<Invigilator[]>([]);
+
+  // Add Invigilator Dialog state
   const [addOpen, setAddOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = (searchParams.get("view") as ViewMode) || "grid";
@@ -348,16 +358,6 @@ export const AdminInvigilators: React.FC = () => {
             }}
           >
             LAST NAME
-          </Button>
-
-          {/* Add Invigilator Button */}
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => setAddOpen(true)}
-            sx={{ ml: 'auto' }}
-          >
-            Add Invigilator
           </Button>
         </Stack>
 
@@ -628,7 +628,7 @@ export const AdminInvigilators: React.FC = () => {
         {/* Pagination & Bulk Actions */}
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3} mt={4}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemove />) : (<PersonAddAlt1 />)} onClick={toggleSelectAll}>
+            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<Clear />) : (<Done />)} onClick={toggleSelectAll}>
               {selected.length === filtered.length
                 ? "Deselect all invigilators"
                 : `Select all ${filtered.length} invigilators`}
@@ -691,8 +691,53 @@ export const AdminInvigilators: React.FC = () => {
           </Box>
         )}
 
+        <Tooltip title="Add a new invigilator">
+          <Fab
+            color="primary"
+            size="large"
+            onClick={() => setAddOpen(true)}
+            sx={{
+              position: 'fixed',
+              bottom: 32,
+              right: 32,
+              boxShadow: 3,
+            }}
+          >
+            <PersonAddAlt1 fontSize="medium" />
+          </Fab>
+        </Tooltip>
+
         {/* Add Invigilator Dialog */}
-        <AddInvigilatorDialog open={addOpen} onClose={() => setAddOpen(false)} />
+        <AddInvigilatorDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onSuccess={(name) => {
+            setSuccessMessage(`${name} added successfully!`);
+            setSuccessOpen(true);
+          }}
+        />
+
+        <Snackbar
+          open={successOpen}
+          autoHideDuration={3000}
+          onClose={() => setSuccessOpen(false)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={() => setSuccessOpen(false)}
+            severity="success"
+            variant="filled"
+            sx={{
+              backgroundColor: '#d4edda',
+              color: '#155724',
+              border: '1px solid #155724',
+              borderRadius: '50px',
+              fontWeight: 500,
+            }}
+          >
+            {successMessage}
+          </Alert>
+        </Snackbar>
       </Box>
     </LocalizationProvider>
   );

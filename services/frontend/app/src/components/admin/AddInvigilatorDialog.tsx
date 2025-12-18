@@ -1,157 +1,321 @@
-import * as React from 'react';
-import { useState } from 'react';
+import * as React from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
-  FormControlLabel,
-  Checkbox,
   Button,
   CircularProgress,
-} from '@mui/material';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiBaseUrl } from '../../utils/api';
-import { Invigilator } from './types'; // Assume you have types; otherwise import from Invigilators.tsx
+  Stack,
+  Chip,
+  Stepper,
+  Step,
+  StepLabel,
+  Box,
+  IconButton,
+} from "@mui/material";
+import { Close } from "@mui/icons-material";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CollapsibleSection } from "../../components/CollapsibleSection";
+import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
+import { apiBaseUrl } from "../../utils/api";
+
+const STEPS = ["Personal Details", "Qualifications", "Restrictions", "Availability"];
+
+const DIET_CHOICES = [
+  { value: "DEC_2025", label: "December 2025" },
+  { value: "APR_MAY_2026", label: "April / May 2026" },
+  { value: "AUG_2026", label: "August 2026" },
+];
+
+const QUALIFICATION_CHOICES = [
+  { value: "SENIOR_INVIGILATOR", label: "Senior Invigilator" },
+  { value: "AKT_TRAINED", label: "AKT Trained" },
+  { value: "CHECK_IN", label: "Check-In" },
+];
+
+const RESTRICTION_CHOICES = [
+  { value: "accessibility_required", label: "Accessibility required" },
+  { value: "separate_room_only", label: "Separate room only" },
+  { value: "purple_cluster", label: "Purple cluster" },
+  { value: "computer_cluster", label: "Computer cluster" },
+  { value: "vet_school", label: "Vet School" },
+  { value: "sec", label: "Scottish Event Campus" },
+  { value: "osce_golden_jubilee", label: "OSCE - Golden Jubilee" },
+  { value: "osce_wolfson", label: "OSCE - Wolfson" },
+  { value: "osce_queen_elizabeth", label: "OSCE - Queen Elizabeth" },
+  { value: "approved_exemption", label: "Approved exemption" },
+];
 
 interface AddInvigilatorDialogProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: (name: string) => void;
 }
 
-export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({ open, onClose }) => {
+export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
+  open,
+  onClose,
+  onSuccess,
+}) => {
   const queryClient = useQueryClient();
-  const [preferredName, setPreferredName] = useState<string | null>(null);
-  const [fullName, setFullName] = useState<string | null>(null);
-  const [mobile, setMobile] = useState<string | null>(null);
-  const [mobileTextOnly, setMobileTextOnly] = useState<string | null>(null);
-  const [altPhone, setAltPhone] = useState<string | null>(null);
-  const [universityEmail, setUniversityEmail] = useState<string | null>(null);
-  const [personalEmail, setPersonalEmail] = useState<string | null>(null);
-  const [notes, setNotes] = useState<string | null>(null);
-  const [isActive, setIsActive] = useState(true);
+  const [activeStep, setActiveStep] = useState(0);
 
-  const addMutation = useMutation({
-    mutationFn: async (data: Omit<Invigilator, 'id' | 'availableDates' | 'availableSlots'>) => {
-      const response = await fetch(`${apiBaseUrl}/invigilators/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to add invigilator');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invigilators'] }); // Refresh list
-      handleClose(); // Close and reset
-    },
-  });
+  // Personal details
+  const [preferredName, setPreferredName] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [mobileTextOnly, setMobileTextOnly] = useState("");
+  const [janetTxt, setJanetTxt] = useState("");
+  const [altPhone, setAltPhone] = useState("");
+  const [universityEmail, setUniversityEmail] = useState("");
+  const [personalEmail, setPersonalEmail] = useState("");
+  const [notes, setNotes] = useState("");
 
-  const handleSubmit = () => {
-    addMutation.mutate({
-      preferred_name: preferredName,
-      full_name: fullName,
-      mobile,
-      mobile_text_only: mobileTextOnly,
-      alt_phone: altPhone,
-      university_email: universityEmail,
-      personal_email: personalEmail,
-      notes,
-      is_active: isActive,
-    });
+  // Multi-step selections
+  const [qualifications, setQualifications] = useState<string[]>([]);
+  const [restrictions, setRestrictions] = useState<string[]>([]);
+  const [resigned, setResigned] = useState(false);
+  const [availabilityDiets, setAvailabilityDiets] = useState<string[]>([]);
+
+  const toggleArrayValue = (
+    value: string,
+    setter: React.Dispatch<React.SetStateAction<string[]>>
+  ) => {
+    setter(prev =>
+      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+    );
   };
 
   const handleClose = () => {
-    // Reset form
-    setPreferredName(null);
-    setFullName(null);
-    setMobile(null);
-    setMobileTextOnly(null);
-    setAltPhone(null);
-    setUniversityEmail(null);
-    setPersonalEmail(null);
-    setNotes(null);
-    setIsActive(true);
+    setActiveStep(0);
+    setPreferredName("");
+    setFullName("");
+    setMobile("");
+    setMobileTextOnly("");
+    setJanetTxt("");
+    setAltPhone("");
+    setUniversityEmail("");
+    setPersonalEmail("");
+    setNotes("");
+    setQualifications([]);
+    setRestrictions([]);
+    setAvailabilityDiets([]);
     onClose();
   };
 
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`${apiBaseUrl}/invigilators/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preferred_name: preferredName,
+          full_name: fullName,
+          mobile,
+          mobile_text_only: mobileTextOnly,
+          janet_txt: janetTxt,
+          alt_phone: altPhone,
+          university_email: universityEmail,
+          personal_email: personalEmail,
+          notes,
+          resigned,
+
+          qualifications: qualifications.map(q => ({ qualification: q })),
+
+          restrictions: availabilityDiets.map(diet => ({
+            diet,
+            restrictions,
+            notes: "",
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text);
+      }
+
+      return response.json();
+    },
+
+    onSuccess: data => {
+      queryClient.invalidateQueries({ queryKey: ["invigilators"] });
+      onSuccess?.(data.preferred_name || data.full_name || "Invigilator");
+      handleClose();
+    },
+
+    onError: (err: any) => {
+      alert(`Failed to add invigilator: ${err.message}`);
+    },
+  });
+
+  const renderStepContent = () => {
+    switch (activeStep) {
+      case 0:
+        return (
+          <Stack spacing={2}>
+            <TextField label="Preferred Name" value={preferredName} onChange={e => setPreferredName(e.target.value)} fullWidth required />
+            <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required />
+            <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required />
+            <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth />
+            <TextField label="Janet txt" value={janetTxt} onChange={e => setJanetTxt(e.target.value)} fullWidth required />
+            <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth />
+            <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required />
+            <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required />
+            <TextField label="Notes" value={notes} onChange={e => setNotes(e.target.value)} fullWidth multiline rows={3} />
+            <BooleanCheckboxRow
+              label="Resigned"
+              value={resigned}
+              onChange={setResigned}
+              yesLabel="Has resigned"
+              noLabel="Active invigilator"
+            />
+          </Stack>
+        );
+
+      case 1:
+        return (
+          <CollapsibleSection title="Qualifications" defaultExpanded>
+            {QUALIFICATION_CHOICES.map(q => (
+              <BooleanCheckboxRow
+                key={q.value}
+                label={q.label}
+                value={qualifications.includes(q.value)}
+                onChange={() => toggleArrayValue(q.value, setQualifications)}
+              />
+            ))}
+          </CollapsibleSection>
+        );
+
+      case 2:
+        return (
+          <Stack spacing={2}>
+            {/* General Requirements */}
+            <CollapsibleSection title="General Requirements" defaultExpanded>
+              {["accessibility_required", "separate_room_only", "purple_cluster", "computer_cluster"].map(r => {
+                const choice = RESTRICTION_CHOICES.find(c => c.value === r);
+                if (!choice) return null;
+                return (
+                  <BooleanCheckboxRow
+                    key={choice.value}
+                    label={choice.label}
+                    value={restrictions.includes(choice.value)}
+                    onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                  />
+                );
+              })}
+            </CollapsibleSection>
+
+            {/* Locations & OSCE Sites */}
+            <CollapsibleSection title="Locations & OSCE Sites" defaultExpanded={false}>
+              {["vet_school", "sec", "osce_golden_jubilee", "osce_wolfson", "osce_queen_elizabeth"].map(r => {
+                const choice = RESTRICTION_CHOICES.find(c => c.value === r);
+                if (!choice) return null;
+                return (
+                  <BooleanCheckboxRow
+                    key={choice.value}
+                    label={choice.label}
+                    value={restrictions.includes(choice.value)}
+                    onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                  />
+                );
+              })}
+            </CollapsibleSection>
+
+            {/* Status / Exemptions */}
+            <CollapsibleSection title="Status / Exemptions" defaultExpanded={false}>
+              {["approved_exemption"].map(r => {
+                const choice = RESTRICTION_CHOICES.find(c => c.value === r);
+                if (!choice) return null;
+                return (
+                  <BooleanCheckboxRow
+                    key={choice.value}
+                    label={choice.label}
+                    value={restrictions.includes(choice.value)}
+                    onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                  />
+                );
+              })}
+            </CollapsibleSection>
+          </Stack>
+        );
+
+      case 3:
+        return (
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            {DIET_CHOICES.map(diet => {
+              const selected = availabilityDiets.includes(diet.value);
+              return (
+                <Chip
+                  key={diet.value}
+                  label={diet.label}
+                  clickable
+                  color={selected ? "primary" : "default"}
+                  variant={selected ? "filled" : "outlined"}
+                  onClick={() =>
+                    setAvailabilityDiets(prev =>
+                      prev.includes(diet.value)
+                        ? prev.filter(d => d !== diet.value)
+                        : [...prev, diet.value]
+                    )
+                  }
+                />
+              );
+            })}
+          </Stack>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const mandatoryFieldsFilled =
+    preferredName && fullName && mobile && universityEmail && personalEmail;
+
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Add New Invigilator</DialogTitle>
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        Add New Invigilator
+        <IconButton onClick={handleClose} sx={{ position: "absolute", right: 8, top: 8 }}>
+          <Close />
+        </IconButton>
+      </DialogTitle>
+
       <DialogContent>
-        <TextField
-          label="Preferred Name"
-          fullWidth
-          margin="normal"
-          value={preferredName || ''}
-          onChange={(e) => setPreferredName(e.target.value || null)}
-        />
-        <TextField
-          label="Full Name"
-          fullWidth
-          margin="normal"
-          value={fullName || ''}
-          onChange={(e) => setFullName(e.target.value || null)}
-        />
-        <TextField
-          label="Mobile"
-          fullWidth
-          margin="normal"
-          value={mobile || ''}
-          onChange={(e) => setMobile(e.target.value || null)}
-        />
-        <TextField
-          label="Mobile Text Only"
-          fullWidth
-          margin="normal"
-          value={mobileTextOnly || ''}
-          onChange={(e) => setMobileTextOnly(e.target.value || null)}
-        />
-        <TextField
-          label="Alternative Phone"
-          fullWidth
-          margin="normal"
-          value={altPhone || ''}
-          onChange={(e) => setAltPhone(e.target.value || null)}
-        />
-        <TextField
-          label="University Email"
-          fullWidth
-          margin="normal"
-          value={universityEmail || ''}
-          onChange={(e) => setUniversityEmail(e.target.value || null)}
-        />
-        <TextField
-          label="Personal Email"
-          fullWidth
-          margin="normal"
-          value={personalEmail || ''}
-          onChange={(e) => setPersonalEmail(e.target.value || null)}
-        />
-        <TextField
-          label="Notes"
-          fullWidth
-          multiline
-          rows={4}
-          margin="normal"
-          value={notes || ''}
-          onChange={(e) => setNotes(e.target.value || null)}
-        />
-        <FormControlLabel
-          control={<Checkbox checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />}
-          label="Is Active"
-        />
+        <Stepper activeStep={activeStep} alternativeLabel>
+          {STEPS.map(step => (
+            <Step key={step}>
+              <StepLabel>{step}</StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+
+        <Box mt={3}>{renderStepContent()}</Box>
       </DialogContent>
+
       <DialogActions>
-        <Button onClick={handleClose} disabled={addMutation.isPending}>Cancel</Button>
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={addMutation.isPending || !preferredName || !fullName} // Basic validation: require names
-        >
-          {addMutation.isPending ? <CircularProgress size={24} /> : 'Add'}
-        </Button>
+        {activeStep > 0 && <Button onClick={() => setActiveStep(s => s - 1)}>Back</Button>}
+        {activeStep < STEPS.length - 1 ? (
+          <Button
+            variant="contained"
+            onClick={() => setActiveStep(s => s + 1)}
+            disabled={activeStep === 0 && !mandatoryFieldsFilled}
+          >
+            Next
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            onClick={() => addMutation.mutate()}
+            disabled={addMutation.isPending || !mandatoryFieldsFilled}
+          >
+            {addMutation.isPending ? <CircularProgress size={22} /> : "Add"}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
