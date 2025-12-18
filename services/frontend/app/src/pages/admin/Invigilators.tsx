@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from "react-router-dom";
+import { Link as RouterLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Box,
   Typography,
@@ -28,10 +30,7 @@ import {
   Tooltip,
   InputBase,
   Checkbox,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Link as MUILink,
 } from '@mui/material';
 import {
   ViewList,
@@ -54,27 +53,40 @@ import {
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs, { Dayjs } from 'dayjs';
-import { Link as RouterLink } from 'react-router-dom';
-import { Link as MUILink } from '@mui/material';
 import { InvigilatorAvailabilityModal } from "../../components/admin/InvigilatorAvailabilityModal";
+import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialog';
+import { apiBaseUrl } from '../../utils/api';
 
 interface Invigilator {
   id: number;
-  preferred_name?: string | null;
-  full_name?: string | null;
-  email?: string | null;
-  availableDates?: string[]; // e.g. ['2025-06-15', '2025-06-20']
-  availableSlots?: string[]; // e.g. ['2025-06-15T09:00', '2025-06-20T14:00']
+  preferred_name: string | null;
+  full_name: string | null;
+  mobile: string | null;
+  mobile_text_only: string | null;
+  alt_phone: string | null;
+  university_email: string | null;
+  personal_email: string | null;
+  notes: string | null;
+  is_active: boolean;
+  availableDates?: string[]; // Optional, as in original
+  availableSlots?: string[]; // Optional, as in original
 }
+
+const fetchInvigilators = async (): Promise<Invigilator[]> => {
+  const response = await fetch(`${apiBaseUrl}/invigilators/`);
+  if (!response.ok) throw new Error('Unable to load invigilators');
+  return response.json();
+};
 
 type ViewMode = 'list' | 'grid' | 'calendar';
 type SortField = 'firstName' | 'lastName';
 type SortOrder = 'asc' | 'desc';
 
 export const AdminInvigilators: React.FC = () => {
+  const { data: invigilatorsData = [], isLoading, isError, error } = useQuery<Invigilator[], Error>({ queryKey: ['invigilators'], queryFn: fetchInvigilators });
   const [invigilators, setInvigilators] = useState<Invigilator[]>([]);
   const [filtered, setFiltered] = useState<Invigilator[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
   
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = (searchParams.get("view") as ViewMode) || "grid";
@@ -108,6 +120,12 @@ export const AdminInvigilators: React.FC = () => {
   // Bulk action state
   const [bulkAction, setBulkAction] = useState("");
 
+  // Sync fetched data to state
+  useEffect(() => {
+    setInvigilators(invigilatorsData);
+    setFiltered(invigilatorsData);
+  }, [invigilatorsData]);
+
   // Handle view mode change
   const handleViewChange = (event: React.MouseEvent<HTMLElement>, value: ViewMode) => {
     if (!value) return;
@@ -129,42 +147,6 @@ export const AdminInvigilators: React.FC = () => {
     return { main: i.preferred_name || i.full_name || `Invigilator #${i.id}`, sub: '' };
   };
 
-  // Fake data for demonstration purposes
-  useEffect(() => {
-    const fake: Invigilator[] = [
-      { id: 1, preferred_name: 'Alex', full_name: 'Alexandra Chen', email: 'a.chen@university.edu', availableDates: ['2025-11-15', '2025-11-20'], availableSlots: ['2025-11-15T09:00','2025-11-15T14;00' , '2025-11-20T14:00'] },
-      { id: 2, preferred_name: 'Ben', full_name: 'Benjamin Okoro', email: 'b.okoro@university.edu', availableDates: ['2025-11-16'],  availableSlots: ['2025-11-16T10:00'] },
-      { id: 3, preferred_name: 'Maria', full_name: 'Maria Garcia', email: 'm.garcia@university.edu', availableDates: ['2025-11-15', '2025-11-18', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-18T13:00', '2025-11-20T14:00'] },
-      { id: 4, preferred_name: 'Sam', full_name: 'Samantha Patel', email: 's.patel@university.edu',  availableDates: ['2025-11-19'], availableSlots: ['2025-11-19T11:00'] },
-      { id: 5, preferred_name: 'Toby', full_name: 'Tobias Müller', email: 't.muller@university.edu', availableDates: ['2025-11-15', '2025-11-17'], availableSlots: ['2025-11-15T09:00', '2025-11-17T12:00'] },
-      { id: 6, preferred_name: 'Lily', full_name: 'Lily Thompson', email: 'l.thompson@university.edu', availableDates: ['2025-11-20'], availableSlots: ['2025-11-20T14:00'] },
-      { id: 7, preferred_name: 'Raj', full_name: 'Rajesh Kumar', email: 'r.kumar@university.edu', availableDates: ['2025-11-18'], availableSlots: ['2025-11-18T13:00'] },
-      { id: 8, preferred_name: 'Emma', full_name: 'Emma Johansson', email: 'e.johansson@university.edu', availableDates: ['2025-11-16', '2025-11-19'], availableSlots: ['2025-11-16T10:00', '2025-11-19T11:00'] },
-      { id: 9, preferred_name: 'Omar', full_name: 'Omar Al-Sayed', email: 'o.sayed@university.edu', availableDates: ['2025-11-17'], availableSlots: ['2025-11-17T12:00'] },
-      { id: 10, preferred_name: 'Grace', full_name: 'Grace Kim', email: 'g.kim@university.edu', availableDates: ['2025-11-15', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-20T14:00'] },
-      { id: 11, preferred_name: 'Noah', full_name: 'Noah Williams', email: 'n.williams@university.edu', availableDates: ['2025-11-16'], availableSlots: ['2025-11-16T10:00'] },
-      { id: 12, preferred_name: 'Zoe', full_name: 'Zoe Zhang', email: 'z.zhang@university.edu',  availableDates: ['2025-11-18'], availableSlots: ['2025-11-18T13:00'] },
-      { id: 13, preferred_name: 'Alex', full_name: 'Alexandra Chen', email: 'a.chen@university.edu', availableDates: ['2025-11-15', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-20T16:00'] },
-      { id: 14, preferred_name: 'Ben', full_name: 'Benjamin Okoro', email: 'b.okoro@university.edu', availableDates: ['2025-11-16'],  availableSlots: ['2025-11-16T10:00'] },
-      { id: 15, preferred_name: 'Maria', full_name: 'Maria Garcia', email: 'm.garcia@university.edu', availableDates: ['2025-11-15', '2025-11-18', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-18T16:00', '2025-11-20T14:00'] },
-      { id: 16, preferred_name: 'Sam', full_name: 'Samantha Patel', email: 's.patel@university.edu', availableDates: ['2025-11-19'], availableSlots: ['2025-11-19T11:00'] },
-      { id: 17, preferred_name: 'Toby', full_name: 'Tobias Müller', email: 't.muller@university.edu', availableDates: ['2025-11-15', '2025-11-17'], availableSlots: ['2025-11-15T09:00', '2025-11-17T16:00'] },
-      { id: 18, preferred_name: 'Lily', full_name: 'Lily Thompson', email: 'l.thompson@university.edu', availableDates: ['2025-11-20'], availableSlots: ['2025-11-20T14:00'] },
-      { id: 19, preferred_name: 'Raj', full_name: 'Rajesh Kumar', email: 'r.kumar@university.edu', availableDates: ['2025-11-18'], availableSlots: ['2025-11-18T13:00'] },
-      { id: 20, preferred_name: 'Emma', full_name: 'Emma Johansson', email: 'e.johansson@university.edu', availableDates: ['2025-11-16', '2025-11-19'], availableSlots: ['2025-11-16T10:00', '2025-11-19T11:00'] },
-      { id: 21, preferred_name: 'Omar', full_name: 'Omar Al-Sayed', email: 'o.sayed@university.edu', availableDates: ['2025-11-17'], availableSlots: ['2025-11-17T12:00'] },
-      { id: 22, preferred_name: 'Grace', full_name: 'Grace Kim', email: 'g.kim@university.edu', availableDates: ['2025-11-15', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-20T14:00'] },
-      { id: 23, preferred_name: 'Noah', full_name: 'Noah Williams', email: 'n.williams@university.edu', availableDates: ['2025-11-16'], availableSlots: ['2025-11-16T10:00'] },
-      { id: 24, preferred_name: 'Zoe', full_name: 'Zoe Zhang', email: 'z.zhang@university.edu', availableDates: ['2025-11-18'], availableSlots: ['2025-11-18T13:00'] },
-    ];
-
-    setTimeout(() => {
-      setInvigilators(fake);
-      setFiltered(fake);
-      setLoading(false);
-    }, 500);
-  }, []);
-
   // Filtering logic
   useEffect(() => {
     let result = invigilators;
@@ -178,7 +160,7 @@ export const AdminInvigilators: React.FC = () => {
     if (lastLetter !== 'All') {
       result = result.filter(i => {
         const parts = (i.full_name || '').split(' ');
-        const last = parts[parts.length - 1];
+        const last = parts[parts.length - 1] || '';
         return last.charAt(0).toUpperCase() === lastLetter;
       });
     }
@@ -187,8 +169,8 @@ export const AdminInvigilators: React.FC = () => {
     if (searchQuery.trim() !== '') {
       const query = searchQuery.trim().toLowerCase();
       result = result.filter(i => {
-        const preferred = i.preferred_name?.toLowerCase() || '';
-        const full = i.full_name?.toLowerCase() || '';
+        const preferred = (i.preferred_name || '').toLowerCase();
+        const full = (i.full_name || '').toLowerCase();
         const first = full.split(' ')[0] || '';
         const last = full.split(' ').slice(-1)[0] || '';
         return preferred.includes(query) || first.includes(query) || last.includes(query);
@@ -206,9 +188,9 @@ export const AdminInvigilators: React.FC = () => {
   const sortInvigilators = (data: Invigilator[]) => {
     return [...data].sort((a, b) => {
       const getName = (i: Invigilator) => {
-        if (sortField === 'firstName') return (i.preferred_name || i.full_name || '').split(' ')[0].toUpperCase();
+        if (sortField === 'firstName') return ((i.preferred_name || i.full_name || '').split(' ')[0] || '').toUpperCase();
         const parts = (i.full_name || '').split(' ');
-        return parts[parts.length - 1].toUpperCase();
+        return (parts[parts.length - 1] || '').toUpperCase();
       };
 
       const nameA = getName(a);
@@ -261,11 +243,21 @@ export const AdminInvigilators: React.FC = () => {
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Box sx={{ p: 6, textAlign: 'center' }}>
         <CircularProgress size={60} />
         <Typography sx={{ mt: 2 }}>Loading invigilators…</Typography>
+      </Box>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Box sx={{ p: 6, textAlign: 'center' }}>
+        <Typography color="error" variant="h6">
+          {error?.message || 'Failed to load invigilators'}
+        </Typography>
       </Box>
     );
   }
@@ -357,6 +349,16 @@ export const AdminInvigilators: React.FC = () => {
           >
             LAST NAME
           </Button>
+
+          {/* Add Invigilator Button */}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => setAddOpen(true)}
+            sx={{ ml: 'auto' }}
+          >
+            Add Invigilator
+          </Button>
         </Stack>
 
         {/* A-Z Filters */}
@@ -393,7 +395,7 @@ export const AdminInvigilators: React.FC = () => {
               m: 3,
               borderRadius: 3,
               overflow: 'hidden',
-              display: 'flex018',
+              display: 'flex',
               flexDirection: 'column',
               height: 'calc(100vh - 165px)',
             }}
@@ -532,7 +534,7 @@ export const AdminInvigilators: React.FC = () => {
                         )}
                       </Box>
                     }
-                    secondary={i.email}
+                    secondary={i.university_email || i.personal_email || 'No email'}
                   />
                 </ListItem>
               ))}
@@ -606,7 +608,7 @@ export const AdminInvigilators: React.FC = () => {
                     })()}
 
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontFamily: theme => theme.typography.fontFamily}}>
-                      {i.email || 'No email'}
+                      {i.university_email || i.personal_email || 'No email'}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -688,6 +690,9 @@ export const AdminInvigilators: React.FC = () => {
             </Button>
           </Box>
         )}
+
+        {/* Add Invigilator Dialog */}
+        <AddInvigilatorDialog open={addOpen} onClose={() => setAddOpen(false)} />
       </Box>
     </LocalizationProvider>
   );
