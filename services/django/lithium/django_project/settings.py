@@ -216,4 +216,6 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",  # Default Django dev server
     "http://127.0.0.1:8000",  # Alternative local address
+    "http://localhost:3000",  # React dev server
+    "http://127.0.0.1:3000",  # Alternative React dev server
 ]
