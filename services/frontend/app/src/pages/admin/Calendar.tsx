@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Box,
   Typography,
   Stack,
   Button,
   Paper,
-  Chip,
   ToggleButton,
   ToggleButtonGroup,
   InputBase,
@@ -13,6 +12,7 @@ import {
   Pagination,
   Divider,
   Tooltip,
+  CircularProgress,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -22,14 +22,35 @@ import {
   Timeline,
   Search,
 } from "@mui/icons-material";
+import { useQuery } from "@tanstack/react-query";
 import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
+import { apiBaseUrl } from "../../utils/api";
+
+interface ExamVenueData {
+  examvenue_id: number;
+  venue_name: string | null;
+  start_time: string | null;
+  exam_length: number | null;
+  core: boolean;
+  provision_capabilities: string[];
+}
+
+interface ExamData {
+  exam_id: number;
+  exam_name: string;
+  course_code: string;
+  no_students: number;
+  exam_school: string;
+  school_contact: string;
+  exam_venues: ExamVenueData[];
+}
 
 interface ExamVenueInfo {
   venue: string;
   startTime: string;
   endTime: string;
-  students: number;
-  invigilators: number;
+  students?: number;
+  invigilators?: number;
 }
 
 interface ExamDetails {
@@ -53,106 +74,63 @@ const departmentColors: Record<string, string> = {
   Biology: "#009688",
 };
 
-export const examData: ExamDetails[] = [
-  {
-    id: 1,
-    code: "CS101",
-    subject: "Introduction to Programming",
-    department: "CS",
-    mainVenue: "James Watt South - J15",
-    mainStartTime: "2025-12-10T09:00",
-    mainEndTime: "2025-12-10T11:00",
-    venues: [
-      { venue: "James Watt South - J15", startTime: "2025-12-10T09:00", endTime: "2025-12-10T11:00", students: 245, invigilators: 8 },
-      { venue: "Boyd Orr - Lecture Theatre 1", startTime: "2025-12-10T09:00", endTime: "2025-12-10T11:00", students: 180, invigilators: 6 },
-      { venue: "Sir Charles Wilson - Main Hall", startTime: "2025-12-10T09:00", endTime: "2025-12-10T11:00", students: 90, invigilators: 4 },
-      { venue: "Separate Room SR7 (Provisions)", startTime: "2025-12-10T09:00", endTime: "2025-12-10T11:30", students: 12, invigilators: 3 },
-    ],
-  },
-  {
-    id: 2,
-    code: "MATH201",
-    subject: "Linear Algebra",
-    department: "Math",
-    mainVenue: "Boyd Orr - LT2",
-    mainStartTime: "2025-12-10T14:00",
-    mainEndTime: "2025-12-10T16:30",
-    venues: [
-      { venue: "Boyd Orr - LT2", startTime: "2025-12-10T14:00", endTime: "2025-12-10T16:30", students: 320, invigilators: 10 },
-      { venue: "Rankine Building - 401", startTime: "2025-12-10T14:00", endTime: "2025-12-10T16:30", students: 120, invigilators: 5 },
-      { venue: "Purple Cluster - PC2", startTime: "2025-12-10T14:00", endTime: "2025-12-10T16:30", students: 48, invigilators: 3 },
-    ],
-  },
-  {
-    id: 3,
-    code: "PHY301",
-    subject: "Quantum Physics",
-    department: "Physics",
-    mainVenue: "Kelvin Building - LT",
-    mainStartTime: "2025-12-11T09:00",
-    mainEndTime: "2025-12-11T12:00",
-    venues: [
-      { venue: "Kelvin Building - LT", startTime: "2025-12-11T09:00", endTime: "2025-12-11T12:00", students: 160, invigilators: 6 },
-      { venue: "Separate Room SR12 (Provisions)", startTime: "2025-12-11T09:00", endTime: "2025-12-11T12:30", students: 8, invigilators: 2 },
-    ],
-  },
-  {
-    id: 4,
-    code: "CHEM402",
-    subject: "Organic Chemistry",
-    department: "Chemistry",
-    mainVenue: "Joseph Black Building - A101",
-    mainStartTime: "2025-12-11T14:00",
-    mainEndTime: "2025-12-11T17:00",
-    venues: [
-      { venue: "Joseph Black - A101", startTime: "2025-12-11T14:00", endTime: "2025-12-11T17:00", students: 280, invigilators: 9 },
-      { venue: "Joseph Black - A102", startTime: "2025-12-11T14:00", endTime: "2025-12-11T17:00", students: 140, invigilators: 5 },
-      { venue: "Purple Cluster - PC3", startTime: "2025-12-11T14:00", endTime: "2025-12-11T17:00", students: 35, invigilators: 3 },
-    ],
-  },
-  {
-    id: 5,
-    code: "ENG150",
-    subject: "English Literature",
-    department: "English",
-    mainVenue: "Boyd Orr - LT2",
-    mainStartTime: "2025-12-10T14:00",
-    mainEndTime: "2025-12-10T16:00",
-    venues: [
-      { venue: "Boyd Orr - LT2", startTime: "2025-12-10T14:00", endTime: "2025-12-10T16:30", students: 320, invigilators: 10 },
-      { venue: "Hunter Hall West", startTime: "2025-12-10T14:00", endTime: "2025-12-10T16:30", students: 120, invigilators: 5 },
-      { venue: "Purple Cluster - PC1", startTime: "2025-12-10T14:00", endTime: "2025-12-10T16:30", students: 48, invigilators: 3 },
-    ],
-  },
-  {
-    id: 6,
-    code: "LAW210",
-    subject: "Contract Law",
-    department: "Law",
-    mainVenue: "Hunter Hall East",
-    mainStartTime: "2025-12-10T10:00",
-    mainEndTime: "2025-12-10T12:30",
-    venues: [
-      { venue: "Hunter Hall East", startTime: "2025-12-10T10:00", endTime: "2025-12-10T12:30", students: 320, invigilators: 10 },
-      { venue: "Hunter Hall West", startTime: "2025-12-10T10:00", endTime: "2025-12-10T12:30", students: 120, invigilators: 5 },
-      { venue: "Hunter Hall West", startTime: "2025-12-10T09:30", endTime: "2025-12-10T13:00", students: 48, invigilators: 3 },
-    ],
-  },
-  {
-    id: 7,
-    code: "BIO330",
-    subject: "Molecular Biology",
-    department: "Biology",
-    mainVenue: "Joseph Black Building - B201",
-    mainStartTime: "2025-12-11T09:00",
-    mainEndTime: "2025-12-11T11:30",
-    venues: [
-      { venue: "Joseph Black - B201", startTime: "2025-12-11T09:00", endTime: "2025-12-11T11:30", students: 200, invigilators: 7 },
-      { venue: "Joseph Black - B202", startTime: "2025-12-11T09:00", endTime: "2025-12-11T11:30", students: 100, invigilators: 4 },
-      { venue: "Separate Room SR15 (Provisions)", startTime: "2025-12-11T09:00", endTime: "2025-12-11T12:00", students: 10, invigilators: 2 },
-    ],
-  },
-];
+const fetchExams = async (): Promise<ExamData[]> => {
+  const response = await fetch(`${apiBaseUrl}/exams/`);
+  if (!response.ok) throw new Error("Unable to load exams");
+  return response.json();
+};
+
+const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
+  return exam.exam_venues.find((v) => v.core) || exam.exam_venues[0];
+};
+
+const addMinutes = (start: string, minutes: number | null) => {
+  if (!start || minutes == null) return "";
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return "";
+  const endDate = new Date(startDate.getTime() + minutes * 60000);
+  return endDate.toISOString();
+};
+
+const toCalendarExam = (exam: ExamData): ExamDetails | null => {
+  const coreVenue = getPrimaryExamVenue(exam);
+  if (!coreVenue?.start_time) return null;
+
+  const mainStartTime = coreVenue.start_time;
+  const mainEndTime = addMinutes(coreVenue.start_time, coreVenue.exam_length);
+  if (!mainEndTime) return null;
+
+  const venues = exam.exam_venues
+    .filter((v) => v.start_time)
+    .map((venue) => ({
+      venue: venue.venue_name || "Unassigned",
+      startTime: venue.start_time as string,
+      endTime: addMinutes(venue.start_time as string, venue.exam_length) || venue.start_time || "",
+    }));
+
+  return {
+    id: exam.exam_id,
+    code: exam.course_code,
+    subject: exam.exam_name,
+    department: exam.exam_school || "Other",
+    mainVenue: coreVenue.venue_name || "Unassigned",
+    mainStartTime,
+    mainEndTime,
+    venues,
+  };
+};
+
+const isSameDay = (dateTime: string, target: Date) => {
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return false;
+  return date.toDateString() === target.toDateString();
+};
+
+const minutesSinceMidnight = (dateTime: string) => {
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.getHours() * 60 + date.getMinutes();
+};
 
 export const AdminCalendar: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -163,6 +141,16 @@ export const AdminCalendar: React.FC = () => {
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
 
+  const { data: examsData = [], isLoading, isError, error } = useQuery<ExamData[], Error>({
+    queryKey: ["exams"],
+    queryFn: fetchExams,
+  });
+
+  const calendarExams = useMemo(
+    () => examsData.map(toCalendarExam).filter((exam): exam is ExamDetails => Boolean(exam)),
+    [examsData]
+  );
+
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-GB", {
       weekday: "long",
@@ -171,12 +159,20 @@ export const AdminCalendar: React.FC = () => {
       year: "numeric",
     });
 
-  const examsToday = examData.filter(
-    (e) =>
-      new Date(e.mainStartTime).toDateString() === currentDate.toDateString() &&
-      (e.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.mainVenue.toLowerCase().includes(searchQuery.toLowerCase()))
+  const examsToday = useMemo(
+    () =>
+      calendarExams.filter((exam) => {
+        const matchesDate = isSameDay(exam.mainStartTime, currentDate);
+        const query = searchQuery.toLowerCase();
+        const matchesQuery =
+          !query ||
+          exam.code.toLowerCase().includes(query) ||
+          exam.subject.toLowerCase().includes(query) ||
+          exam.mainVenue.toLowerCase().includes(query) ||
+          exam.department.toLowerCase().includes(query);
+        return matchesDate && matchesQuery;
+      }),
+    [calendarExams, currentDate, searchQuery]
   );
 
   const paginatedExams = examsToday.slice((page - 1) * itemsPerPage, page * itemsPerPage);
@@ -193,6 +189,52 @@ export const AdminCalendar: React.FC = () => {
     acc[exam.mainVenue].push(exam);
     return acc;
   }, {} as Record<string, ExamDetails[]>);
+
+  const { startMinutes, endMinutes } = useMemo(() => {
+    const defaultStart = 8 * 60;
+    const defaultEnd = 20 * 60;
+
+    let minStart = Number.POSITIVE_INFINITY;
+    let maxEnd = Number.NEGATIVE_INFINITY;
+
+    examsToday.forEach((exam) => {
+      const start = minutesSinceMidnight(exam.mainStartTime);
+      const end = minutesSinceMidnight(exam.mainEndTime);
+      if (start != null) minStart = Math.min(minStart, start);
+      if (end != null) maxEnd = Math.max(maxEnd, end);
+    });
+
+    if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd)) {
+      return { startMinutes: defaultStart, endMinutes: defaultEnd };
+    }
+
+    const padding = 30;
+    return {
+      startMinutes: Math.min(defaultStart, minStart - padding),
+      endMinutes: Math.max(defaultEnd, maxEnd + padding),
+    };
+  }, [examsToday]);
+
+  const halfHourTicks = Math.max(Math.ceil((endMinutes - startMinutes) / 30) + 1, 1);
+
+  if (isLoading)
+    return (
+      <Box sx={{ p: 6, textAlign: "center" }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }}>Loading exams...</Typography>
+      </Box>
+    );
+
+  if (isError)
+    return (
+      <Box sx={{ maxWidth: 900, mx: "auto", p: 4 }}>
+        <Paper sx={{ p: 4, textAlign: "center" }}>
+          <Typography color="error" variant="h6">
+            {error?.message || "Failed to load exams"}
+          </Typography>
+        </Paper>
+      </Box>
+    );
 
   return (
     <Box sx={{ p: 4, maxWidth: "1400px", mx: "auto" }}>
@@ -219,23 +261,45 @@ export const AdminCalendar: React.FC = () => {
             />
           </Paper>
 
-          <Button variant="outlined" size="medium" startIcon={<ArrowBack />} onClick={() => setCurrentDate(d => { const nd = new Date(d); nd.setDate(d.getDate() - 1); return nd; })}>
+          <Button
+            variant="outlined"
+            size="medium"
+            startIcon={<ArrowBack />}
+            onClick={() =>
+              setCurrentDate((d) => {
+                const nd = new Date(d);
+                nd.setDate(d.getDate() - 1);
+                return nd;
+              })
+            }
+          >
             Previous
           </Button>
           <Button variant="contained" size="medium" startIcon={<Today />} onClick={() => setCurrentDate(new Date())}>
             Today
           </Button>
-          <Button variant="outlined" size="medium" endIcon={<ArrowForward />} onClick={() => setCurrentDate(d => { const nd = new Date(d); nd.setDate(d.getDate() + 1); return nd; })}>
+          <Button
+            variant="outlined"
+            size="medium"
+            endIcon={<ArrowForward />}
+            onClick={() =>
+              setCurrentDate((d) => {
+                const nd = new Date(d);
+                nd.setDate(d.getDate() + 1);
+                return nd;
+              })
+            }
+          >
             Next
           </Button>
         </Stack>
 
         <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && setViewMode(v)} color="primary">
           <ToggleButton value="grid" data-testid="grid-btn">
-            <GridView/>
+            <GridView />
           </ToggleButton>
           <ToggleButton value="timeline" data-testid="timeline-btn">
-            <Timeline/>
+            <Timeline />
           </ToggleButton>
         </ToggleButtonGroup>
       </Stack>
@@ -252,19 +316,22 @@ export const AdminCalendar: React.FC = () => {
       {/* Grid View */}
       {viewMode === "grid" && (
         <>
-          <Grid container spacing={3}>
+          <Grid container spacing={3} alignItems="stretch">
             {paginatedExams.map((exam) => (
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={exam.id}>
+              <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={exam.id} sx={{ display: "flex" }}>
                 <Tooltip
                   title={
                     <>
-                      <strong>{exam.code} — {exam.subject}</strong><br/>
-                      {exam.mainVenue}<br/>
-                      {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – 
+                      <strong>
+                        {exam.code} - {exam.subject}
+                      </strong>
+                      <br />
+                      {exam.mainVenue}
+                      <br />
+                      {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} -{" "}
                       {new Date(exam.mainEndTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      <br/>
-                      {exam.venues.reduce((a, v) => a + v.students, 0)} students · 
-                      {exam.venues.length} venues
+                      <br />
+                      {exam.venues.length} venue{exam.venues.length !== 1 ? "s" : ""}
                     </>
                   }
                   arrow
@@ -275,43 +342,34 @@ export const AdminCalendar: React.FC = () => {
                     elevation={3}
                     onClick={() => handleExamClick(exam)}
                     sx={{
-                      height: 200,
-                      width: 200,
+                      height: "100%",
+                      width: "100%",
+                      minHeight: 240,
                       p: 3,
                       cursor: "pointer",
                       transition: "all 0.2s",
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "space-between",
+                      boxSizing: "border-box",
                       "&:hover": { transform: "translateY(-6px)", boxShadow: 8 },
                     }}
                   >
                     <Box>
-                      <Stack direction="row" justifyContent="space-between" alignItems="start" mb={2}>
-                        <Box>
-                          <Typography variant="h6" fontWeight={700}>
-                            {exam.code}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {exam.subject}
-                          </Typography>
-                        </Box>
-                        <Chip
-                          label={exam.department}
-                          size="small"
-                          sx={{
-                            bgcolor: departmentColors[exam.department] || "#9e9e9e",
-                            color: "white",
-                            fontWeight: 600,
-                          }}
-                        />
-                      </Stack>
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="h6" fontWeight={700}>
+                          {exam.code}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {exam.subject}
+                        </Typography>
+                      </Box>
 
                       <Typography variant="body2" sx={{ mb: 1 }}>
                         <strong>Main:</strong> {exam.mainVenue}
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 2 }}>
-                        {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
+                        {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} -{" "}
                         {new Date(exam.mainEndTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </Typography>
                     </Box>
@@ -319,8 +377,7 @@ export const AdminCalendar: React.FC = () => {
                     <Box>
                       <Divider sx={{ mb: 1.5 }} />
                       <Typography variant="body2" color="primary" fontWeight={600}>
-                        {exam.venues.length} venue{exam.venues.length > 1 ? "s" : ""} ·{" "}
-                        {exam.venues.reduce((a, v) => a + v.students, 0)} students
+                        {exam.venues.length} venue{exam.venues.length > 1 ? "s" : ""}
                       </Typography>
                     </Box>
                   </Paper>
@@ -339,162 +396,162 @@ export const AdminCalendar: React.FC = () => {
 
       {/* Timeline View */}
       {viewMode === "timeline" && (
-      <Box sx={{ overflowX: "auto", py: 2 }}>
-        <Stack direction="column" spacing={5} minWidth={1200}>
-          {Object.entries(examsByMainVenue).map(([mainVenue, exams]) => {
-            // Sort exams by start time
-            const sortedExams = [...exams].sort(
-              (a, b) => new Date(a.mainStartTime).getTime() - new Date(b.mainStartTime).getTime()
-            );
+        <Box sx={{ overflowX: "auto", py: 2 }}>
+          <Stack direction="column" spacing={5} minWidth={1200}>
+            {Object.entries(examsByMainVenue).map(([mainVenue, exams]) => {
+              // Sort exams by start time
+              const sortedExams = [...exams].sort(
+                (a, b) => new Date(a.mainStartTime).getTime() - new Date(b.mainStartTime).getTime()
+              );
 
-            // Build lanes to prevent overlap
-            const lanes: ExamDetails[][] = [];
-            sortedExams.forEach((exam) => {
-              let placed = false;
-              for (const lane of lanes) {
-                const lastInLane = lane[lane.length - 1];
-                if (new Date(lastInLane.mainEndTime) <= new Date(exam.mainStartTime)) {
-                  lane.push(exam);
-                  placed = true;
-                  break;
+              // Build lanes to prevent overlap
+              const lanes: ExamDetails[][] = [];
+              sortedExams.forEach((exam) => {
+                if (!exam.mainStartTime || !exam.mainEndTime) return;
+                let placed = false;
+                for (const lane of lanes) {
+                  const lastInLane = lane[lane.length - 1];
+                  if (new Date(lastInLane.mainEndTime) <= new Date(exam.mainStartTime)) {
+                    lane.push(exam);
+                    placed = true;
+                    break;
+                  }
                 }
-              }
-              if (!placed) {
-                lanes.push([exam]);
-              }
-            });
+                if (!placed) {
+                  lanes.push([exam]);
+                }
+              });
 
-            const rowHeight = 40; // height per exam bar + spacing
-            const totalHeight = lanes.length * rowHeight + 20;
-
-            return (
-              <Box key={mainVenue}>
-                <Typography variant="h6" fontWeight={700} mb={2} color="primary">
-                  {mainVenue}
-                </Typography>
-
-                <Box
-                  sx={{
-                    position: "relative",
-                    height: totalHeight,
-                    bgcolor: "#f8f9fa",
-                    borderRadius: 2,
-                    mb: 4,
-                    border: "1px solid #e0e0e0",
-                  }}
-                >
-                  {lanes.flatMap((lane, laneIndex) =>
-                    lane.map((exam) => {
-                      const dayStart = 8 * 60;
-                      const dayEnd = 20 * 60;
-                      const startMins =
-                        new Date(exam.mainStartTime).getHours() * 60 +
-                        new Date(exam.mainStartTime).getMinutes();
-                      const endMins =
-                        new Date(exam.mainEndTime).getHours() * 60 +
-                        new Date(exam.mainEndTime).getMinutes();
-                      const left = ((startMins - dayStart) / (dayEnd - dayStart)) * 100;
-                      const width = ((endMins - startMins) / (dayEnd - dayStart)) * 100;
-
-                      const otherCount = exam.venues.length - 1;
-                      const venueLabel =
-                        otherCount > 0
-                          ? `(${otherCount} other venue${otherCount > 1 ? "s" : ""})`
-                          : "";
-
-                      return (
-                        <Tooltip
-                          title={
-                            <>
-                              <strong>{exam.code} — {exam.subject}</strong><br/>
-                              Main venue: {exam.mainVenue}<br/>
-                              {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – 
-                              {new Date(exam.mainEndTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                              <br/>
-                              {exam.venues.length} venues · 
-                              {exam.venues.reduce((a, v) => a + v.students, 0)} students
-                            </>
-                          }
-                          arrow
-                          placement="top"
-                        >
-                          <Box
-                            key={exam.id}
-                            data-testid={`exam-${exam.id}`}
-                            onClick={() => handleExamClick(exam)}
-                            sx={{
-                              position: "absolute",
-                              left: `${left}%`,
-                              width: `${width}%`,
-                              top: 10 + laneIndex * rowHeight,
-                              height: 34,
-                              bgcolor: departmentColors[exam.department] || "#9e9e9e",
-                              color: "white",
-                              borderRadius: 1,
-                              px: 1.5,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              fontWeight: 600,
-                              fontSize: "0.8125rem",
-                              fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif",
-                              letterSpacing: "0.01em",
-                              boxShadow: 3,
-                              transition: "all 0.2s",
-                              "&:hover": { transform: "scale(1.06)", boxShadow: 6, zIndex: 10 },
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {exam.code} {venueLabel}
-                          </Box>
-                        </Tooltip>
-                      );
-                    })
-                  )}
-                </Box>
-              </Box>
-            );
-          })}
-
-          {/* Perfect half-hour time ruler - always on one line */}
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(25, 1fr)",
-              gap: 0,
-              mt: 4,
-              width: "100%",
-              pb: 2,
-            }}
-          >
-            {Array.from({ length: 25 }, (_, i) => {
-              const hour = 8 + Math.floor(i / 2);
-              const minute = i % 2 === 0 ? "00" : "30";
-              const isHour = i % 2 === 0;
+              const rowHeight = 40; // height per exam bar + spacing
+              const totalHeight = lanes.length * rowHeight + 20;
 
               return (
-                <Typography
-                  key={i}
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{
-                    textAlign: "center",
-                    fontSize: "0.75rem",
-                    fontWeight: isHour ? 600 : 400,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {isHour ? `${hour}:${minute}` : `${hour}:${minute}`}
-                </Typography>
+                <Box key={mainVenue}>
+                  <Typography variant="h6" fontWeight={700} mb={2} color="primary">
+                    {mainVenue}
+                  </Typography>
+
+                  <Box
+                    sx={{
+                      position: "relative",
+                      height: totalHeight,
+                      bgcolor: "#f8f9fa",
+                      borderRadius: 2,
+                      mb: 4,
+                      border: "1px solid #e0e0e0",
+                    }}
+                  >
+                    {lanes.flatMap((lane, laneIndex) =>
+                      lane.map((exam) => {
+                        const startMins = minutesSinceMidnight(exam.mainStartTime);
+                        const endMins = minutesSinceMidnight(exam.mainEndTime);
+                        if (startMins == null || endMins == null) return null;
+
+                        const totalWindow = Math.max(endMinutes - startMinutes, 1);
+                        const left = ((startMins - startMinutes) / totalWindow) * 100;
+                        const width = Math.max(((endMins - startMins) / totalWindow) * 100, 2);
+
+                        const otherCount = exam.venues.length - 1;
+                        const venueLabel =
+                          otherCount > 0 ? `(${otherCount} other venue${otherCount > 1 ? "s" : ""})` : "";
+
+                        return (
+                          <Tooltip
+                            key={exam.id}
+                            title={
+                              <>
+                                <strong>
+                                  {exam.code} - {exam.subject}
+                                </strong>
+                                <br />
+                                Main venue: {exam.mainVenue}
+                                <br />
+                                {new Date(exam.mainStartTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} -{" "}
+                                {new Date(exam.mainEndTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                <br />
+                                {exam.venues.length} venue{exam.venues.length !== 1 ? "s" : ""}
+                              </>
+                            }
+                            arrow
+                            placement="top"
+                          >
+                            <Box
+                              data-testid={`exam-${exam.id}`}
+                              onClick={() => handleExamClick(exam)}
+                              sx={{
+                                position: "absolute",
+                                left: `${left}%`,
+                                width: `${width}%`,
+                                top: 10 + laneIndex * rowHeight,
+                                height: 34,
+                                bgcolor: departmentColors[exam.department] || "#9e9e9e",
+                                color: "white",
+                                borderRadius: 1,
+                                px: 1.5,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                fontSize: "0.8125rem",
+                                fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif",
+                                letterSpacing: "0.01em",
+                                boxShadow: 3,
+                                transition: "all 0.2s",
+                                "&:hover": { transform: "scale(1.06)", boxShadow: 6, zIndex: 10 },
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {exam.code} {venueLabel}
+                            </Box>
+                          </Tooltip>
+                        );
+                      })
+                    )}
+                  </Box>
+                </Box>
               );
             })}
-          </Box>
-        </Stack>
-      </Box>
-    )}
+
+            {/* Perfect half-hour time ruler - always on one line */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${halfHourTicks}, 1fr)`,
+                gap: 0,
+                mt: 4,
+                width: "100%",
+                pb: 2,
+              }}
+            >
+              {Array.from({ length: halfHourTicks }, (_, i) => {
+                const minutesFromStart = startMinutes + i * 30;
+                const hour = Math.floor(minutesFromStart / 60);
+                const minute = minutesFromStart % 60 === 0 ? "00" : "30";
+                const isHour = minute === "00";
+
+                return (
+                  <Typography
+                    key={i}
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      textAlign: "center",
+                      fontSize: "0.75rem",
+                      fontWeight: isHour ? 600 : 400,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {hour}:{minute}
+                  </Typography>
+                );
+              })}
+            </Box>
+          </Stack>
+        </Box>
+      )}
 
       <ExamDetailsPopup
         open={popupOpen}
