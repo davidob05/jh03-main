@@ -15,6 +15,7 @@ import {
   StepLabel,
   Box,
   IconButton,
+  Tooltip,
 } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -31,22 +32,22 @@ const DIET_CHOICES = [
 ];
 
 const QUALIFICATION_CHOICES = [
-  { value: "SENIOR_INVIGILATOR", label: "Senior Invigilator" },
-  { value: "AKT_TRAINED", label: "AKT Trained" },
-  { value: "CHECK_IN", label: "Check-In" },
+  { value: "SENIOR_INVIGILATOR", label: "Senior Invigilator", help: "Can lead an exam room and supervise assistants" },
+  { value: "AKT_TRAINED", label: "AKT Trained", help: "Approved for AKT duties" },
+  { value: "CHECK_IN", label: "Check-In", help: "Can support candidate check-in" },
 ];
 
 const RESTRICTION_CHOICES = [
-  { value: "accessibility_required", label: "Accessibility required" },
-  { value: "separate_room_only", label: "Separate room only" },
-  { value: "purple_cluster", label: "Purple cluster" },
-  { value: "computer_cluster", label: "Computer cluster" },
-  { value: "vet_school", label: "Vet School" },
-  { value: "sec", label: "Scottish Event Campus" },
-  { value: "osce_golden_jubilee", label: "OSCE - Golden Jubilee" },
-  { value: "osce_wolfson", label: "OSCE - Wolfson" },
-  { value: "osce_queen_elizabeth", label: "OSCE - Queen Elizabeth" },
-  { value: "approved_exemption", label: "Approved exemption" },
+  { value: "accessibility_required", label: "Accessibility required", yes: "Has accessibility needs", no: "No accessibility needs" },
+  { value: "separate_room_only", label: "Separate room only", yes: "Must be in a separate room", no: "Can work in main rooms" },
+  { value: "purple_cluster", label: "Purple cluster", yes: "Can work in Purple Cluster", no: "Cannot work in Purple Cluster" },
+  { value: "computer_cluster", label: "Computer cluster", yes: "Can work in computer clusters", no: "Cannot work in computer clusters" },
+  { value: "vet_school", label: "Vet School", yes: "Can work at the Vet School", no: "Cannot work at the Vet School" },
+  { value: "sec", label: "Scottish Event Campus", yes: "Can work at the SEC", no: "Cannot work at the SEC" },
+  { value: "osce_golden_jubilee", label: "OSCE - Golden Jubilee", yes: "Can work at Golden Jubilee", no: "Cannot work at Golden Jubilee" },
+  { value: "osce_wolfson", label: "OSCE - Wolfson", yes: "Can work at Wolfson", no: "Cannot work at Wolfson" },
+  { value: "osce_queen_elizabeth", label: "OSCE - Queen Elizabeth", yes: "Can work at Queen Elizabeth", no: "Cannot work at Queen Elizabeth" },
+  { value: "approved_exemption", label: "Approved exemption", yes: "Has approved exemption", no: "No exemption" },
 ];
 
 interface AddInvigilatorDialogProps {
@@ -180,12 +181,15 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
         return (
           <CollapsibleSection title="Qualifications" defaultExpanded>
             {QUALIFICATION_CHOICES.map(q => (
-              <BooleanCheckboxRow
-                key={q.value}
-                label={q.label}
-                value={qualifications.includes(q.value)}
-                onChange={() => toggleArrayValue(q.value, setQualifications)}
-              />
+              <Tooltip key={q.value} title={q.help || q.label}>
+                <Box>
+                  <BooleanCheckboxRow
+                    label={q.label}
+                    value={qualifications.includes(q.value)}
+                    onChange={() => toggleArrayValue(q.value, setQualifications)}
+                  />
+                </Box>
+              </Tooltip>
             ))}
           </CollapsibleSection>
         );
@@ -199,12 +203,17 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
                 const choice = RESTRICTION_CHOICES.find(c => c.value === r);
                 if (!choice) return null;
                 return (
-                  <BooleanCheckboxRow
-                    key={choice.value}
-                    label={choice.label}
-                    value={restrictions.includes(choice.value)}
-                    onChange={() => toggleArrayValue(choice.value, setRestrictions)}
-                  />
+                  <Tooltip key={choice.value} title={restrictions.includes(choice.value) ? choice.yes || choice.label : choice.no || choice.label}>
+                    <Box>
+                      <BooleanCheckboxRow
+                        label={choice.label}
+                        value={restrictions.includes(choice.value)}
+                        onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                        yesLabel={choice.yes}
+                        noLabel={choice.no}
+                      />
+                    </Box>
+                  </Tooltip>
                 );
               })}
             </CollapsibleSection>
@@ -215,12 +224,17 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
                 const choice = RESTRICTION_CHOICES.find(c => c.value === r);
                 if (!choice) return null;
                 return (
-                  <BooleanCheckboxRow
-                    key={choice.value}
-                    label={choice.label}
-                    value={restrictions.includes(choice.value)}
-                    onChange={() => toggleArrayValue(choice.value, setRestrictions)}
-                  />
+                  <Tooltip key={choice.value} title={restrictions.includes(choice.value) ? choice.yes || choice.label : choice.no || choice.label}>
+                    <Box>
+                      <BooleanCheckboxRow
+                        label={choice.label}
+                        value={restrictions.includes(choice.value)}
+                        onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                        yesLabel={choice.yes}
+                        noLabel={choice.no}
+                      />
+                    </Box>
+                  </Tooltip>
                 );
               })}
             </CollapsibleSection>
@@ -231,12 +245,17 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
                 const choice = RESTRICTION_CHOICES.find(c => c.value === r);
                 if (!choice) return null;
                 return (
-                  <BooleanCheckboxRow
-                    key={choice.value}
-                    label={choice.label}
-                    value={restrictions.includes(choice.value)}
-                    onChange={() => toggleArrayValue(choice.value, setRestrictions)}
-                  />
+                  <Tooltip key={choice.value} title={restrictions.includes(choice.value) ? choice.yes || choice.label : choice.no || choice.label}>
+                    <Box>
+                      <BooleanCheckboxRow
+                        label={choice.label}
+                        value={restrictions.includes(choice.value)}
+                        onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                        yesLabel={choice.yes}
+                        noLabel={choice.no}
+                      />
+                    </Box>
+                  </Tooltip>
                 );
               })}
             </CollapsibleSection>
@@ -249,20 +268,21 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
             {DIET_CHOICES.map(diet => {
               const selected = availabilityDiets.includes(diet.value);
               return (
-                <Chip
-                  key={diet.value}
-                  label={diet.label}
-                  clickable
-                  color={selected ? "primary" : "default"}
-                  variant={selected ? "filled" : "outlined"}
-                  onClick={() =>
-                    setAvailabilityDiets(prev =>
-                      prev.includes(diet.value)
-                        ? prev.filter(d => d !== diet.value)
-                        : [...prev, diet.value]
-                    )
-                  }
-                />
+                <Tooltip key={diet.value} title={selected ? `Remove ${diet.label}` : `Add ${diet.label}`}>
+                  <Chip
+                    label={diet.label}
+                    clickable
+                    color={selected ? "primary" : "default"}
+                    variant={selected ? "filled" : "outlined"}
+                    onClick={() =>
+                      setAvailabilityDiets(prev =>
+                        prev.includes(diet.value)
+                          ? prev.filter(d => d !== diet.value)
+                          : [...prev, diet.value]
+                      )
+                    }
+                  />
+                </Tooltip>
               );
             })}
           </Stack>
