@@ -13,8 +13,9 @@ import {
   ToggleButtonGroup,
   CircularProgress,
   Alert,
+  Fab,
 } from "@mui/material";
-import { GridView, CalendarViewMonth } from "@mui/icons-material";
+import { GridView, CalendarViewMonth, Edit, Delete as DeleteIcon } from "@mui/icons-material";
 import dayjs, { Dayjs } from "dayjs";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -25,6 +26,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { StaticDatePicker } from "@mui/x-date-pickers/StaticDatePicker";
 import { apiBaseUrl } from "../../utils/api";
+import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDialog";
 
 const baseDietOptions = [
   { code: "DEC_2025", label: "December 2025" },
@@ -89,6 +91,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const [availabilityView, setAvailabilityView] = useState<"list" | "calendar">("list");
   const [availabilityLimit, setAvailabilityLimit] = useState(4);
   const [selectedAvailabilityDate, setSelectedAvailabilityDate] = useState<Dayjs | null>(dayjs());
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { id } = useParams();
 
   const { data, isLoading, isError, error } = useQuery<InvigilatorData, Error>({
@@ -170,6 +173,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
   }
 
   return (
+    <>
     <Box sx={{ p: { xs: 2, md: 4 }, minHeight: "100vh" }}>
       {/* Header */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={4}>
@@ -711,5 +715,36 @@ export const AdminInvigilatorProfile: React.FC = () => {
         </Box>
       </Box>
     </Box>
+
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 32,
+          right: 32,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
+          zIndex: 1000,
+        }}
+      >
+        <Tooltip title="Edit invigilator">
+          <Fab color="primary" aria-label="edit invigilator" onClick={() => setEditDialogOpen(true)}>
+            <Edit />
+          </Fab>
+        </Tooltip>
+        <Tooltip title="Delete invigilator">
+          <Fab color="error" aria-label="delete invigilator">
+            <DeleteIcon />
+          </Fab>
+        </Tooltip>
+      </Box>
+
+      <EditInvigilatorDialog
+        open={editDialogOpen}
+        invigilatorId={data.id}
+        onClose={() => setEditDialogOpen(false)}
+        onSuccess={() => setEditDialogOpen(false)}
+      />
+    </>
   );
 };

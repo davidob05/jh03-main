@@ -236,7 +236,6 @@ class InvigilatorSerializer(serializers.ModelSerializer):
         return invigilator
     def _generate_availability(self, invigilator, diets):
         availability_objects = []
-        availability_objects = []
 
         for diet in diets:
             if diet not in DIET_DATE_RANGES:
@@ -261,3 +260,25 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             availability_objects,
             ignore_conflicts=True,
         )
+
+    def update(self, instance, validated_data):
+        qualifications_data = validated_data.pop("qualifications", None)
+        restrictions_data = validated_data.pop("restrictions", None)
+
+        instance = super().update(instance, validated_data)
+
+        if qualifications_data is not None:
+            InvigilatorQualification.objects.filter(invigilator=instance).delete()
+            for q in qualifications_data:
+                InvigilatorQualification.objects.create(invigilator=instance, **q)
+
+        if restrictions_data is not None:
+            InvigilatorRestriction.objects.filter(invigilator=instance).delete()
+            InvigilatorAvailability.objects.filter(invigilator=instance).delete()
+            diets = []
+            for r in restrictions_data:
+                InvigilatorRestriction.objects.create(invigilator=instance, **r)
+                diets.append(r["diet"])
+            self._generate_availability(instance, diets)
+
+        return instance
