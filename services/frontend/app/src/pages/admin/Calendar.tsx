@@ -8,6 +8,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   InputBase,
+  TextField,
   Grid,
   Pagination,
   Divider,
@@ -159,6 +160,8 @@ export const AdminCalendar: React.FC = () => {
       year: "numeric",
     });
 
+  const formatDateInput = (date: Date) => date.toISOString().split("T")[0];
+
   const examsToday = useMemo(
     () =>
       calendarExams.filter((exam) => {
@@ -260,6 +263,20 @@ export const AdminCalendar: React.FC = () => {
               sx={{ width: 300 }}
             />
           </Paper>
+
+          <TextField
+            label="Select a date"
+            type="date"
+            size="small"
+            value={formatDateInput(currentDate)}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              const picked = new Date(e.target.value);
+              if (!Number.isNaN(picked.getTime())) setCurrentDate(picked);
+            }}
+            InputLabelProps={{ shrink: true }}
+            sx={{ minWidth: 180 }}
+          />
 
           <Button
             variant="outlined"
