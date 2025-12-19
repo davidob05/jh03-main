@@ -14,11 +14,13 @@ import {
   CircularProgress,
   Alert,
   Fab,
+  Snackbar,
 } from "@mui/material";
 import { GridView, CalendarViewMonth, Edit, Delete as DeleteIcon } from "@mui/icons-material";
 import dayjs, { Dayjs } from "dayjs";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { ContractedHoursReport } from "../../components/admin/ContractedHoursReport";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
 import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
@@ -27,6 +29,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { StaticDatePicker } from "@mui/x-date-pickers/StaticDatePicker";
 import { apiBaseUrl } from "../../utils/api";
 import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDialog";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 
 const baseDietOptions = [
   { code: "DEC_2025", label: "December 2025" },
@@ -92,9 +95,14 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const [availabilityLimit, setAvailabilityLimit] = useState(4);
   const [selectedAvailabilityDate, setSelectedAvailabilityDate] = useState<Dayjs | null>(dayjs());
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [successOpen, setSuccessOpen] = useState(false);
   const { id } = useParams();
+  const navigate = useNavigate();
 
-  const { data, isLoading, isError, error } = useQuery<InvigilatorData, Error>({
+  const { data, isLoading, isError, error, refetch } = useQuery<InvigilatorData, Error>({
     queryKey: ["invigilator", id],
     queryFn: async () => {
       const response = await fetch(`${apiBaseUrl}/invigilators/${id}/`);
@@ -155,6 +163,26 @@ export const AdminInvigilatorProfile: React.FC = () => {
       remaining_hours: contracted != null ? contracted - totalAssignedHours : undefined,
     };
   }, [data?.contracted_hours, totalAssignedHours]);
+
+  const handleDelete = async () => {
+    if (!id) return;
+    try {
+      setDeleting(true);
+      const response = await fetch(`${apiBaseUrl}/invigilators/${id}/`, { method: "DELETE" });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to delete invigilator");
+      }
+      setSuccessMessage("Invigilator deleted successfully!");
+      setSuccessOpen(true);
+      setTimeout(() => navigate("/admin/invigilators"), 400);
+    } catch (err: any) {
+      alert(err?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
+      setDeleteOpen(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -733,7 +761,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
           </Fab>
         </Tooltip>
         <Tooltip title="Delete invigilator">
-          <Fab color="error" aria-label="delete invigilator">
+          <Fab color="error" aria-label="delete invigilator" onClick={() => setDeleteOpen(true)}>
             <DeleteIcon />
           </Fab>
         </Tooltip>
@@ -743,8 +771,45 @@ export const AdminInvigilatorProfile: React.FC = () => {
         open={editDialogOpen}
         invigilatorId={data.id}
         onClose={() => setEditDialogOpen(false)}
-        onSuccess={() => setEditDialogOpen(false)}
+        onSuccess={(name) => {
+          setSuccessMessage(`${name} updated successfully!`);
+          setSuccessOpen(true);
+          refetch();
+          setEditDialogOpen(false);
+        }}
       />
+      <DeleteConfirmationDialog
+        open={deleteOpen}
+        title="Delete invigilator account?"
+        description="This will permanently delete this invigilator."
+        confirmText="Delete"
+        loading={deleting}
+        onClose={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+        onConfirm={handleDelete}
+      />
+      <Snackbar
+        open={successOpen}
+        autoHideDuration={3000}
+        onClose={() => setSuccessOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSuccessOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </>
   );
 };
