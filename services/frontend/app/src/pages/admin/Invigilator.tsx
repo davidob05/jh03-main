@@ -6,6 +6,7 @@ import {
   Stack,
   Chip,
   Grid,
+  Button,
   Tooltip,
   Divider,
   ToggleButton,
@@ -14,12 +15,15 @@ import {
   Alert,
 } from "@mui/material";
 import { GridView, CalendarViewMonth } from "@mui/icons-material";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ContractedHoursReport } from "../../components/admin/ContractedHoursReport";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
 import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { StaticDatePicker } from "@mui/x-date-pickers/StaticDatePicker";
 import { apiBaseUrl } from "../../utils/api";
 
 const baseDietOptions = [
@@ -82,7 +86,9 @@ const slotLabelMap: Record<string, string> = {
 };
 
 export const AdminInvigilatorProfile: React.FC = () => {
-  const [availabilityView] = useState<"list" | "calendar">("list");
+  const [availabilityView, setAvailabilityView] = useState<"list" | "calendar">("list");
+  const [availabilityLimit, setAvailabilityLimit] = useState(4);
+  const [selectedAvailabilityDate, setSelectedAvailabilityDate] = useState<Dayjs | null>(dayjs());
   const { id } = useParams();
 
   const { data, isLoading, isError, error } = useQuery<InvigilatorData, Error>({
@@ -115,6 +121,16 @@ export const AdminInvigilatorProfile: React.FC = () => {
     acc[slot.date].push(slot);
     return acc;
   }, {});
+
+  const availabilityByDate = useMemo(() => groupedAvailability, [groupedAvailability]);
+
+  const sortedAvailabilityEntries = useMemo(
+    () =>
+      Object.entries(groupedAvailability).sort(
+        ([a], [b]) => new Date(a).getTime() - new Date(b).getTime()
+      ),
+    [groupedAvailability]
+  );
 
   const totalAssignedHours = useMemo(() => {
     const assignments = data?.assignments || [];
@@ -168,11 +184,16 @@ export const AdminInvigilatorProfile: React.FC = () => {
           </Box>
         </Tooltip>
 
-        <ToggleButtonGroup value={availabilityView} exclusive color="primary">
+        <ToggleButtonGroup
+          value={availabilityView}
+          exclusive
+          color="primary"
+          onChange={(_, v) => v && setAvailabilityView(v)}
+        >
           <ToggleButton value="list">
             <GridView />
           </ToggleButton>
-          <ToggleButton value="calendar" disabled>
+          <ToggleButton value="calendar">
             <CalendarViewMonth />
           </ToggleButton>
         </ToggleButtonGroup>
@@ -547,35 +568,136 @@ export const AdminInvigilatorProfile: React.FC = () => {
         {/* Right Column - Availability, Contract */}
         <Box sx={{ flex: 1, minWidth: 300 }}>
           {/* Availability */}
-          <Paper sx={{ p: 4 }}>
-            <Typography variant="h6" fontWeight={700} mb={3}>
-              Availability
-            </Typography>
+          {availabilityView === "list" ? (
+            <Paper sx={{ p: 4 }}>
+              <Typography variant="h6" fontWeight={700} mb={3}>
+                Availability
+              </Typography>
 
-            <Grid container spacing={3}>
-              {Object.entries(groupedAvailability).map(([date, slots]) => (
-                <Grid item xs={12} key={date}>
-                  <Paper sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2 }}>
-                    <Typography variant="subtitle1" fontWeight={600} mb={2}>
-                      {dayjs(date).format("dddd, D MMMM YYYY")}
-                    </Typography>
-                    <Stack direction="row" spacing={1.5} flexWrap="wrap">
-                      {slots.map((s, i) => (
-                        <Tooltip key={i} title={s.available ? "Available for this slot" : "Unavailable for this slot"}>
-                          <Chip
-                            label={slotLabelMap[s.slot] || s.slot}
-                            color={s.available ? "success" : "default"}
-                            variant={s.available ? "filled" : "outlined"}
-                            size="medium"
-                          />
-                        </Tooltip>
-                      ))}
-                    </Stack>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          </Paper>
+              <Grid container spacing={3}>
+                {sortedAvailabilityEntries.slice(0, availabilityLimit).map(([date, slots]) => (
+                  <Grid item xs={12} key={date}>
+                    <Paper sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2 }}>
+                      <Typography variant="subtitle1" fontWeight={600} mb={2}>
+                        {dayjs(date).format("dddd, D MMMM YYYY")}
+                      </Typography>
+                      <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                        {slots.map((s, i) => (
+                          <Tooltip key={i} title={s.available ? "Available for this slot" : "Unavailable for this slot"}>
+                            <Chip
+                              label={slotLabelMap[s.slot] || s.slot}
+                              color={s.available ? "success" : "default"}
+                              variant={s.available ? "filled" : "outlined"}
+                              size="medium"
+                            />
+                          </Tooltip>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+              {(sortedAvailabilityEntries.length > availabilityLimit || availabilityLimit > 4) && (
+                <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+                  {sortedAvailabilityEntries.length > availabilityLimit && (
+                    <Button variant="text" onClick={() => setAvailabilityLimit((prev) => prev + 4)}>
+                      Show 4 more
+                    </Button>
+                  )}
+                  {availabilityLimit > 4 && (
+                    <Button variant="text" onClick={() => setAvailabilityLimit(4)}>
+                      Show less
+                    </Button>
+                  )}
+                </Box>
+              )}
+            </Paper>
+          ) : (
+            <Paper sx={{ p: 4 }}>
+              <Typography variant="h6" fontWeight={700} mb={3}>
+                Availability Calendar
+              </Typography>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <StaticDatePicker
+                  displayStaticWrapperAs="desktop"
+                  value={selectedAvailabilityDate}
+                  onChange={(newValue) => setSelectedAvailabilityDate(newValue)}
+                  slots={{
+                    toolbar: () => null,
+                  }}
+                  slotProps={{
+                    actionBar: { actions: [] },
+                    day: (ownerState) => {
+                      const dateStr = (ownerState.day as Dayjs).format("YYYY-MM-DD");
+                      const hasAvailability = availabilityByDate[dateStr]?.some((a) => a.available);
+                      return {
+                        sx: hasAvailability
+                          ? {
+                              "&::after": {
+                                content: '""',
+                                position: "absolute",
+                                bottom: 6,
+                                right: 6,
+                                width: 8,
+                                height: 8,
+                                bgcolor: "success.main",
+                                borderRadius: "50%",
+                                border: "2px solid white",
+                              },
+                            }
+                          : {},
+                      };
+                    },
+                  }}
+                  views={["day"]}
+                  showDaysOutsideCurrentMonth
+                  sx={{
+                    "& .MuiPickersDay-root": {
+                      width: 38,
+                      height: 38,
+                      fontSize: "0.9rem",
+                      margin: "3px",
+                      borderRadius: "50%",
+                      lineHeight: "38px",
+                    },
+                    "& .MuiDayCalendar-weekContainer": {
+                      justifyContent: "center",
+                    },
+                    "& .MuiDayCalendar-monthContainer": {
+                      overflow: "visible",
+                    },
+                    "& .MuiDayCalendar-slideTransition": {
+                      minHeight: "320px",
+                    },
+                  }}
+                />
+              </LocalizationProvider>
+
+              {selectedAvailabilityDate && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" fontWeight={600} mb={1}>
+                    {selectedAvailabilityDate.format("dddd, D MMMM YYYY")}
+                  </Typography>
+                  <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                    {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).map((slot, i) => (
+                      <Chip
+                        key={i}
+                        label={slotLabelMap[slot.slot] || slot.slot}
+                        color={slot.available ? "success" : "default"}
+                        variant={slot.available ? "filled" : "outlined"}
+                        size="medium"
+                      />
+                    ))}
+                    {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).length === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        No availability recorded for this date.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              )}
+            </Paper>
+          )}
 
           {/* Contracted Hours */}
           <Box sx={{ mt: 4, mr: 6 }}>
