@@ -77,8 +77,9 @@ interface Invigilator {
   personal_email: string | null;
   notes: string | null;
   resigned: boolean;
-  availableDates?: string[]; // Optional, as in original
-  availableSlots?: string[]; // Optional, as in original
+  availableDates?: string[]; // Optional legacy shape
+  availableSlots?: string[]; // Optional legacy shape
+  availabilities?: { date: string; slot: string; available: boolean }[]; // Newer shape from backend
 }
 
 const fetchInvigilators = async (): Promise<Invigilator[]> => {
@@ -492,9 +493,14 @@ export const AdminInvigilators: React.FC = () => {
                       }}
                       slotProps={{
                         day: (ownerState) => ({
-                          sx: invigilators.some((i) =>
-                            i.availableDates?.includes((ownerState.day as Dayjs).format('YYYY-MM-DD'))
-                          )
+                          sx: invigilators.some((i) => {
+                            const dateStr = (ownerState.day as Dayjs).format('YYYY-MM-DD');
+                            const hasLegacyDate = i.availableDates?.includes(dateStr);
+                            const hasAvailability = i.availabilities?.some(
+                              (a) => a.available && a.date === dateStr
+                            );
+                            return hasLegacyDate || hasAvailability;
+                          })
                             ? {
                                 '&::after': {
                                   content: '""',

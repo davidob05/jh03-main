@@ -190,6 +190,7 @@ class InvigilatorSerializer(serializers.ModelSerializer):
     assignments = InvigilatorAssignmentSerializer(many=True, read_only=True)
     qualifications = InvigilatorQualificationSerializer(many=True, required=False)
     restrictions = InvigilatorRestrictionSerializer(many=True, required=False)
+    availabilities = InvigilatorAvailabilitySerializer(many=True, read_only=True)
 
     class Meta:
         model = Invigilator
@@ -208,6 +209,7 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "qualifications",
             "restrictions",
             "assignments",
+            "availabilities",
         )
 
     def create(self, validated_data):
