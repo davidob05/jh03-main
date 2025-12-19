@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from "react-router-dom";
 import { Link as RouterLink } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Typography,
@@ -33,6 +33,7 @@ import {
   Fab,
   Snackbar,
   Alert,
+  IconButton,
   Link as MUILink,
 } from '@mui/material';
 import {
@@ -51,6 +52,7 @@ import {
   ArrowForward,
   Clear,
   Done,
+  Delete,
 } from '@mui/icons-material';
 import {
   StaticDatePicker,
@@ -60,6 +62,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs, { Dayjs } from 'dayjs';
 import { InvigilatorAvailabilityModal } from "../../components/admin/InvigilatorAvailabilityModal";
 import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialog';
+import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { apiBaseUrl } from '../../utils/api';
 
 interface Invigilator {
@@ -97,6 +100,10 @@ export const AdminInvigilators: React.FC = () => {
   const [addOpen, setAddOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Delete Invigilator Dialog state
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = (searchParams.get("view") as ViewMode) || "grid";
@@ -212,6 +219,45 @@ export const AdminInvigilators: React.FC = () => {
     });
   };
 
+  const queryClient = useQueryClient();
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          const res = await fetch(`${apiBaseUrl}/invigilators/${id}/`, {
+            method: "DELETE",
+          });
+
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Failed deleting #${id}: ${text}`);
+          }
+          return true;
+        })
+      );
+
+      return results;
+    },
+    onSuccess: async (_data, ids) => {
+      const count = ids?.length ?? 0;
+      setSuccessMessage(
+        count === 1
+          ? "Invigilator account deleted!"
+          : `${count} invigilator accounts deleted!`
+      );
+      setSuccessOpen(true);
+      setSelected([]);
+      setBulkAction("");
+      setDeleteOpen(false);
+      setDeleteError(null);
+      await queryClient.invalidateQueries({ queryKey: ["invigilators"] });
+    },
+    onError: (err: any) => {
+      setDeleteError(err?.message || "Delete failed");
+    },
+  });
+
   // Find invigilators available on a specific date
   const getAvailableOnDate = (date: Dayjs) => {
     const dateStr = date.format('YYYY-MM-DD');
@@ -252,6 +298,8 @@ export const AdminInvigilators: React.FC = () => {
       .slice(0, 2);
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const selectedCount = selected.length;
+  const selectionLabel = (singular: string, plural: string) => selectedCount === 1 ? singular : plural;
 
   if (isLoading) {
     return (
@@ -638,6 +686,7 @@ export const AdminInvigilators: React.FC = () => {
               <Select
                 label="With all selected users..."
                 value={bulkAction}
+                disabled={selected.length === 0}
                 onChange={(e) => setBulkAction(e.target.value)}
               >
                 <MenuItem value="">
@@ -645,7 +694,7 @@ export const AdminInvigilators: React.FC = () => {
                 </MenuItem>
                 <MenuItem value="export">
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Download fontSize="small" /> Export timetable
+                    <Download fontSize="small" /> {selectionLabel("Export timetable", "Export timetables")}
                   </Stack>
                 </MenuItem>
                 <MenuItem value="notify">
@@ -653,26 +702,72 @@ export const AdminInvigilators: React.FC = () => {
                     <Notifications fontSize="small" /> Send notification
                   </Stack>
                 </MenuItem>
+                <MenuItem value="delete">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Delete fontSize="small" /> {selectionLabel("Delete account", "Delete accounts")}
+                  </Stack>
+                </MenuItem>
               </Select>
             </FormControl>
 
-            {/* Dynamic Icon */}
+            {/* Dynamic Action Icon */}
             <Tooltip
               title={
-                bulkAction === "export"
-                  ? "This downloads the selected invigilator's timetable(s)"
+                selected.length === 0
+                  ? "Select at least one invigilator"
+                  : bulkAction === "export"
+                  ? selectionLabel(
+                      "Download the selected invigilator's timetable",
+                      "Download the selected invigilators' timetables"
+                    )
                   : bulkAction === "notify"
-                  ? "Send a notification to the selected invigilator(s)"
+                  ? selectionLabel(
+                      "Send a notification to the selected invigilator",
+                      "Send a notification to the selected invigilators"
+                    )
+                  : bulkAction === "delete"
+                  ? selectionLabel(
+                      "Delete the selected invigilator's account",
+                      "Delete the selected invigilators' accounts"
+                    )
                   : "Choose an action"
               }
             >
-              {bulkAction === "export" ? (
-                <Download color="action" />
-              ) : bulkAction === "notify" ? (
-                <Notifications color="action" />
-              ) : (
-                <Pending color="disabled" /> // neutral icon before selection
-              )}
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={selected.length === 0 || !bulkAction}
+                  onClick={() => {
+                    if (bulkAction === "delete") {
+                      setDeleteError?.(null);
+                      setDeleteOpen(true);
+                      return;
+                    }
+
+                    if (bulkAction === "export") {
+                      // TODO: run export action here
+                      // exportSelected(selected);
+                      return;
+                    }
+
+                    if (bulkAction === "notify") {
+                      // TODO: run notify action here
+                      // notifySelected(selected);
+                      return;
+                    }
+                  }}
+                >
+                  {bulkAction === "export" ? (
+                    <Download color="action" />
+                  ) : bulkAction === "notify" ? (
+                    <Notifications color="action" />
+                  ) : bulkAction === "delete" ? (
+                    <Delete color="error" />
+                  ) : (
+                    <Pending color="disabled" />
+                  )}
+                </IconButton>
+              </span>
             </Tooltip>
           </Stack>
 
@@ -715,6 +810,32 @@ export const AdminInvigilators: React.FC = () => {
             setSuccessMessage(`${name} added successfully!`);
             setSuccessOpen(true);
           }}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          open={deleteOpen}
+          title="Delete invigilator accounts?"
+          description={
+            <>
+              You are about to permanently delete <strong>{selected.length}</strong>{" "}
+              invigilator's {selectionLabel("account", "accounts")}.
+              {deleteError ? (
+                <Typography sx={{ mt: 2 }} color="error">
+                  {deleteError}
+                </Typography>
+              ) : null}
+            </>
+          }
+          confirmText={`Delete ${selected.length}`}
+          loading={bulkDeleteMutation.isPending}
+          onClose={() => {
+            if (!bulkDeleteMutation.isPending) {
+              setDeleteOpen(false);
+              setDeleteError(null);
+            }
+          }}
+          onConfirm={() => bulkDeleteMutation.mutate(selected)}
         />
 
         <Snackbar
