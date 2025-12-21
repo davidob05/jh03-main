@@ -6,7 +6,7 @@ from timetabling_system.models import Exam, Venue
 from timetabling_system.services import ingest_upload_result
 from timetabling_system.utils.excel_parser import parse_excel_file
 from timetabling_system.utils.venue_ingest import upsert_venues
-from .serializers import ExamSerializer, VenueSerializer
+from .serializers import ExamSerializer, VenueSerializer, VenueWriteSerializer
 
 
 class ExamViewSet(viewsets.ReadOnlyModelViewSet):
@@ -14,9 +14,14 @@ class ExamViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ExamSerializer
 
 
-class VenueViewSet(viewsets.ReadOnlyModelViewSet):
+class VenueViewSet(viewsets.ModelViewSet):
     queryset = Venue.objects.all().prefetch_related("examvenue_set__exam")
     serializer_class = VenueSerializer
+
+    def get_serializer_class(self):
+        if self.action in {"create", "update", "partial_update"}:
+            return VenueWriteSerializer
+        return VenueSerializer
 
 
 class TimetableUploadView(APIView):

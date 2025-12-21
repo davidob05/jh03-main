@@ -71,3 +71,20 @@ class VenueSerializer(serializers.ModelSerializer):
         exam_venues = getattr(obj, "_prefetched_objects_cache", {}).get("examvenue_set")
         if exam_venues is None: exam_venues = obj.examvenue_set.select_related("exam").all()
         return [ev.exam.exam_name for ev in exam_venues]
+
+
+class VenueWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Venue
+        fields = (
+            "venue_name",
+            "capacity",
+            "venuetype",
+            "is_accessible",
+            "provision_capabilities",
+            "qualifications",
+            "availability",
+        )
+
+    def to_representation(self, instance):
+        return VenueSerializer(instance).data
