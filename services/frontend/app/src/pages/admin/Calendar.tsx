@@ -24,7 +24,7 @@ import {
   Search,
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
-import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
+import { ExamDetailsPopup } from "@/components/admin/ExamDetailsPopup";
 import { apiBaseUrl } from "../../utils/api";
 
 interface ExamVenueData {
@@ -65,6 +65,13 @@ interface ExamDetails {
   venues: ExamVenueInfo[];
 }
 
+interface AdminCalendarProps {
+  initialExams?: ExamDetails[];
+  fetchEnabled?: boolean;
+}
+
+export const examData: ExamDetails[] = [];
+
 const departmentColors: Record<string, string> = {
   CS: "#4caf50",
   Math: "#2196f3",
@@ -75,10 +82,11 @@ const departmentColors: Record<string, string> = {
   Biology: "#009688",
 };
 
-const fetchExams = async (): Promise<ExamData[]> => {
+const fetchExams = async (): Promise<ExamDetails[]> => {
   const response = await fetch(`${apiBaseUrl}/exams/`);
   if (!response.ok) throw new Error("Unable to load exams");
-  return response.json();
+  const data: ExamData[] = await response.json();
+  return data.map(toCalendarExam).filter((exam): exam is ExamDetails => Boolean(exam));
 };
 
 const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
@@ -133,7 +141,7 @@ const minutesSinceMidnight = (dateTime: string) => {
   return date.getHours() * 60 + date.getMinutes();
 };
 
-export const AdminCalendar: React.FC = () => {
+export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"grid" | "timeline">("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -142,15 +150,25 @@ export const AdminCalendar: React.FC = () => {
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
 
-  const { data: examsData = [], isLoading, isError, error } = useQuery<ExamData[], Error>({
+  const fallbackExams = initialExams ?? examData;
+  const shouldFetch = fetchEnabled ?? import.meta.env.MODE !== "test";
+
+  const {
+    data: calendarExams,
+    isLoading: queryLoading,
+    isError: queryError,
+    error,
+  } = useQuery<ExamDetails[], Error>({
     queryKey: ["exams"],
     queryFn: fetchExams,
+    enabled: shouldFetch,
+    retry: false,
+    ...(shouldFetch ? {} : { initialData: fallbackExams }),
   });
 
-  const calendarExams = useMemo(
-    () => examsData.map(toCalendarExam).filter((exam): exam is ExamDetails => Boolean(exam)),
-    [examsData]
-  );
+  const effectiveExams = calendarExams ?? fallbackExams;
+  const isLoading = shouldFetch && queryLoading;
+  const isError = shouldFetch && queryError;
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-GB", {
@@ -164,7 +182,7 @@ export const AdminCalendar: React.FC = () => {
 
   const examsToday = useMemo(
     () =>
-      calendarExams.filter((exam) => {
+      effectiveExams.filter((exam) => {
         const matchesDate = isSameDay(exam.mainStartTime, currentDate);
         const query = searchQuery.toLowerCase();
         const matchesQuery =
@@ -175,7 +193,7 @@ export const AdminCalendar: React.FC = () => {
           exam.department.toLowerCase().includes(query);
         return matchesDate && matchesQuery;
       }),
-    [calendarExams, currentDate, searchQuery]
+    [effectiveExams, currentDate, searchQuery]
   );
 
   const paginatedExams = examsToday.slice((page - 1) * itemsPerPage, page * itemsPerPage);
