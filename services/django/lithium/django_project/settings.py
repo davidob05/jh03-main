@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.sites",
     # Third-party
     "rest_framework",
+    "rest_framework.authtoken",
     "allauth",
     "allauth.account",
     "crispy_forms",
@@ -198,6 +199,16 @@ ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = False
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_EMAIL_REQUIRED = True
+
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAdminUser",
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+}
 
 # Allow bulk admin actions (e.g., deleting many ExamVenue rows) without hitting the
 # default per-request field cap.
