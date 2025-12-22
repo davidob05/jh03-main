@@ -130,6 +130,23 @@ class VenueSerializer(serializers.ModelSerializer):
         return [ev.exam.exam_name for ev in exam_venues]
 
 
+class VenueWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Venue
+        fields = (
+            "venue_name",
+            "capacity",
+            "venuetype",
+            "is_accessible",
+            "provision_capabilities",
+            "qualifications",
+            "availability",
+        )
+
+    def to_representation(self, instance):
+        return VenueSerializer(instance).data
+
+
 class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
     invigilator_name = serializers.SerializerMethodField()
     exam_name = serializers.CharField(source="exam_venue.exam.exam_name", read_only=True)
@@ -181,3 +198,4 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "is_active",
             "assignments",
         )
+

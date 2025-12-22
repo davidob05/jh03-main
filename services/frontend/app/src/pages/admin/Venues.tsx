@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
 import {
   Box,
+  Button,
   Table,
   TableBody,
   TableCell,
@@ -24,7 +25,7 @@ import {
 import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { apiBaseUrl } from '../../utils/api';
 
@@ -201,9 +202,10 @@ interface EnhancedTableToolbarProps {
   numSelected: number;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onAddVenue: () => void;
 }
 
-const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange }: EnhancedTableToolbarProps) => {
+const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddVenue }: EnhancedTableToolbarProps) => {
   return (
     <Toolbar
       sx={[
@@ -240,6 +242,7 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange }: Enha
               sx={{ width: 250 }}
             />
           </Box>
+          <Button variant="contained" onClick={onAddVenue}>Add venue</Button>
         </Box>
       )}
 
@@ -264,6 +267,7 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange }: Enha
 };
 
 export const AdminVenues: React.FC = () => {
+  const navigate = useNavigate();
   const [order, setOrder] = React.useState<Order>('asc');
   const [orderBy, setOrderBy] = React.useState<keyof RowData>('name');
   const [selected, setSelected] = React.useState<readonly string[]>([]);
@@ -389,6 +393,7 @@ export const AdminVenues: React.FC = () => {
           numSelected={selected.length}
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
+          onAddVenue={() => navigate('/admin/venues/new')}
         />
 
         <TableContainer>
@@ -421,7 +426,7 @@ export const AdminVenues: React.FC = () => {
                       </TableCell>
 
                       <TableCell id={labelId} component="th" scope="row" padding="none">
-                        <Link to={`/venues/${row.id}`}>
+                        <Link to={`/admin/venues/${row.id}`}>
                           <MUILink sx={{ cursor: 'pointer' }}>{row.name}</MUILink>
                         </Link>
                       </TableCell>
