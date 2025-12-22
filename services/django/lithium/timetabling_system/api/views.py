@@ -20,17 +20,22 @@ from .serializers import (
     InvigilatorAssignmentSerializer,
     InvigilatorSerializer,
     VenueSerializer,
+    VenueWriteSerializer
 )
-
 
 class ExamViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
     serializer_class = ExamSerializer
 
 
-class VenueViewSet(viewsets.ReadOnlyModelViewSet):
+class VenueViewSet(viewsets.ModelViewSet):
     queryset = Venue.objects.all().prefetch_related("examvenue_set__exam")
     serializer_class = VenueSerializer
+
+    def get_serializer_class(self):
+        if self.action in {"create", "update", "partial_update"}:
+            return VenueWriteSerializer
+        return VenueSerializer
 
 
 class ExamVenueViewSet(viewsets.ModelViewSet):
