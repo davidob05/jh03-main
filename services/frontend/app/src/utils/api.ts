@@ -16,3 +16,34 @@ const normalisedBase = stripTrailingSlash(rawBaseUrl);
 export const apiBaseUrl = normalisedBase.endsWith("/api")
   ? normalisedBase
   : `${normalisedBase}/api`;
+
+export const authTokenKey = "authToken";
+
+const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
+  if (!headers) return {};
+  if (headers instanceof Headers) {
+    const result: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      result[key] = value;
+    });
+    return result;
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+  return { ...headers };
+};
+
+const withAuthHeader = (headers?: HeadersInit): HeadersInit => {
+  const base = normalizeHeaders(headers);
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem(authTokenKey) : null;
+  if (token) {
+    base.Authorization = `Token ${token}`;
+  }
+  return base;
+};
+
+export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
+  const headers = withAuthHeader(init.headers);
+  return fetch(input, { ...init, headers });
+};

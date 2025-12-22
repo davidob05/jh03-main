@@ -27,7 +27,7 @@ import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { apiBaseUrl } from '../../utils/api';
+import { apiBaseUrl, apiFetch } from '../../utils/api';
 
 interface ExamVenueData {
   exam_name: string;
@@ -82,7 +82,7 @@ const headCells: readonly HeadCell[] = [
 ];
 
 const fetchVenues = async (): Promise<VenueData[]> => {
-  const response = await fetch(apiBaseUrl + "/venues/");
+  const response = await apiFetch(apiBaseUrl + "/venues/");
   if (!response.ok) throw new Error('Unable to load venues');
   return response.json();
 };

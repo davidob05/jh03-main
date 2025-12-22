@@ -1,16 +1,24 @@
 import React, { useState } from "react";
 import { Box, Button, TextField, Typography, Paper, CircularProgress, Alert } from "@mui/material";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { apiBaseUrl, authTokenKey } from "../utils/api";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromPath = (location.state as { from?: string } | null)?.from || "/admin";
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  React.useEffect(() => {
+    if (localStorage.getItem(authTokenKey)) {
+      navigate(fromPath, { replace: true });
+    }
+  }, [fromPath, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,29 +26,33 @@ export default function Login() {
     setErrorMsg("");
 
     try {
-      const res = await axios.post("/api/auth/login/", {
-        email,
-        password,
+      const res = await fetch(`${apiBaseUrl}/auth/token/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
       });
 
-      // Expecting Django to return:
-      // { token: "..." } or { access: "..." }
-      const token = res.data.token || res.data.access;
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data?.detail || data?.non_field_errors?.[0] || "Login failed.");
+        setLoading(false);
+        return;
+      }
 
+      const token = data.token;
       if (!token) {
         setErrorMsg("Invalid server response.");
         setLoading(false);
         return;
       }
 
-      localStorage.setItem("authToken", token);
-
-      navigate("/dashboard"); // Redirect after login
+      localStorage.setItem(authTokenKey, token);
+      navigate(fromPath, { replace: true });
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || "Login failed.");
+      setErrorMsg(err?.message || "Login failed.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -75,12 +87,11 @@ export default function Login() {
         <form onSubmit={handleLogin}>
           <TextField
             fullWidth
-            label="Email"
+            label="Email or Username"
             variant="outlined"
             margin="normal"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
           />
 

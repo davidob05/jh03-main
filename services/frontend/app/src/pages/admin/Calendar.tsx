@@ -25,7 +25,7 @@ import {
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -83,7 +83,7 @@ const departmentColors: Record<string, string> = {
 };
 
 const fetchExams = async (): Promise<ExamDetails[]> => {
-  const response = await fetch(`${apiBaseUrl}/exams/`);
+  const response = await apiFetch(`${apiBaseUrl}/exams/`);
   if (!response.ok) throw new Error("Unable to load exams");
   const data: ExamData[] = await response.json();
   return data.map(toCalendarExam).filter((exam): exam is ExamDetails => Boolean(exam));

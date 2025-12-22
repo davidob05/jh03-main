@@ -14,7 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 const PROVISION_CAPABILITIES = [
   { value: "separate_room_on_own", label: "Separate room on own" },
@@ -46,7 +46,7 @@ type VenueData = {
 };
 
 const fetchVenue = async (venueName: string): Promise<VenueData> => {
-  const response = await fetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueName)}/`);
+  const response = await apiFetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueName)}/`);
   if (!response.ok) throw new Error("Unable to load venue");
   return response.json();
 };
@@ -99,7 +99,7 @@ export const AdminVenueForm: React.FC = () => {
         ? `${apiBaseUrl}/venues/${encodeURIComponent(venueName || "")}/`
         : `${apiBaseUrl}/venues/`;
       const method = isEdit ? "PATCH" : "POST";
-      const resp = await fetch(url, {
+      const resp = await apiFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

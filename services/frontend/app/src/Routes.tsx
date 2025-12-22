@@ -2,6 +2,8 @@ import { createTheme, ThemeProvider } from "@mui/material";
 import React, { useMemo } from "react";
 import { BrowserRouter, Routes as RouterRoutes, Route as RouterRoute } from "react-router-dom";
 import { NotFound } from "./pages/NotFound";
+import Login from "./pages/Login";
+import { RequireAuth } from "./components/RequireAuth";
 
 // Import admin pages and layout
 import { AdminLayout } from "./components/admin/Layout";
@@ -36,25 +38,30 @@ export const Routes: React.FC = () => {
     <ThemeProvider theme={theme}>
       <BrowserRouter>
         <RouterRoutes>
-          {/* Administrator Pages */}
-          <RouterRoute path="/admin" element={<AdminLayout />}>
-            <RouterRoute index element={<AdminDashboard />} />
-            <RouterRoute path="exams" element={<AdminExams />} />
-            <RouterRoute path="exam/:examId/edit" element={<AdminExamEdit />} />
-            <RouterRoute path="venues" element={<AdminVenues />} />
-            <RouterRoute path="venues/new" element={<AdminVenueForm />} />
-            <RouterRoute path="venues/:venueName" element={<AdminVenueForm />} />
-            <RouterRoute path="calendar" element={<AdminCalendar />} />
-            <RouterRoute path="profile" element={<AdminProfile />} />
-            <RouterRoute path="invigilators" element={<AdminInvigilators />} />
-            <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
-          </RouterRoute>
+          <RouterRoute path="/" element={<Login />} />
+          <RouterRoute path="/login" element={<Login />} />
 
-          {/* Invigilator Pages */}
-          <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
-            <RouterRoute index element={<InvigilatorDashboard />} /> 
-            <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
-            <RouterRoute path="profile" element={<InvigilatorProfile />} />
+          <RouterRoute element={<RequireAuth />}>
+            {/* Administrator Pages */}
+            <RouterRoute path="/admin" element={<AdminLayout />}>
+              <RouterRoute index element={<AdminDashboard />} />
+              <RouterRoute path="exams" element={<AdminExams />} />
+              <RouterRoute path="exam/:examId/edit" element={<AdminExamEdit />} />
+              <RouterRoute path="venues" element={<AdminVenues />} />
+              <RouterRoute path="venues/new" element={<AdminVenueForm />} />
+              <RouterRoute path="venues/:venueName" element={<AdminVenueForm />} />
+              <RouterRoute path="calendar" element={<AdminCalendar />} />
+              <RouterRoute path="profile" element={<AdminProfile />} />
+              <RouterRoute path="invigilators" element={<AdminInvigilators />} />
+              <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
+            </RouterRoute>
+
+            {/* Invigilator Pages */}
+            <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
+              <RouterRoute index element={<InvigilatorDashboard />} /> 
+              <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
+              <RouterRoute path="profile" element={<InvigilatorProfile />} />
+            </RouterRoute>
           </RouterRoute>
 
           {/* Fallback Route */}

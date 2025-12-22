@@ -63,7 +63,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { InvigilatorAvailabilityModal } from "../../components/admin/InvigilatorAvailabilityModal";
 import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialog';
 import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
-import { apiBaseUrl } from '../../utils/api';
+import { apiBaseUrl, apiFetch } from '../../utils/api';
 
 interface Invigilator {
   id: number;
@@ -83,7 +83,7 @@ interface Invigilator {
 }
 
 const fetchInvigilators = async (): Promise<Invigilator[]> => {
-  const response = await fetch(`${apiBaseUrl}/invigilators/`);
+  const response = await apiFetch(`${apiBaseUrl}/invigilators/`);
   if (!response.ok) throw new Error('Unable to load invigilators');
   return response.json();
 };
@@ -226,7 +226,7 @@ export const AdminInvigilators: React.FC = () => {
     mutationFn: async (ids: number[]) => {
       const results = await Promise.all(
         ids.map(async (id) => {
-          const res = await fetch(`${apiBaseUrl}/invigilators/${id}/`, {
+          const res = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`, {
             method: "DELETE",
           });
 
