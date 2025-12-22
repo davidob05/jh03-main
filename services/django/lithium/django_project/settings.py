@@ -203,6 +203,10 @@ ACCOUNT_EMAIL_REQUIRED = True
 # default per-request field cap.
 DATA_UPLOAD_MAX_NUMBER_FIELDS = int(os.getenv("DJANGO_DATA_UPLOAD_MAX_NUMBER_FIELDS", "50000"))
 ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_ADAPTER = "accounts.adapters.AccountAdapter"
+
+# Toggle to block resigned invigilators from logging in.
+BLOCK_RESIGNED_INVIGILATORS = False
 
 # CORS setup for local frontend
 CORS_ALLOWED_ORIGINS = [

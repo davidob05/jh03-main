@@ -25,6 +25,7 @@ interface Invigilator {
   email?: string | null;
   availableDates?: string[];
   availableSlots?: string[];
+  availabilities?: { date: string; slot: string; available: boolean }[];
 }
 
 interface Props {
@@ -62,8 +63,23 @@ export const InvigilatorAvailabilityModal: React.FC<Props> = ({
 
   const dateStr = date.format("YYYY-MM-DD");
 
-  const available = invigilators.filter((i) =>
-    i.availableDates?.includes(dateStr)
+  const slotLabel = (slot: string) => {
+    switch (slot) {
+      case "MORNING":
+        return "Morning";
+      case "AFTERNOON":
+        return "Afternoon";
+      case "EVENING":
+        return "Evening";
+      default:
+        return slot;
+    }
+  };
+
+  const available = invigilators.filter(
+    (i) =>
+      i.availabilities?.some((a) => a.available && a.date === dateStr) ||
+      i.availableDates?.includes(dateStr)
   );
 
   return (
@@ -81,17 +97,15 @@ export const InvigilatorAvailabilityModal: React.FC<Props> = ({
           <List>
             {available.map((i) => {
               const slotsOnDate =
+                i.availabilities
+                  ?.filter((a) => a.available && a.date === dateStr)
+                  .map((a) => slotLabel(a.slot)) ||
                 i.availableSlots
                   ?.filter((slot) => slot.startsWith(dateStr))
-                  .map((slot) => {
-                    const time = slot.split("T")[1].slice(0, 5);
-                    const hour = parseInt(time.split(":")[0]);
-
-                    if (hour < 12) return `Morning (${time})`;
-                    if (hour < 13) return `Noon (${time})`;
-                    if (hour < 16) return `Afternoon (${time})`;
-                    return `Evening (${time})`;
-                  }) || [];
+                  .map((slot) => slot.split("T")[1]?.slice(0, 5))
+                  .filter(Boolean)
+                  .map((time) => `Available (${time})`) ||
+                [];
 
               const names = displayPreferredAndFull(i);
               const initials = getInitials(names.main);

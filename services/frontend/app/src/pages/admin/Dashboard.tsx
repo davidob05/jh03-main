@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Box,
   Grid,
@@ -7,7 +7,33 @@ import {
   Paper,
   Button,
 } from "@mui/material";
+import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
+import { apiBaseUrl } from "../../utils/api";
+
+interface ExamVenueData {
+  examvenue_id: number;
+  venue_name: string | null;
+  start_time: string | null;
+  exam_length: number | null;
+  core: boolean;
+  provision_capabilities: string[];
+}
+
+interface ExamData {
+  exam_id: number;
+  exam_name: string;
+  course_code: string;
+  exam_venues: ExamVenueData[];
+}
+
+interface InvigilatorData {
+  id: number;
+}
+
+interface VenueData {
+  venue_name: string;
+}
 
 interface Notification {
   id: number;
@@ -92,6 +118,62 @@ const mockNotifications: Notification[] = [
 
 export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4); // show 4 by default
+  const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
+    queryKey: ["dashboard-exams"],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/exams/`);
+      if (!res.ok) throw new Error("Unable to load exams");
+      return res.json();
+    },
+  });
+
+  const { data: invigilators = [], isLoading: loadingInvigilators } = useQuery<InvigilatorData[]>({
+    queryKey: ["dashboard-invigilators"],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/invigilators/`);
+      if (!res.ok) throw new Error("Unable to load invigilators");
+      return res.json();
+    },
+  });
+
+  const { data: venues = [], isLoading: loadingVenues } = useQuery<VenueData[]>({
+    queryKey: ["dashboard-venues"],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/venues/`);
+      if (!res.ok) throw new Error("Unable to load venues");
+      return res.json();
+    },
+  });
+
+  const stats = useMemo(() => {
+    const totalExams = exams.length;
+    const totalInvigilators = invigilators.length;
+    const totalVenues = venues.length;
+
+    const upcomingExamIds = new Set<number>();
+    const unallocatedExamVenueIds = new Set<number>();
+    const now = new Date();
+
+    exams.forEach((exam) => {
+      exam.exam_venues?.forEach((ev) => {
+        if (ev.start_time) {
+          const start = new Date(ev.start_time);
+          if (start > now) upcomingExamIds.add(exam.exam_id);
+        }
+        if (!ev.venue_name) unallocatedExamVenueIds.add(ev.examvenue_id);
+      });
+    });
+
+    return {
+      totalExams,
+      totalInvigilators,
+      totalVenues,
+      upcomingExams: upcomingExamIds.size,
+      examsForAllocation: unallocatedExamVenueIds.size,
+      slotsToAllocate: null,
+      contractsFulfilled: null,
+    };
+  }, [exams, invigilators, venues]);
 
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
@@ -113,7 +195,7 @@ export const AdminDashboard: React.FC = () => {
               Total Exams
             </Typography>
             <Typography variant="h5" fontWeight={600}>
-              371
+              {loadingExams ? "…" : stats.totalExams}
             </Typography>
           </Card>
         </Grid>
@@ -124,7 +206,7 @@ export const AdminDashboard: React.FC = () => {
               Total Invigilators
             </Typography>
             <Typography variant="h5" fontWeight={600}>
-              112
+              {loadingInvigilators ? "…" : stats.totalInvigilators}
             </Typography>
           </Card>
         </Grid>
@@ -135,7 +217,7 @@ export const AdminDashboard: React.FC = () => {
               Active Venues
             </Typography>
             <Typography variant="h5" fontWeight={600}>
-              201
+              {loadingVenues ? "…" : stats.totalVenues}
             </Typography>
           </Card>
         </Grid>
@@ -146,7 +228,7 @@ export const AdminDashboard: React.FC = () => {
               Upcoming Exams
             </Typography>
             <Typography variant="h5" fontWeight={600}>
-              146
+              {loadingExams ? "…" : stats.upcomingExams}
             </Typography>
           </Card>
         </Grid>
@@ -157,7 +239,7 @@ export const AdminDashboard: React.FC = () => {
               Exams for Allocation
             </Typography>
             <Typography variant="h5" fontWeight={600}>
-              124
+              {loadingExams ? "…" : stats.examsForAllocation}
             </Typography>
           </Card>
         </Grid>
@@ -168,7 +250,7 @@ export const AdminDashboard: React.FC = () => {
               Slots to Allocate
             </Typography>
             <Typography variant="h5" fontWeight={600}>
-              773
+              {stats.slotsToAllocate ?? "—"}
             </Typography>
           </Card>
         </Grid>
@@ -179,7 +261,7 @@ export const AdminDashboard: React.FC = () => {
               Contracts Fulfilled
             </Typography>
             <Typography variant="h5" fontWeight={600}>
-              28
+              {stats.contractsFulfilled ?? "—"}
             </Typography>
           </Card>
         </Grid>

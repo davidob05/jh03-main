@@ -59,9 +59,10 @@ class ExamVenueViewSet(viewsets.ModelViewSet):
 
 
 class InvigilatorViewSet(viewsets.ModelViewSet):
-    queryset = Invigilator.objects.all().prefetch_related(
+    queryset = Invigilator.objects.select_related("user").prefetch_related(
         "assignments__exam_venue__exam",
         "assignments__exam_venue__venue",
+        "availabilities",
     )
     serializer_class = InvigilatorSerializer
 
