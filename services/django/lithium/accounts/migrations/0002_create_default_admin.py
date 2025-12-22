@@ -1,3 +1,4 @@
+from django.contrib.auth.hashers import make_password
 from django.db import migrations
 
 
@@ -15,18 +16,17 @@ def create_default_admin(apps, _schema_editor):
             "is_staff": True,
             "is_superuser": True,
             "is_active": True,
+            "password": make_password(DEFAULT_PASSWORD),
         },
     )
-    if created:
-        user.set_password(DEFAULT_PASSWORD)
-    else:
+    if not created:
         # Ensure the seeded admin keeps admin privileges and credentials for dev convenience.
         user.email = user.email or DEFAULT_EMAIL
         user.is_staff = True
         user.is_superuser = True
         user.is_active = True
-        user.set_password(DEFAULT_PASSWORD)
-    user.save()
+        user.password = make_password(DEFAULT_PASSWORD)
+        user.save()
 
     # Pre-create an API token for the admin user.
     Token = apps.get_model("authtoken", "Token")
