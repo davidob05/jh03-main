@@ -18,6 +18,36 @@ export const apiBaseUrl = normalisedBase.endsWith("/api")
   : `${normalisedBase}/api`;
 
 export const authTokenKey = "authToken";
+export const authUserKey = "authUser";
+
+export type AuthUser = {
+  id?: number;
+  email?: string;
+  username?: string;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  role?: string;
+};
+
+const parseStoredUser = (): AuthUser | null => {
+  if (typeof localStorage === "undefined") return null;
+  const raw = localStorage.getItem(authUserKey);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch (_err) {
+    return null;
+  }
+};
+
+export const getStoredUser = (): AuthUser | null => parseStoredUser();
+export const getStoredRole = (): string | null => {
+  const user = parseStoredUser();
+  if (!user) return null;
+  if (user.role) return user.role;
+  if (user.is_staff || user.is_superuser) return "admin";
+  return "invigilator";
+};
 
 const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
   if (!headers) return {};

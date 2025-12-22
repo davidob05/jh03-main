@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { Box, Button, TextField, Typography, Paper, CircularProgress, Alert } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
-import { apiBaseUrl, authTokenKey } from "../utils/api";
+import { apiBaseUrl, authTokenKey, authUserKey, getStoredRole } from "../utils/api";
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const fromPath = (location.state as { from?: string } | null)?.from || "/admin";
+  const fromPath = (location.state as { from?: string } | null)?.from || "";
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -14,10 +14,22 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  React.useEffect(() => {
-    if (localStorage.getItem(authTokenKey)) {
-      navigate(fromPath, { replace: true });
+  const resolveRedirect = (role: string | null, requested: string) => {
+    if (role === "admin") {
+      return requested && requested.startsWith("/admin") ? requested : "/admin";
     }
+    if (role === "invigilator") {
+      return requested && requested.startsWith("/invigilator") ? requested : "/invigilator";
+    }
+    return "/login";
+  };
+
+  React.useEffect(() => {
+    const token = localStorage.getItem(authTokenKey);
+    if (!token) return;
+    const role = getStoredRole();
+    const target = resolveRedirect(role, fromPath);
+    navigate(target, { replace: true });
   }, [fromPath, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -47,7 +59,12 @@ export default function Login() {
       }
 
       localStorage.setItem(authTokenKey, token);
-      navigate(fromPath, { replace: true });
+      if (data.user) {
+        localStorage.setItem(authUserKey, JSON.stringify(data.user));
+      }
+      const role = data.user?.role || (data.user?.is_staff || data.user?.is_superuser ? "admin" : "invigilator");
+      const target = resolveRedirect(role, fromPath);
+      navigate(target, { replace: true });
     } catch (err: any) {
       setErrorMsg(err?.message || "Login failed.");
     } finally {

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes as RouterRoutes, Route as RouterRoute } from "rea
 import { NotFound } from "./pages/NotFound";
 import Login from "./pages/Login";
 import { RequireAuth } from "./components/RequireAuth";
+import { RequireRole } from "./components/RequireRole";
 
 // Import admin pages and layout
 import { AdminLayout } from "./components/admin/Layout";
@@ -42,30 +43,34 @@ export const Routes: React.FC = () => {
           <RouterRoute path="/login" element={<Login />} />
 
           <RouterRoute element={<RequireAuth />}>
-            {/* Administrator Pages */}
-            <RouterRoute path="/admin" element={<AdminLayout />}>
-              <RouterRoute index element={<AdminDashboard />} />
-              <RouterRoute path="exams" element={<AdminExams />} />
-              <RouterRoute path="exam/:examId/edit" element={<AdminExamEdit />} />
-              <RouterRoute path="venues" element={<AdminVenues />} />
-              <RouterRoute path="venues/new" element={<AdminVenueForm />} />
-              <RouterRoute path="venues/:venueName" element={<AdminVenueForm />} />
-              <RouterRoute path="calendar" element={<AdminCalendar />} />
-              <RouterRoute path="profile" element={<AdminProfile />} />
-              <RouterRoute path="invigilators" element={<AdminInvigilators />} />
-              <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
+            <RouterRoute element={<RequireRole role="admin" />}>
+              {/* Administrator Pages */}
+              <RouterRoute path="/admin" element={<AdminLayout />}>
+                <RouterRoute index element={<AdminDashboard />} />
+                <RouterRoute path="exams" element={<AdminExams />} />
+                <RouterRoute path="exam/:examId/edit" element={<AdminExamEdit />} />
+                <RouterRoute path="venues" element={<AdminVenues />} />
+                <RouterRoute path="venues/new" element={<AdminVenueForm />} />
+                <RouterRoute path="venues/:venueName" element={<AdminVenueForm />} />
+                <RouterRoute path="calendar" element={<AdminCalendar />} />
+                <RouterRoute path="profile" element={<AdminProfile />} />
+                <RouterRoute path="invigilators" element={<AdminInvigilators />} />
+                <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
+              </RouterRoute>
             </RouterRoute>
 
-            {/* Invigilator Pages */}
-            <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
-              <RouterRoute index element={<InvigilatorDashboard />} /> 
-              <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
-              <RouterRoute path="profile" element={<InvigilatorProfile />} />
+            <RouterRoute element={<RequireRole role="invigilator" />}>
+              {/* Invigilator Pages */}
+              <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
+                <RouterRoute index element={<InvigilatorDashboard />} /> 
+                <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
+                <RouterRoute path="profile" element={<InvigilatorProfile />} />
+              </RouterRoute>
             </RouterRoute>
+
+            {/* Fallback Route for authenticated users */}
+            <RouterRoute path="*" element={<NotFound />} />
           </RouterRoute>
-
-          {/* Fallback Route */}
-          <RouterRoute path="*" element={<NotFound />} />
         </RouterRoutes>
       </BrowserRouter>
     </ThemeProvider>

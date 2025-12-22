@@ -3,18 +3,29 @@ from django.db.models import Q
 from rest_framework import serializers, status
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 
-class AdminAuthTokenSerializer(serializers.Serializer):
+def _derive_role(user):
+    if user.is_staff or user.is_superuser:
+        return "admin"
+    try:
+        if user.invigilator_profile:
+            return "invigilator"
+    except Exception:
+        pass
+    return "invigilator"
+
+
+class AuthTokenSerializer(serializers.Serializer):
     username = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
 
     default_error_messages = {
         "invalid_credentials": "Unable to log in with provided credentials.",
         "inactive": "User account is disabled.",
-        "not_admin": "Admin access required.",
     }
 
     def validate(self, attrs):
@@ -33,21 +44,19 @@ class AdminAuthTokenSerializer(serializers.Serializer):
             raise serializers.ValidationError(self.error_messages["invalid_credentials"], code="authorization")
         if not user.is_active:
             raise serializers.ValidationError(self.error_messages["inactive"], code="authorization")
-        if not user.is_staff:
-            raise serializers.ValidationError(self.error_messages["not_admin"], code="authorization")
 
         attrs["user"] = user
         return attrs
 
 
-class AdminObtainAuthToken(ObtainAuthToken):
+class ObtainAuthTokenView(ObtainAuthToken):
     """
-    Issue an auth token for staff/superuser accounts only.
+    Issue an auth token for any active user (admin or invigilator).
     Accepts either username or email in the "username" field.
     """
 
     permission_classes = [AllowAny]
-    serializer_class = AdminAuthTokenSerializer
+    serializer_class = AuthTokenSerializer
 
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={"request": request})
@@ -63,7 +72,26 @@ class AdminObtainAuthToken(ObtainAuthToken):
                     "username": user.username,
                     "is_staff": user.is_staff,
                     "is_superuser": user.is_superuser,
+                    "role": _derive_role(user),
                 },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class CurrentUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *_args, **_kwargs):
+        user = request.user
+        return Response(
+            {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "is_staff": user.is_staff,
+                "is_superuser": user.is_superuser,
+                "role": _derive_role(user),
             },
             status=status.HTTP_200_OK,
         )
