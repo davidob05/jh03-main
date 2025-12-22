@@ -24,7 +24,7 @@ import {
   Search,
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
-import { ExamDetailsPopup } from "@/components/admin/ExamDetailsPopup";
+import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl } from "../../utils/api";
 
 interface ExamVenueData {
