@@ -73,6 +73,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
   const [altPhone, setAltPhone] = useState("");
   const [universityEmail, setUniversityEmail] = useState("");
   const [personalEmail, setPersonalEmail] = useState("");
+  const [contractedHours, setContractedHours] = useState("100");
   const [notes, setNotes] = useState("");
 
   // Multi-step selections
@@ -100,6 +101,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
     setAltPhone("");
     setUniversityEmail("");
     setPersonalEmail("");
+    setContractedHours("100");
     setNotes("");
     setQualifications([]);
     setRestrictions([]);
@@ -121,6 +123,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
           alt_phone: altPhone,
           university_email: universityEmail,
           personal_email: personalEmail,
+          contracted_hours: contractedHours ? Number(contractedHours) : null,
           notes,
           resigned,
 
@@ -166,6 +169,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
             <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth />
             <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required />
             <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required />
+            <TextField label="Contracted Hours" type="number" value={contractedHours} onChange={e => setContractedHours(e.target.value)} fullWidth />
             <TextField label="Notes" value={notes} onChange={e => setNotes(e.target.value)} fullWidth multiline rows={3} />
             <BooleanCheckboxRow
               label="Resigned"

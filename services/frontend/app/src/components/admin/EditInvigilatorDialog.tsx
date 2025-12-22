@@ -79,6 +79,7 @@ interface InvigilatorData {
   personal_email: string | null;
   notes: string | null;
   resigned: boolean;
+  contracted_hours: number | null;
   qualifications: InvigilatorQualification[];
   restrictions: InvigilatorRestriction[];
 }
@@ -101,6 +102,7 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
   const [altPhone, setAltPhone] = useState("");
   const [universityEmail, setUniversityEmail] = useState("");
   const [personalEmail, setPersonalEmail] = useState("");
+  const [contractedHours, setContractedHours] = useState<string>("");
   const [notes, setNotes] = useState("");
 
   // Multi-step selections
@@ -138,6 +140,11 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
     setAltPhone(data.alt_phone || "");
     setUniversityEmail(data.university_email || "");
     setPersonalEmail(data.personal_email || "");
+    setContractedHours(
+      data.contracted_hours != null && Number.isFinite(Number(data.contracted_hours))
+        ? String(data.contracted_hours)
+        : ""
+    );
     setNotes(data.notes || "");
     setResigned(Boolean(data.resigned));
     setQualifications(data.qualifications?.map((q) => q.qualification) || []);
@@ -166,6 +173,7 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
           alt_phone: altPhone,
           university_email: universityEmail,
           personal_email: personalEmail,
+          contracted_hours: contractedHours ? Number(contractedHours) : null,
           notes,
           resigned,
           qualifications: qualifications.map((q) => ({ qualification: q })),
@@ -208,6 +216,7 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
             <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth />
             <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required />
             <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required />
+            <TextField label="Contracted Hours" type="number" value={contractedHours} onChange={e => setContractedHours(e.target.value)} fullWidth />
             <TextField label="Notes" value={notes} onChange={e => setNotes(e.target.value)} fullWidth multiline rows={3} />
             <BooleanCheckboxRow
               label="Resigned"

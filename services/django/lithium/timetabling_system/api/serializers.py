@@ -206,6 +206,7 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "personal_email",
             "notes",
             "resigned",
+            "contracted_hours",
             "qualifications",
             "restrictions",
             "assignments",
