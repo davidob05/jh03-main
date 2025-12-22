@@ -6,7 +6,7 @@ FRONTEND_DIR := services/frontend/app
 SMOKE_FRONTEND_CMD := npm test -- --passWithNoTests --testNamePattern="smoke|health"
 SMOKE_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py test timetabling_system.utils
 TEST_FRONTEND_CMD := npm test -- --passWithNoTests
-TEST_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py test
+TEST_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py makemigrations --noinput && python manage.py migrate --noinput && python manage.py test
 
 
 .PHONY: up down logs build reset-django-db makemigrations migrate superuser django frontend test

@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-
+from django.utils import timezone
 
 # ---------- ENUM TYPES ----------
 
@@ -28,6 +28,7 @@ class ProvisionType(models.TextChoices):
     USE_SCRIBE = 'use_scribe', 'Use of a scribe'
     READER = 'reader', 'Reader'
     SCRIBE = 'scribe', 'Scribe'
+    VERBAL_INSTR_WRITTEN = 'verbal_instr_written', 'Verbal instructions in written format'
 
 
 class ExamVenueProvisionType(models.TextChoices):
@@ -43,6 +44,58 @@ class VenueType(models.TextChoices):
     COMPUTER_CLUSTER = 'computer_cluster', 'Computer Cluster'
     SEPARATE_ROOM = 'separate_room', 'Separate Room'
     SCHOOL_TO_SORT = 'school_to_sort', 'School To Sort'
+    KELVIN_HALL = 'kelvin_hall', 'Kelvin Hall'
+    DETACHED_DUTY = 'detached_duty', 'Detached Duty'
+    VET_SCHOOL = 'vet_school', 'Vet School'
+    SCOTTISH_EVENT_CAMPUS = 'scottish_event_campus', 'Scottish Event Campus'
+    OSCE_EXAM = 'osce_exam', 'OSCE Exam'
+    PRE_SESSIONAL_ENGLISH = 'pre_sessional_english', 'Pre-Sessional English'
+    ADMIN = 'admin', 'Admin'
+
+
+class ExamTypeChoices(models.TextChoices):
+    ON_CAMPUS = 'on_campus', 'On Campus Exam'
+    ON_CAMPUS_ONLINE = 'on_campus_online', 'On Campus Online Exam'
+
+
+class DietChoices(models.TextChoices):
+    DEC_2025 = 'DEC_2025', 'December 2025'
+    APR_MAY_2026 = 'APR_MAY_2026', 'April/May 2026'
+    AUG_2026 = 'AUG_2026', 'August 2026'
+    # Add more as needed
+
+
+class SlotChoices(models.TextChoices):
+    MORNING = 'MORNING', 'Morning (AM)'
+    AFTERNOON = 'AFTERNOON', 'Afternoon (Noon)'
+    EVENING = 'EVENING', 'Evening (PM)'
+
+
+class InvigilatorQualificationChoices(models.TextChoices):
+    SENIOR_INVIGILATOR = 'SENIOR_INVIGILATOR', 'Senior Invigilator (SI)'
+    AKT_TRAINED = 'AKT_TRAINED', 'AKT Trained'
+    CHECK_IN = 'CHECK_IN', 'Check-In'
+    # Add more qualifications as needed
+
+
+class InvigilatorRestrictionType(models.TextChoices):
+    ACCESSIBILITY_REQUIRED = "accessibility_required", "Accessibility required"
+    SEPARATE_ROOM_ONLY = "separate_room_only", "Separate room only"
+    PURPLE_CLUSTER = "purple_cluster", "Purple cluster"
+    COMPUTER_CLUSTER = "computer_cluster", "Computer cluster"
+    VET_SCHOOL = "vet_school", "Vet School"
+    SEC = "sec", "Scottish Event Campus"
+    OSCE_GOLDEN_JUBILEE = "osce_golden_jubilee", "OSCE - Golden Jubilee"
+    OSCE_WOLFSON = "osce_wolfson", "OSCE - Wolfson"
+    OSCE_QUEEN_ELIZABETH = "osce_queen_elizabeth", "OSCE - Queen Elizabeth"
+    APPROVED_EXEMPTION = "approved_exemption", "Approved exemption"
+
+
+class AccessibilityFeatures(models.TextChoices):
+    WHEELCHAIR_ACCESSIBLE = 'WHEELCHAIR_ACCESSIBLE', 'Wheelchair accessible'
+    HEARING_LOOP = 'HEARING_LOOP', 'Hearing loop'
+    ELEVATOR_ACCESS = 'ELEVATOR_ACCESS', 'Elevator access'
+    # Add more features as needed
 
 
 # ---------- MAIN TABLES ----------
@@ -75,6 +128,8 @@ class Venue(models.Model):
         default=list,
         blank=True,
     )
+    accessibility_features = models.CharField(max_length=50, choices=AccessibilityFeatures.choices, blank=True)
+    additional_info = models.TextField(blank=True)  # e.g., "Ground floor access"
 
     def __str__(self):
         return self.venue_name
@@ -123,7 +178,6 @@ class StudentExam(models.Model):
 
 class Provisions(models.Model):
     provision_id = models.AutoField(primary_key=True)
-
     exam = models.ForeignKey(
         Exam,
         to_field="exam_id",
@@ -134,20 +188,23 @@ class Provisions(models.Model):
         to_field="student_id",
         on_delete=models.CASCADE
     )
-
     provisions = ArrayField(
         models.CharField(max_length=50, choices=ProvisionType.choices),
         default=list,
         blank=True
     )
-
+    extra_time_custom = models.CharField(max_length=100, blank=True)  # For non-standard extra time
     notes = models.CharField(max_length=200, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Provisions"
+        verbose_name_plural = "Provisions"
 
     def __str__(self):
         return f"Provisions for {self.student} in {self.exam}"
 
 
-class UploadLog(models.Model):  # this lets us view upload history
+class UploadLog(models.Model):  # This gives a view of upload history
     file_name = models.CharField(max_length=255)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -161,3 +218,134 @@ class UploadLog(models.Model):  # this lets us view upload history
 
     def __str__(self):
         return f"{self.file_name} by {self.uploaded_by} on {self.uploaded_at:%Y-%m-%d %H:%M}"
+
+
+class Invigilator(models.Model):
+    preferred_name = models.CharField(max_length=255)
+    full_name = models.CharField(max_length=255)
+
+    mobile = models.CharField(max_length=30, blank=True, null=True)
+    mobile_text_only = models.CharField(max_length=30, blank=True, null=True)
+    janet_txt = models.CharField(max_length=30, blank=True, null=True)
+    alt_phone = models.CharField(max_length=30, blank=True, null=True)
+
+    university_email = models.EmailField(blank=True, null=True)
+    personal_email = models.EmailField(blank=True, null=True)
+
+    notes = models.TextField(blank=True, null=True)
+
+    contracted_hours = models.FloatField(default=0)
+    resigned = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.preferred_name or self.full_name
+
+
+class InvigilatorQualification(models.Model):
+    invigilator = models.ForeignKey(
+        Invigilator,
+        on_delete=models.CASCADE,
+        related_name="qualifications"
+    )
+    qualification = models.CharField(
+        max_length=50,
+        choices=InvigilatorQualificationChoices.choices
+    )
+
+    class Meta:
+        unique_together = ("invigilator", "qualification")
+
+    def __str__(self):
+        return f"{self.invigilator} - {self.get_qualification_display()}"
+
+
+class InvigilatorRestriction(models.Model):
+    invigilator = models.ForeignKey(
+        Invigilator,
+        on_delete=models.CASCADE,
+        related_name="restrictions"
+    )
+    diet = models.CharField(
+        max_length=20,
+        choices=DietChoices.choices
+    )
+    restrictions = ArrayField(
+        models.CharField(
+            max_length=50,
+            choices=InvigilatorRestrictionType.choices
+        ),
+        default=list,
+        blank=True
+    )
+
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ("invigilator", "diet")
+
+    def __str__(self):
+        return f"{self.invigilator} - {self.diet}"
+
+
+class InvigilatorAvailability(models.Model):
+    invigilator = models.ForeignKey(
+        Invigilator,
+        on_delete=models.CASCADE,
+        related_name="availabilities"
+    )
+    date = models.DateField()
+    slot = models.CharField(
+        max_length=20,
+        choices=SlotChoices.choices
+    )
+    available = models.BooleanField(default=True)  # True if available, False if cannot work
+
+    class Meta:
+        unique_together = ("invigilator", "date", "slot")
+        indexes = [models.Index(fields=["date", "slot"])]
+
+    def __str__(self):
+        return f"{self.invigilator} availability on {self.date} ({self.slot}): {'Available' if self.available else 'Unavailable'}" 
+
+
+class InvigilatorAssignment(models.Model):
+    invigilator = models.ForeignKey(
+        Invigilator,
+        on_delete=models.CASCADE,
+        related_name="assignments"
+    )
+
+    exam_venue = models.ForeignKey(
+        ExamVenue,
+        on_delete=models.CASCADE,
+        related_name="invigilator_assignments"
+    )
+
+    role = models.CharField(
+        max_length=50,
+        choices=[
+            ("lead", "Lead Invigilator"),
+            ("assistant", "Assistant Invigilator"),
+            ("support", "Support Invigilator"),
+        ],
+        default="assistant"
+    )
+
+    assigned_start = models.DateTimeField()
+    assigned_end = models.DateTimeField()
+    break_time_minutes = models.IntegerField(default=0)
+    cancel = models.BooleanField(default=False)
+    cancel_cause = models.TextField(blank=True)
+
+    notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        unique_together = ("invigilator", "exam_venue")
+
+    def __str__(self):
+        return f"{self.invigilator} → {self.exam_venue}"
+    
+    def total_hours(self):
+        # Calculate duration (you can add this as a property)
+        delta = timezone.timedelta(hours=self.assigned_end.hour - self.assigned_start.hour, minutes=self.assigned_end.minute - self.assigned_start.minute)
+        return delta.total_seconds() / 3600 + (self.approved_additional_time / 60) - (self.break_time_minutes / 60)

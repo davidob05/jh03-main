@@ -879,12 +879,9 @@ def _create_exam_venue_links(
         )
 
         if conflict:
-            # Conflict: create or update a placeholder so we do not double-book the room.
-            exam_venue = (
-                ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
-                or ExamVenue.objects.filter(exam=exam, venue=venue).first()
-            )
-            created = False
+            # If the requested venue clashes with an existing booking, fall back to a placeholder
+            # so downstream allocation can pick an alternative without tying the exam to a busy room.
+            exam_venue = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
             if not exam_venue:
                 exam_venue = ExamVenue.objects.create(
                     exam=exam,
@@ -893,22 +890,21 @@ def _create_exam_venue_links(
                     exam_length=exam_length,
                     core=True,
                 )
-                created = True
-            updates = []
-            if exam_venue.venue is not None:
-                exam_venue.venue = None
-                updates.append("venue")
-            if start_time and exam_venue.start_time != start_time:
-                exam_venue.start_time = start_time
-                updates.append("start_time")
-            if exam_length is not None and exam_venue.exam_length != exam_length:
-                exam_venue.exam_length = exam_length
-                updates.append("exam_length")
-            if exam_venue.core is not True:
-                exam_venue.core = True
-                updates.append("core")
-            if updates and not created:
-                exam_venue.save(update_fields=updates)
+            else:
+                updates = []
+                if start_time and exam_venue.start_time != start_time:
+                    exam_venue.start_time = start_time
+                    updates.append("start_time")
+                if exam_length is not None and exam_venue.exam_length != exam_length:
+                    exam_venue.exam_length = exam_length
+                    updates.append("exam_length")
+                if exam_venue.core is not True:
+                    exam_venue.core = True
+                    updates.append("core")
+                if updates:
+                    exam_venue.save(update_fields=updates)
+            # Make sure no conflicting venue link lingers for this exam.
+            ExamVenue.objects.filter(exam=exam, venue=venue).exclude(pk=exam_venue.pk).delete()
             continue
 
         exam_venue, created = ExamVenue.objects.get_or_create(
@@ -933,110 +929,6 @@ def _create_exam_venue_links(
             updates.append("core")
         if updates and not created:
             exam_venue.save(update_fields=updates)
-
-
-@transaction.atomic
-def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    Venue uploads carry a list of day blocks, each with a list of rooms.
-    We treat each room as a Venue row and upsert by venue_name.
-    """
-    
-    rooms: List[Dict[str, Any]] = []
-    for day in days or []:
-        day_date = _coerce_date(day.get("date"))
-        for room in day.get("rooms", []):
-            room_copy = dict(room)
-            room_copy["_day_date"] = day_date
-            room_copy["_day_name"] = day.get("day")
-            rooms.append(room_copy)
-
-    summary = _base_summary(len(rooms))
-
-    for idx, room in enumerate(rooms, start=1):
-        name = _clean_string(room.get("name"), max_length=255)
-        if not name:
-            summary["skipped"] += 1
-            summary["errors"].append(f"Room {idx}: Missing name.")
-            continue
-
-        cap_val = _coerce_int(room.get("capacity"))
-        defaults = {
-            "capacity": cap_val if cap_val is not None else 0,
-            "venuetype": room.get("venuetype") or VenueType.SCHOOL_TO_SORT,
-            "is_accessible": bool(room.get("accessible", True)),
-            "qualifications": room.get("qualifications") or [],
-            "availability": [],
-        }
-
-        day_date = room.get("_day_date")
-        if day_date:
-            defaults["availability"] = [day_date.isoformat()]
-
-        venue_obj, created = Venue.objects.get_or_create(
-            venue_name=name,
-            defaults=defaults,
-        )
-
-        updated_fields = []
-        for field in ("venuetype", "is_accessible", "qualifications"):
-            if getattr(venue_obj, field) != defaults[field]:
-                setattr(venue_obj, field, defaults[field])
-                updated_fields.append(field)
-        if cap_val is not None and venue_obj.capacity != cap_val:
-            venue_obj.capacity = cap_val
-            updated_fields.append("capacity")
-
-        if defaults["availability"]:
-            merged = sorted(set((venue_obj.availability or []) + defaults["availability"]))
-            if merged != (venue_obj.availability or []):
-                venue_obj.availability = merged
-                updated_fields.append("availability")
-
-        if updated_fields:
-            venue_obj.save(update_fields=updated_fields)
-
-        if created:
-            summary["created"] += 1
-        else:
-            summary["updated"] += 1
-
-    return summary
-
-def _create_provision_exam_venues():
-    provision_list = Provisions.objects.all()
-    for provision in provision_list:
-        evs = ExamVenue.objects.all(exam=provision.exam)
-
-def _extract_venue_names(row: Dict[str, Any]) -> List[str]:
-    raw_value = row.get("main_venue") or row.get("venue")
-    if _is_missing(raw_value):
-        return []
-    if isinstance(raw_value, (list, tuple, set)):
-        tokens = raw_value
-    else:
-        tokens = re.split(r"[;,/|]", str(raw_value))
-    normalized: List[str] = []
-    for token in tokens:
-        name = _clean_string(token, max_length=255)
-        if name:
-            normalized.append(name)
-    return normalized
-
-
-def _required_capabilities(provisions: List[str]) -> List[str]:
-    mapping = {
-        ProvisionType.SEPARATE_ROOM_ON_OWN: ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN,
-        ProvisionType.SEPARATE_ROOM_NOT_ON_OWN: ExamVenueProvisionType.SEPARATE_ROOM_NOT_ON_OWN,
-        ProvisionType.USE_COMPUTER: ExamVenueProvisionType.USE_COMPUTER,
-        ProvisionType.ACCESSIBLE_HALL: ExamVenueProvisionType.ACCESSIBLE_HALL,
-    }
-    caps: List[str] = []
-    for prov in provisions or []:
-        cap = mapping.get(prov)
-        if cap and cap not in caps:
-            caps.append(cap)
-    return caps
 
 
 @transaction.atomic

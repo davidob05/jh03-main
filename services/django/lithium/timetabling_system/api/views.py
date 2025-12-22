@@ -1,13 +1,27 @@
 from rest_framework import status, viewsets
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from timetabling_system.models import Exam, Venue
+from timetabling_system.models import (
+    Exam,
+    ExamVenue,
+    Invigilator,
+    InvigilatorAssignment,
+    Venue,
+)
 from timetabling_system.services import ingest_upload_result
 from timetabling_system.utils.excel_parser import parse_excel_file
 from timetabling_system.utils.venue_ingest import upsert_venues
-from .serializers import ExamSerializer, VenueSerializer, VenueWriteSerializer
-
+from .serializers import (
+    ExamSerializer,
+    ExamVenueSerializer,
+    ExamVenueWriteSerializer,
+    InvigilatorAssignmentSerializer,
+    InvigilatorSerializer,
+    VenueSerializer,
+    VenueWriteSerializer
+)
 
 class ExamViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
@@ -22,6 +36,43 @@ class VenueViewSet(viewsets.ModelViewSet):
         if self.action in {"create", "update", "partial_update"}:
             return VenueWriteSerializer
         return VenueSerializer
+
+
+class ExamVenueViewSet(viewsets.ModelViewSet):
+    """
+    CRUD endpoints for ExamVenue rows.
+    - Core venues are read-only and cannot be updated or deleted here.
+    - Creation requires an existing Exam and an optional existing Venue name.
+    """
+
+    queryset = ExamVenue.objects.select_related("exam", "venue").all()
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return ExamVenueWriteSerializer
+        return ExamVenueSerializer
+
+    def perform_destroy(self, instance):
+        if instance.core:
+            raise ValidationError("Core exam venues cannot be deleted.")
+        return super().perform_destroy(instance)
+
+
+class InvigilatorViewSet(viewsets.ModelViewSet):
+    queryset = Invigilator.objects.all().prefetch_related(
+        "assignments__exam_venue__exam",
+        "assignments__exam_venue__venue",
+    )
+    serializer_class = InvigilatorSerializer
+
+
+class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
+    queryset = InvigilatorAssignment.objects.select_related(
+        "invigilator",
+        "exam_venue__exam",
+        "exam_venue__venue",
+    ).all()
+    serializer_class = InvigilatorAssignmentSerializer
 
 
 class TimetableUploadView(APIView):

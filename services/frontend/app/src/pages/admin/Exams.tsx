@@ -20,10 +20,11 @@ import {
   Tooltip,
   InputBase,
   Link as MUILink,
+  CircularProgress,
 } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
 import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiBaseUrl } from '../../utils/api';
 
 interface ExamData {
@@ -168,9 +169,10 @@ interface EnhancedTableToolbarProps {
   numSelected: number;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onEditSelected: () => void;
 }
 
-function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange }: EnhancedTableToolbarProps) {
+function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEditSelected }: EnhancedTableToolbarProps) {
   return (
     <Toolbar sx={[{ pl: { sm: 2 }, pr: { xs: 1, sm: 1 } }, numSelected > 0 && { bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity) }]}>
       {numSelected > 0 ? (
@@ -190,7 +192,7 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange }: Enha
         <Box sx={{ display: 'flex', gap: 1 }}>
           {numSelected === 1 && (
             <Tooltip title="Edit">
-              <IconButton><EditIcon /></IconButton>
+              <IconButton onClick={onEditSelected}><EditIcon /></IconButton>
             </Tooltip>
           )}
           <Tooltip title="Delete">
@@ -210,6 +212,7 @@ export const AdminExams: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
+  const navigate = useNavigate();
 
   const { data: examsData = [], isLoading, isError, error } = useQuery<ExamData[], Error>({ queryKey: ['exams'], queryFn: fetchExams });
 
@@ -261,6 +264,9 @@ export const AdminExams: React.FC = () => {
   const handleChangePage = (event: unknown, newPage: number) => setPage(newPage);
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
   const handleSearchChange = (query: string) => { setSearchQuery(query); setPage(0); };
+  const handleEditSelected = () => {
+    if (selected.length === 1) navigate(`/admin/exam/${selected[0]}/edit`);
+  };
 
   const filteredRows = React.useMemo(() => {
     if (!searchQuery) return rows;
@@ -278,13 +284,19 @@ export const AdminExams: React.FC = () => {
   const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredRows.length) : 0;
   const visibleRows = React.useMemo(() => [...filteredRows].sort(getComparator(order, orderBy)).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage), [order, orderBy, page, rowsPerPage, filteredRows]);
 
-  if (isLoading) return <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}><Paper sx={{ width: '100%', p: 4, textAlign: 'center' }}><Typography variant="h6">Loading exams...</Typography></Paper></Box>;
+  if (isLoading) 
+    return (
+      <Box sx={{ p: 6, textAlign: 'center' }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }}>Loading exams…</Typography>
+      </Box>
+    );
   if (isError) return <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}><Paper sx={{ width: '100%', p: 4, textAlign: 'center' }}><Typography color="error" variant="h6">{error?.message || 'Failed to load exams'}</Typography></Paper></Box>;
 
   return (
     <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}>
       <Paper sx={{ width: '100%', mb: 2 }}>
-        <EnhancedTableToolbar numSelected={selected.length} searchQuery={searchQuery} onSearchChange={handleSearchChange} />
+        <EnhancedTableToolbar numSelected={selected.length} searchQuery={searchQuery} onSearchChange={handleSearchChange} onEditSelected={handleEditSelected} />
         <TableContainer>
           <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle" size="medium">
             <EnhancedTableHead numSelected={selected.length} order={order} orderBy={orderBy} onSelectAllClick={handleSelectAllClick} onRequestSort={handleRequestSort} rowCount={filteredRows.length} />
@@ -300,7 +312,7 @@ export const AdminExams: React.FC = () => {
                         <Checkbox color="primary" checked={isItemSelected} onClick={(event) => handleClick(event, row.id)} inputProps={{ 'aria-labelledby': labelId }} />
                       </TableCell>
                       <TableCell component="th" id={labelId} scope="row" padding="none">
-                        <Link to={`/exams/${row.code}`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
+                        <Link to={`/admin/exam/${row.id}/edit`}><MUILink style={{ cursor: 'pointer' }}>{row.code}</MUILink></Link>
                       </TableCell>
                       <TableCell>{row.subject}</TableCell>
                       <TableCell>{row.coreVenue}</TableCell>
