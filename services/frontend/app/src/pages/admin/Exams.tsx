@@ -283,7 +283,7 @@ export const AdminExams: React.FC = () => {
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
   const handleSearchChange = (query: string) => { setSearchQuery(query); setPage(0); };
   const handleEditSelected = () => {
-    if (selected.length === 1) navigate(`/admin/exam/${selected[0]}/edit`);
+    if (selected.length === 1) navigate(`/admin/exam/${selected[0]}`);
   };
 
   const filteredRows = React.useMemo(() => {
@@ -344,7 +344,7 @@ export const AdminExams: React.FC = () => {
                           <Checkbox color="primary" checked={isItemSelected} onClick={(event) => handleClick(event, row.id)} inputProps={{ 'aria-labelledby': labelId }} />
                         </TableCell>
                         <TableCell component="th" id={labelId} scope="row" padding="none">
-                          <Link to={`/admin/exam/${row.id}/edit`}><MUILink sx={{ cursor: 'pointer', fontWeight: 600 }}>{row.code}</MUILink></Link>
+                        <Link to={`/admin/exam/${row.id}`}><MUILink sx={{ cursor: 'pointer', fontWeight: 600 }}>{row.code}</MUILink></Link>
                         </TableCell>
                         <TableCell>{row.subject}</TableCell>
                         <TableCell>{row.coreVenue || '—'}</TableCell>

@@ -9,7 +9,7 @@ import { AdminDashboard } from "./pages/admin/Dashboard";
 import { AdminCalendar } from "./pages/admin/Calendar";
 import { AdminProfile } from "./pages/admin/Profile";
 import { AdminExams } from "./pages/admin/Exams";
-import { AdminExamEdit } from "./pages/admin/Exam";
+import { AdminExamDetails } from "./pages/admin/Exam";
 import { AdminVenues } from "./pages/admin/Venues";
 import { AdminVenuePage } from "./pages/admin/Venue";
 import { AdminInvigilators } from "./pages/admin/Invigilators";
@@ -40,7 +40,7 @@ export const Routes: React.FC = () => {
           <RouterRoute path="/admin" element={<AdminLayout />}>
             <RouterRoute index element={<AdminDashboard />} />
             <RouterRoute path="exams" element={<AdminExams />} />
-            <RouterRoute path="exam/:examId/edit" element={<AdminExamEdit />} />
+            <RouterRoute path="exam/:examId" element={<AdminExamDetails />} />
             <RouterRoute path="venues" element={<AdminVenues />} />
             <RouterRoute path="venues/:venueId" element={<AdminVenuePage />} />
             <RouterRoute path="calendar" element={<AdminCalendar />} />
