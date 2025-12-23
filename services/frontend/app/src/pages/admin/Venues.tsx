@@ -553,7 +553,7 @@ export const AdminVenues: React.FC = () => {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onSuccess={(name) => {
-          setSuccessMessage(`${name} added successfully`);
+          setSuccessMessage(`${name} added successfully!`);
           setSuccessOpen(true);
           queryClient.invalidateQueries({ queryKey: ['venues'] });
           setAddOpen(false);

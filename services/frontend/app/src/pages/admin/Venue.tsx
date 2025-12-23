@@ -13,12 +13,13 @@ import {
   Tooltip,
   Snackbar,
 } from "@mui/material";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiBaseUrl } from "../../utils/api";
 import { EditVenueDialog } from "../../components/admin/EditVenueDialog";
-import { Edit } from "@mui/icons-material";
+import { Edit, Delete } from "@mui/icons-material";
 import { ExamDetailsPopup, ExamDetails as PopupExamDetails, ExamVenueInfo as PopupExamVenueInfo } from "../../components/admin/ExamDetailsPopup";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 
 interface ExamVenueData {
   exam_name: string;
@@ -70,12 +71,15 @@ const calculateEndTime = (start: string | null, length: number | null): string |
 export const AdminVenuePage: React.FC = () => {
   const { venueId } = useParams();
   const venueKey = venueId ? decodeURIComponent(venueId) : "";
+  const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
   const [popupOpen, setPopupOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<PopupExamDetails | null>(null);
   const [visibleCount, setVisibleCount] = useState(4);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery<VenueData>({
     queryKey: ["venue", venueKey],
@@ -115,6 +119,26 @@ export const AdminVenuePage: React.FC = () => {
 
     setSelectedExam(popupExam);
     setPopupOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!venueKey) return;
+    try {
+      setDeleting(true);
+      const res = await fetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueKey)}/`, { method: "DELETE" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Delete failed");
+      }
+      setSuccessMessage(`${venueKey} deleted successfully!`);
+      setSuccessOpen(true);
+      setDeleteOpen(false);
+      setTimeout(() => navigate("/admin/venues"), 400);
+    } catch (err: any) {
+      alert(err?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (isLoading) {
@@ -261,11 +285,19 @@ export const AdminVenuePage: React.FC = () => {
           bottom: 32,
           right: 32,
           zIndex: 1000,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
         }}
       >
         <Tooltip title="Edit venue">
           <Fab color="primary" onClick={() => setEditOpen(true)}>
             <Edit />
+          </Fab>
+        </Tooltip>
+        <Tooltip title="Delete venue">
+          <Fab color="error" onClick={() => setDeleteOpen(true)}>
+            <Delete />
           </Fab>
         </Tooltip>
       </Box>
@@ -286,6 +318,18 @@ export const AdminVenuePage: React.FC = () => {
         open={popupOpen}
         onClose={() => setPopupOpen(false)}
         exam={selectedExam}
+      />
+
+      <DeleteConfirmationDialog
+        open={deleteOpen}
+        title="Delete venue?"
+        description="This will permanently delete this venue."
+        confirmText="Delete"
+        loading={deleting}
+        onClose={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+        onConfirm={handleDelete}
       />
 
       <Snackbar
