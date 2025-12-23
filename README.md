@@ -158,6 +158,10 @@ CI mirrors these commands via `.gitlab-ci.yml`.
   - `DJANGO_CSRF_HTTPONLY=1` (default) hides the CSRF cookie from JavaScript.
   - `DJANGO_SECURE_SSL_REDIRECT=1` forces HTTPS.
   - `DJANGO_SESSION_COOKIE_SAMESITE` / `DJANGO_CSRF_COOKIE_SAMESITE` default to `Lax`; override as needed.
+- **Hardening toggles**  
+  - `DJANGO_CORS_ALLOWED_ORIGINS` and `DJANGO_CSRF_TRUSTED_ORIGINS`: comma-separated lists to restrict origins (defaults cover localhost only).
+  - DRF throttling: override `DRF_THROTTLE_ANON_RATE` / `DRF_THROTTLE_USER_RATE` (defaults 20/min anon, 60/min user).
+  - Passwords: minimum length 12 and must include upper, lower, digit, and symbol.
 
 ---
 
