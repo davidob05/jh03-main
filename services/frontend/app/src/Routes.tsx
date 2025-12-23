@@ -11,7 +11,7 @@ import { AdminProfile } from "./pages/admin/Profile";
 import { AdminExams } from "./pages/admin/Exams";
 import { AdminExamEdit } from "./pages/admin/Exam";
 import { AdminVenues } from "./pages/admin/Venues";
-import { AdminVenueForm } from "./pages/admin/VenueForm";
+import { AdminVenuePage } from "./pages/admin/Venue";
 import { AdminInvigilators } from "./pages/admin/Invigilators";
 import { AdminInvigilatorProfile } from "./pages/admin/Invigilator";
 
@@ -42,8 +42,7 @@ export const Routes: React.FC = () => {
             <RouterRoute path="exams" element={<AdminExams />} />
             <RouterRoute path="exam/:examId/edit" element={<AdminExamEdit />} />
             <RouterRoute path="venues" element={<AdminVenues />} />
-            <RouterRoute path="venues/new" element={<AdminVenueForm />} />
-            <RouterRoute path="venues/:venueName" element={<AdminVenueForm />} />
+            <RouterRoute path="venues/:venueId" element={<AdminVenuePage />} />
             <RouterRoute path="calendar" element={<AdminCalendar />} />
             <RouterRoute path="profile" element={<AdminProfile />} />
             <RouterRoute path="invigilators" element={<AdminInvigilators />} />

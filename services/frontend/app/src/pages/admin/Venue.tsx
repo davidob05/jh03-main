@@ -1,0 +1,287 @@
+import React, { useState } from "react";
+import {
+  Box,
+  Paper,
+  Typography,
+  Stack,
+  Chip,
+  Divider,
+  CircularProgress,
+  Alert,
+  Grid,
+  Fab,
+  Tooltip,
+} from "@mui/material";
+import { useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { apiBaseUrl } from "../../utils/api";
+import { EditVenueDialog } from "../../components/admin/EditVenueDialog";
+import { Edit } from "@mui/icons-material";
+import { ExamDetailsPopup, ExamDetails as PopupExamDetails, ExamVenueInfo as PopupExamVenueInfo } from "../../components/admin/ExamDetailsPopup";
+
+interface ExamVenueData {
+  exam_name: string;
+  venue_name?: string | null;
+  start_time: string | null;
+  exam_length: number | null;
+}
+
+interface VenueData {
+  venue_name: string;
+  capacity: number;
+  venuetype: string;
+  is_accessible: boolean;
+  provision_capabilities: string[];
+  exam_venues: ExamVenueData[];
+}
+
+const formatLabel = (text?: string): string => {
+  if (!text) return "Unknown";
+  const spaced = text.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+};
+
+const formatDateTime = (dateTime?: string): string => {
+  if (!dateTime) return "N/A";
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return "N/A";
+  return date.toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
+const formatDurationFromLength = (length: number | null | undefined): string => {
+  if (length == null) return "N/A";
+  const hours = Math.floor(length / 60);
+  const minutes = Math.round(length % 60);
+  const parts = [];
+  if (hours) parts.push(`${hours}h`);
+  if (minutes) parts.push(`${minutes}m`);
+  return parts.join(" ") || "0m";
+};
+
+const calculateEndTime = (start: string | null, length: number | null): string | null => {
+  if (!start || length == null) return null;
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return null;
+  const end = new Date(startDate.getTime() + length * 60000);
+  return end.toISOString();
+};
+
+export const AdminVenuePage: React.FC = () => {
+  const { venueId } = useParams();
+  const venueKey = venueId ? decodeURIComponent(venueId) : "";
+  const [editOpen, setEditOpen] = useState(false);
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [selectedExam, setSelectedExam] = useState<PopupExamDetails | null>(null);
+  const [visibleCount, setVisibleCount] = useState(4);
+
+  const { data, isLoading, isError, error, refetch } = useQuery<VenueData>({
+    queryKey: ["venue", venueKey],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueKey)}/`);
+      if (!res.ok) throw new Error("Unable to load venue");
+      return res.json();
+    },
+    enabled: Boolean(venueKey),
+  });
+
+  const exams = (data?.exam_venues ?? []).filter((ev) => !ev.venue_name || ev.venue_name === data?.venue_name);
+  const examCount = exams.length;
+  const visibleExams = exams.slice(0, visibleCount);
+
+  const handleExamClick = (exam: ExamVenueData) => {
+    const start = exam.start_time || "";
+    const end = calculateEndTime(exam.start_time, exam.exam_length) || exam.start_time || "";
+
+    const venueInfo: PopupExamVenueInfo = {
+      venue: data.venue_name,
+      startTime: start,
+      endTime: end,
+      students: 0,
+      invigilators: 0,
+    };
+
+    const popupExam: PopupExamDetails = {
+      code: exam.exam_name,
+      subject: exam.exam_name,
+      department: undefined,
+      mainVenue: data.venue_name,
+      mainStartTime: start,
+      mainEndTime: end,
+      venues: [venueInfo],
+    };
+
+    setSelectedExam(popupExam);
+    setPopupOpen(true);
+  };
+
+  if (isLoading) {
+    return (
+      <Box sx={{ p: 4, textAlign: "center" }}>
+        <CircularProgress />
+        <Typography sx={{ mt: 2 }}>Loading venue...</Typography>
+      </Box>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <Box sx={{ p: 4 }}>
+        <Alert severity="error">{error?.message || "Failed to load venue"}</Alert>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 2, md: 4 } }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" rowGap={1.5}>
+        <Box>
+          <Typography variant="h4" fontWeight={700}>{data.venue_name}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Capacity {data.capacity} | {data.is_accessible ? "Accessible" : "Not accessible"}
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Chip label={formatLabel(data.venuetype)} color="primary" variant="outlined" />
+          <Chip label={`Exams: ${examCount}`} variant="outlined" />
+        </Stack>
+      </Stack>
+
+      <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+        <Typography variant="h6" fontWeight={700} gutterBottom>Details</Typography>
+        <Stack spacing={1.5}>
+          <Typography variant="body2"><strong>Capacity:</strong> {data.capacity}</Typography>
+          <Typography variant="body2"><strong>Accessible:</strong> {data.is_accessible ? "Yes" : "No"}</Typography>
+          <Box>
+            <Typography variant="body2" fontWeight={700}>Provision Capabilities</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1} mt={1}>
+              {(data.provision_capabilities || []).length
+                ? data.provision_capabilities.map((p) => <Chip key={p} label={formatLabel(p)} size="small" />)
+                : <Typography variant="body2" color="text.secondary">No provisions listed.</Typography>}
+            </Stack>
+          </Box>
+        </Stack>
+      </Paper>
+
+      <Paper sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h6" fontWeight={700} gutterBottom>Exams in this venue</Typography>
+        <Divider sx={{ mb: 2 }} />
+        {examCount === 0 ? (
+          <Typography variant="body2" color="text.secondary">No exams scheduled for this venue.</Typography>
+        ) : (
+          <>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "repeat(1, minmax(0, 1fr))",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  md: "repeat(4, minmax(0, 1fr))",
+                },
+                gap: 3,
+              }}
+            >
+              {visibleExams.map((ex, idx) => (
+                <Paper
+                  key={`${ex.exam_name}-${idx}`}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    height: "100%",
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1,
+                    cursor: "pointer",
+                    transition: "box-shadow 120ms ease",
+                    minHeight: 200,
+                    boxSizing: "border-box",
+                    "&:hover": { boxShadow: 3 },
+                  }}
+                  variant="outlined"
+                  onClick={() => handleExamClick(ex)}
+                >
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={600}
+                    title={ex.exam_name}
+                    sx={{
+                      maxWidth: "100%",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {ex.exam_name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">{formatDateTime(ex.start_time)}</Typography>
+                  <Typography variant="body2">Duration: {formatDurationFromLength(ex.exam_length)}</Typography>
+                  <Box sx={{ flexGrow: 1 }} />
+                  <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
+                    View details
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, mt: 3 }}>
+              <Tooltip title="Show fewer exams">
+                <span>
+                  <Chip
+                    label="Show less"
+                    onClick={() => setVisibleCount(4)}
+                    disabled={visibleCount <= 4}
+                    variant="outlined"
+                    color="primary"
+                  />
+                </span>
+              </Tooltip>
+              <Tooltip title="Show 4 more exams">
+                <span>
+                  <Chip
+                    label="Show 4 more"
+                    onClick={() => setVisibleCount((prev) => Math.min(prev + 4, examCount))}
+                    disabled={visibleCount >= examCount}
+                    color="primary"
+                  />
+                </span>
+              </Tooltip>
+            </Box>
+          </>
+        )}
+      </Paper>
+
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 32,
+          right: 32,
+          zIndex: 1000,
+        }}
+      >
+        <Tooltip title="Edit venue">
+          <Fab color="primary" onClick={() => setEditOpen(true)}>
+            <Edit />
+          </Fab>
+        </Tooltip>
+      </Box>
+
+      <EditVenueDialog
+        open={editOpen}
+        venueId={venueKey || null}
+        onClose={() => setEditOpen(false)}
+        onSuccess={() => {
+          setEditOpen(false);
+          refetch();
+        }}
+      />
+
+      <ExamDetailsPopup
+        open={popupOpen}
+        onClose={() => setPopupOpen(false)}
+        exam={selectedExam}
+      />
+    </Box>
+  );
+};

@@ -19,6 +19,8 @@ def ensure_computer_cluster_for_use_computer(sender, instance: Venue, **kwargs):
 
 @receiver(post_save, sender=Venue)
 def update_placeholders_on_venue_save(sender, instance: Venue, **kwargs):
-    # When a venue is created or its capabilities change, try to upgrade any
-    # placeholder ExamVenue rows that this venue can now satisfy.
+    # Only attempt to attach placeholders when a venue is first created; avoid
+    # mass reassignment on every edit.
+    if not kwargs.get("created"):
+        return
     attach_placeholders_to_venue(instance)

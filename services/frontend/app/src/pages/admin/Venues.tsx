@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
 import {
   Box,
@@ -21,13 +21,20 @@ import {
   Tooltip,
   InputBase,
   CircularProgress,
+  Chip,
+  Divider,
+  Stack,
+  Snackbar,
+  Alert,
+  Fab,
 } from '@mui/material';
-import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, AddLocationAlt as AddLocationAltIcon } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
 import { Link as MUILink } from '@mui/material';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { apiBaseUrl } from '../../utils/api';
+import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
 
 interface ExamVenueData {
   exam_name: string;
@@ -242,7 +249,6 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
               sx={{ width: 250 }}
             />
           </Box>
-          <Button variant="contained" onClick={onAddVenue}>Add venue</Button>
         </Box>
       )}
 
@@ -267,7 +273,7 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
 };
 
 export const AdminVenues: React.FC = () => {
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [order, setOrder] = React.useState<Order>('asc');
   const [orderBy, setOrderBy] = React.useState<keyof RowData>('name');
   const [selected, setSelected] = React.useState<readonly string[]>([]);
@@ -275,6 +281,9 @@ export const AdminVenues: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<string, boolean>>({});
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [successOpen, setSuccessOpen] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState('');
 
   const {
     data: venuesData = [],
@@ -367,6 +376,13 @@ export const AdminVenues: React.FC = () => {
     [order, orderBy, page, rowsPerPage, filteredRows],
   );
 
+  const summary = React.useMemo(() => {
+    const total = venuesData.length;
+    const accessible = venuesData.filter((v) => v.is_accessible).length;
+    const examCount = venuesData.reduce((acc, v) => acc + (v.exam_venues?.length || 0), 0);
+    return { total, accessible, examCount };
+  }, [venuesData]);
+
   if (isLoading)
     return (
       <Box sx={{ p: 6, textAlign: 'center' }}>
@@ -387,14 +403,27 @@ export const AdminVenues: React.FC = () => {
     );
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 1050, mx: 'auto', p: 3 }}>
-      <Paper sx={{ width: '100%', mb: 2 }}>
+    <Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto', p: { xs: 2, md: 4 } }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" rowGap={1.5}>
+        <Box>
+          <Typography variant="h4" fontWeight={700}>Venues</Typography>
+          <Typography variant="body2" color="text.secondary">Browse and manage all exam venues.</Typography>
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Chip label={`Total: ${summary.total}`} color="primary" variant="outlined" />
+          <Chip label={`Accessible: ${summary.accessible}`} color="secondary" variant="outlined" />
+          <Chip label={`Exam slots: ${summary.examCount}`} variant="outlined" />
+        </Stack>
+      </Stack>
+
+      <Paper sx={{ width: '100%', mb: 2, borderRadius: 3, overflow: 'hidden', boxShadow: 3 }}>
         <EnhancedTableToolbar
           numSelected={selected.length}
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
-          onAddVenue={() => navigate('/admin/venues/new')}
+          onAddVenue={() => setAddOpen(true)}
         />
+        <Divider />
 
         <TableContainer>
           <Table sx={{ minWidth: 750 }} size="medium">
@@ -426,7 +455,7 @@ export const AdminVenues: React.FC = () => {
                       </TableCell>
 
                       <TableCell id={labelId} component="th" scope="row" padding="none">
-                        <Link to={`/admin/venues/${row.id}`}>
+                        <Link to={`/admin/venues/${encodeURIComponent(row.id)}`}>
                           <MUILink sx={{ cursor: 'pointer' }}>{row.name}</MUILink>
                         </Link>
                       </TableCell>
@@ -506,6 +535,7 @@ export const AdminVenues: React.FC = () => {
           </Table>
         </TableContainer>
 
+        <Divider />
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
@@ -519,6 +549,50 @@ export const AdminVenues: React.FC = () => {
           }}
         />
       </Paper>
+      <AddVenueDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSuccess={(name) => {
+          setSuccessMessage(`${name} added successfully`);
+          setSuccessOpen(true);
+          queryClient.invalidateQueries({ queryKey: ['venues'] });
+          setAddOpen(false);
+        }}
+      />
+      <Snackbar
+        open={successOpen}
+        autoHideDuration={3000}
+        onClose={() => setSuccessOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSuccessOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: '#d4edda',
+            color: '#155724',
+            border: '1px solid #155724',
+            borderRadius: '50px',
+            fontWeight: 500,
+          }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
+      <Fab
+        color="primary"
+        onClick={() => setAddOpen(true)}
+        sx={{
+          position: 'fixed',
+          bottom: 32,
+          right: 32,
+          boxShadow: 4,
+        }}
+        aria-label="Add venue"
+      >
+        <AddLocationAltIcon />
+      </Fab>
     </Box>
   );
 };
