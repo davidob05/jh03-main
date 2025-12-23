@@ -630,17 +630,33 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 ))}
               </Grid>
               {(sortedAvailabilityEntries.length > availabilityLimit || availabilityLimit > 4) && (
-                <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-                  {sortedAvailabilityEntries.length > availabilityLimit && (
-                    <Button variant="text" onClick={() => setAvailabilityLimit((prev) => prev + 4)}>
-                      Show 4 more
-                    </Button>
-                  )}
-                  {availabilityLimit > 4 && (
-                    <Button variant="text" onClick={() => setAvailabilityLimit(4)}>
-                      Show less
-                    </Button>
-                  )}
+                <Box sx={{ mt: 2, display: "flex", gap: 1.5, justifyContent: "flex-end" }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setAvailabilityLimit(4)}
+                    disabled={availabilityLimit <= 4}
+                    sx={{
+                      borderRadius: "999px",
+                      textTransform: "none",
+                      fontWeight: 600,
+                      px: 2.5,
+                    }}
+                  >
+                    Show less
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={() => setAvailabilityLimit((prev) => Math.min(prev + 4, sortedAvailabilityEntries.length))}
+                    disabled={availabilityLimit >= sortedAvailabilityEntries.length}
+                    sx={{
+                      borderRadius: "999px",
+                      textTransform: "none",
+                      fontWeight: 600,
+                      px: 2.5,
+                    }}
+                  >
+                    {`Show ${Math.min(4, sortedAvailabilityEntries.length - availabilityLimit)} more`}
+                  </Button>
                 </Box>
               )}
             </Paper>

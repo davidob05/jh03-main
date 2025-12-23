@@ -1,15 +1,9 @@
 import React, { useMemo, useState } from "react";
-import {
-  Box,
-  Grid,
-  Card,
-  Typography,
-  Paper,
-  Button,
-} from "@mui/material";
+import { Box, Grid, Card, Typography, Paper, Button } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl } from "../../utils/api";
+import { NotificationsPanel, NotificationItem } from "../../components/admin/NotificationsPanel";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -35,35 +29,23 @@ interface VenueData {
   venue_name: string;
 }
 
-interface Notification {
-  id: number;
-  type:
-    | "availability"
-    | "cancellation"
-    | "shiftPickup"
-    | "examChange"
-    | "invigilatorUpdate";
-  message: string;
-  timestamp: string;
-}
-
-const mockNotifications: Notification[] = [
+const mockNotifications: NotificationItem[] = [
   {
     id: 1,
     type: "availability",
-    message: "Invigilator Alex Chen submitted availability for 2025-11-20",
+    message: "Invigilator Alex Chen submitted restrictions for 2025-11-20",
     timestamp: "2025-11-19T09:15:00Z",
   },
   {
     id: 2,
     type: "cancellation",
-    message: "Invigilator Rajesh Kumar cancelled availability for 2025-11-18",
+    message: "Invigilator Rajesh Kumar cancelled a shift for 2025-11-18",
     timestamp: "2025-11-18T14:30:00Z",
   },
   {
     id: 3,
     type: "examChange",
-    message: "Exam 'Calculus 101' on 2025-11-20 had the time changed",
+    message: "Exam 'Calculus 101' on 2025-11-20 has changed time",
     timestamp: "2025-11-17T10:00:00Z",
   },
   {
@@ -81,19 +63,19 @@ const mockNotifications: Notification[] = [
   {
     id: 6,
     type: "availability",
-    message: "Invigilator Li Wei submitted availability for 2025-11-22",
+    message: "Invigilator Li Wei submitted restrictions for 2025-11-22",
     timestamp: "2025-11-14T11:10:00Z",
   },
   {
     id: 7,
     type: "cancellation",
-    message: "Invigilator Sarah Johnson cancelled availability for 2025-11-21",
+    message: "Invigilator Sarah Johnson cancelled a shift for 2025-11-21",
     timestamp: "2025-11-13T13:55:00Z",
   },
   {
     id: 8,
     type: "examChange",
-    message: "Exam 'Physics 201' on 2025-11-23 had the venue changed",
+    message: "Exam 'Physics 201' on 2025-11-23 venue has changed",
     timestamp: "2025-11-12T09:05:00Z",
   },
   {
@@ -111,7 +93,7 @@ const mockNotifications: Notification[] = [
   {
     id: 11,
     type: "availability",
-    message: "Invigilator Carlos Martinez submitted availability for 2025-11-25",
+    message: "Invigilator Carlos Martinez submitted restrictions for 2025-11-25",
     timestamp: "2025-11-09T10:50:00Z",
   },
 ];
@@ -268,63 +250,41 @@ export const AdminDashboard: React.FC = () => {
       </Grid>
 
       {/* Notifications */}
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Recent Activity
-      </Typography>
-      <Paper sx={{ p: 3, mb: 6, height: "100%", overflowY: "auto" }}>
-        {mockNotifications.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            No recent activity yet.
-          </Typography>
-        ) : (
-          <>
-            {mockNotifications.slice(0, visibleCount).map((n) => (
-              <Box
-                key={n.id}
-                sx={{
-                  mb: 2,
-                  p: 1,
-                  borderRadius: 1,
-                  backgroundColor:
-                    n.type === "cancellation"
-                      ? "error.light"
-                      : n.type === "availability"
-                      ? "success.light"
-                      : n.type === "shiftPickup"
-                      ? "info.light"
-                      : "warning.light",
-                }}
-              >
-                <Typography variant="body2">{n.message}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {new Date(n.timestamp).toLocaleString()}
-                </Typography>
-              </Box>
-            ))}
-
-            {/* Show More / Show Less Button */}
-            {mockNotifications.length > 4 && (
-              <Box sx={{ textAlign: "center", mt: 1 }}>
-                <Button
-                  variant="text"
-                  onClick={() =>
-                    setVisibleCount((prev) =>
-                      prev >= mockNotifications.length ? 4 : prev + 4
-                    )
-                  }
-                >
-                  {visibleCount >= mockNotifications.length
-                    ? "Show less"
-                    : `Show ${Math.min(
-                        4,
-                        mockNotifications.length - visibleCount
-                      )} more notifications`}
-                </Button>
-              </Box>
-            )}
-          </>
-        )}
-      </Paper>
+      <NotificationsPanel notifications={mockNotifications.slice(0, visibleCount)} />
+      {mockNotifications.length > 0 && (
+        <Box sx={{ textAlign: "center", mt: 3, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setVisibleCount(4)}
+            disabled={visibleCount <= 4}
+            sx={{
+              borderRadius: "999px",
+              textTransform: "none",
+              fontWeight: 600,
+              px: 2.5,
+            }}
+          >
+            Show less
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() =>
+              setVisibleCount((prev) =>
+                Math.min(prev + 4, mockNotifications.length)
+              )
+            }
+            disabled={visibleCount >= mockNotifications.length}
+            sx={{
+              borderRadius: "999px",
+              textTransform: "none",
+              fontWeight: 600,
+              px: 2.5,
+            }}
+          >
+            {`Show ${Math.min(4, mockNotifications.length - visibleCount)} more`}
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 };

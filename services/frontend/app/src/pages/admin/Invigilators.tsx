@@ -782,12 +782,32 @@ export const AdminInvigilators: React.FC = () => {
 
         {/* Show All Button */}
         {filtered.length > itemsPerPage && (
-          <Box sx={{ textAlign: 'center', mt: 2 }}>
+          <Box sx={{ textAlign: 'center', mt: 2, display: 'flex', justifyContent: 'center', gap: 1.5 }}>
             <Button
-              variant="text"
-              onClick={() => setShowAll(prev => !prev)}
+              variant="outlined"
+              onClick={() => setShowAll(false)}
+              disabled={!showAll}
+              sx={{
+                borderRadius: '999px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 2.5,
+              }}
             >
-              {showAll ? `Show less` : `Show all ${filtered.length} invigilators`}
+              Show less
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => setShowAll(true)}
+              disabled={showAll}
+              sx={{
+                borderRadius: '999px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 2.5,
+              }}
+            >
+              {`Show all ${filtered.length}`}
             </Button>
           </Box>
         )}

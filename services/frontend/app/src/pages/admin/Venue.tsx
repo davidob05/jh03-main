@@ -12,6 +12,7 @@ import {
   Fab,
   Tooltip,
   Snackbar,
+  Button,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -253,27 +254,32 @@ export const AdminVenuePage: React.FC = () => {
             </Box>
 
             <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, mt: 3 }}>
-              <Tooltip title="Show fewer exams">
-                <span>
-                  <Chip
-                    label="Show less"
-                    onClick={() => setVisibleCount(4)}
-                    disabled={visibleCount <= 4}
-                    variant="outlined"
-                    color="primary"
-                  />
-                </span>
-              </Tooltip>
-              <Tooltip title="Show 4 more exams">
-                <span>
-                  <Chip
-                    label="Show 4 more"
-                    onClick={() => setVisibleCount((prev) => Math.min(prev + 4, examCount))}
-                    disabled={visibleCount >= examCount}
-                    color="primary"
-                  />
-                </span>
-              </Tooltip>
+              <Button
+                variant="outlined"
+                onClick={() => setVisibleCount(4)}
+                disabled={visibleCount <= 4}
+                sx={{
+                  borderRadius: "999px",
+                  textTransform: "none",
+                  fontWeight: 600,
+                  px: 2.5,
+                }}
+              >
+                Show less
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => setVisibleCount((prev) => Math.min(prev + 4, examCount))}
+                disabled={visibleCount >= examCount}
+                sx={{
+                  borderRadius: "999px",
+                  textTransform: "none",
+                  fontWeight: 600,
+                  px: 2.5,
+                }}
+              >
+                {`Show ${Math.min(4, examCount - visibleCount)} more`}
+              </Button>
             </Box>
           </>
         )}
