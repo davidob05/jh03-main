@@ -13,11 +13,12 @@ import {
   Tooltip,
   Snackbar,
 } from "@mui/material";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import Grid from "@mui/material/Grid";
-import { Edit } from "@mui/icons-material";
+import { Edit, Delete } from "@mui/icons-material";
 import { apiBaseUrl } from "../../utils/api";
 import { EditExamDialog } from "../../components/admin/EditExamDialog";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -74,9 +75,12 @@ const formatExamType = (code?: string) => {
 
 export const AdminExamDetails: React.FC = () => {
   const { examId } = useParams<ExamRouteParams>();
+  const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery<ExamData, Error>({
     queryKey: ["exam", examId],
@@ -180,11 +184,19 @@ export const AdminExamDetails: React.FC = () => {
           bottom: 32,
           right: 32,
           zIndex: 1000,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
         }}
       >
         <Tooltip title="Edit exam">
           <Fab color="primary" onClick={() => setEditOpen(true)}>
             <Edit />
+          </Fab>
+        </Tooltip>
+        <Tooltip title="Delete exam">
+          <Fab color="error" onClick={() => setDeleteOpen(true)}>
+            <Delete />
           </Fab>
         </Tooltip>
       </Box>
@@ -202,6 +214,36 @@ export const AdminExamDetails: React.FC = () => {
           }}
         />
       )}
+
+      <DeleteConfirmationDialog
+        open={deleteOpen}
+        title="Delete exam?"
+        description="This will permanently delete this exam."
+        confirmText="Delete"
+        loading={deleting}
+        onClose={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+        onConfirm={async () => {
+          if (!examId) return;
+          try {
+            setDeleting(true);
+            const res = await fetch(`${apiBaseUrl}/exams/${examId}/`, { method: "DELETE" });
+            if (!res.ok) {
+              const text = await res.text();
+              throw new Error(text || "Delete failed");
+            }
+            setSuccessMessage("Exam deleted successfully!");
+            setSuccessOpen(true);
+            setDeleteOpen(false);
+            setTimeout(() => navigate("/admin/exams"), 400);
+          } catch (err: any) {
+            alert(err?.message || "Delete failed");
+          } finally {
+            setDeleting(false);
+          }
+        }}
+      />
 
       <Snackbar
         open={successOpen}
