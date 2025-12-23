@@ -4,7 +4,7 @@ FROM public.ecr.aws/docker/library/node:20-bullseye-slim
 ARG DEBIAN_FRONTEND=noninteractive
 
 # OS packages for React tooling and native module builds
-RUN set -euo pipefail; \
+RUN set -eu; \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         bash \
