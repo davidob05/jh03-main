@@ -84,10 +84,17 @@ const toLocalInputValue = (isoDate?: string | null) => {
 
 const toIsoString = (localValue: string) => {
   if (!localValue) return "";
-  const parsed = new Date(localValue);
-  if (Number.isNaN(parsed.getTime())) return "";
-  const offsetMs = parsed.getTimezoneOffset() * 60000;
-  return new Date(parsed.getTime() + offsetMs).toISOString();
+  // Preserve the exact local time the user picked and include the local timezone offset
+  // so BST/GMT are respected by the backend.
+  const withSeconds = localValue.length === 16 ? `${localValue}:00` : localValue;
+  const localDate = new Date(withSeconds);
+  if (Number.isNaN(localDate.getTime())) return withSeconds;
+  const offsetMinutes = localDate.getTimezoneOffset(); // minutes behind UTC
+  const sign = offsetMinutes > 0 ? "-" : "+";
+  const abs = Math.abs(offsetMinutes);
+  const hours = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mins = String(abs % 60).padStart(2, "0");
+  return `${withSeconds}${sign}${hours}:${mins}`;
 };
 
 export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSuccess }) => {
