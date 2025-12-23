@@ -23,7 +23,7 @@ from .serializers import (
     VenueWriteSerializer
 )
 
-class ExamViewSet(viewsets.ReadOnlyModelViewSet):
+class ExamViewSet(viewsets.ModelViewSet):
     queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
     serializer_class = ExamSerializer
 

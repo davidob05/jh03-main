@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
@@ -9,10 +9,15 @@ import {
   Paper,
   Stack,
   Typography,
+  Fab,
+  Tooltip,
+  Snackbar,
 } from "@mui/material";
 import { useParams } from "react-router-dom";
 import Grid from "@mui/material/Grid";
+import { Edit } from "@mui/icons-material";
 import { apiBaseUrl } from "../../utils/api";
+import { EditExamDialog } from "../../components/admin/EditExamDialog";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -69,8 +74,11 @@ const formatExamType = (code?: string) => {
 
 export const AdminExamDetails: React.FC = () => {
   const { examId } = useParams<ExamRouteParams>();
+  const [editOpen, setEditOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const { data, isLoading, isError, error } = useQuery<ExamData, Error>({
+  const { data, isLoading, isError, error, refetch } = useQuery<ExamData, Error>({
     queryKey: ["exam", examId],
     queryFn: () => fetchExam(examId || ""),
     enabled: Boolean(examId),
@@ -165,6 +173,57 @@ export const AdminExamDetails: React.FC = () => {
           </Grid>
         )}
       </Paper>
+
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 32,
+          right: 32,
+          zIndex: 1000,
+        }}
+      >
+        <Tooltip title="Edit exam">
+          <Fab color="primary" onClick={() => setEditOpen(true)}>
+            <Edit />
+          </Fab>
+        </Tooltip>
+      </Box>
+
+      {data && (
+        <EditExamDialog
+          open={editOpen}
+          examId={data?.exam_id ?? null}
+          onClose={() => setEditOpen(false)}
+          onSuccess={(name) => {
+            setSuccessMessage(`${name || "Exam"} updated successfully!`);
+            setSuccessOpen(true);
+            setEditOpen(false);
+            refetch();
+          }}
+        />
+      )}
+
+      <Snackbar
+        open={successOpen}
+        autoHideDuration={3000}
+        onClose={() => setSuccessOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSuccessOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -180,9 +180,6 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
         )}
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={onClose} disabled={updateMutation.isPending}>
-          Cancel
-        </Button>
         <Button
           variant="contained"
           onClick={() => updateMutation.mutate()}
