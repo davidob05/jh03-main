@@ -83,11 +83,7 @@ def attach_placeholders_to_venue(venue: Venue) -> None:
     if not venue:
         return
 
-    placeholders = ExamVenue.objects.select_related("exam").filter(
-        venue__isnull=True,
-        start_time__isnull=False,
-        exam_length__isnull=False,
-    )
+    placeholders = ExamVenue.objects.select_related("exam").filter(venue__isnull=True)
     for ev in placeholders:
         required_caps = ev.provision_capabilities or []
         # Skip placeholders that have no specific provision requirements to avoid

@@ -59,6 +59,14 @@ const formatDuration = (minutes?: number | null) => {
   return [hrs ? `${hrs}h` : "", mins ? `${mins}m` : ""].filter(Boolean).join(" ") || "0m";
 };
 
+const formatExamType = (code?: string) => {
+  if (!code) return "N/A";
+  const normalized = code.trim().toUpperCase();
+  if (normalized === "ONCM") return "On campus";
+  if (normalized === "CMOL") return "On campus online";
+  return code;
+};
+
 export const AdminExamDetails: React.FC = () => {
   const { examId } = useParams<ExamRouteParams>();
 
@@ -94,7 +102,7 @@ export const AdminExamDetails: React.FC = () => {
         <Box>
           <Typography variant="h4" fontWeight={700}>{data.exam_name}</Typography>
           <Typography variant="body2" color="text.secondary">
-            {data.course_code} • {data.exam_type}
+            {data.course_code} • {formatExamType(data.exam_type)}
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
@@ -107,7 +115,7 @@ export const AdminExamDetails: React.FC = () => {
         <Typography variant="h6" fontWeight={700} gutterBottom>Exam details</Typography>
         <Stack spacing={1.2}>
           <Typography variant="body2"><strong>Course code:</strong> {data.course_code}</Typography>
-          <Typography variant="body2"><strong>Exam type:</strong> {data.exam_type}</Typography>
+          <Typography variant="body2"><strong>Exam type:</strong> {formatExamType(data.exam_type)}</Typography>
           <Typography variant="body2"><strong>School contact:</strong> {data.school_contact || "N/A"}</Typography>
         </Stack>
       </Paper>
