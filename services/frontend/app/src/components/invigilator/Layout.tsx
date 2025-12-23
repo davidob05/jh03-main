@@ -1,10 +1,11 @@
 import { AppBar, Toolbar, Box, Button, Avatar, IconButton } from "@mui/material";
 import React from "react";
-import { Link, useLocation, Outlet } from "react-router-dom";
-import { text } from "stream/consumers";
+import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
+import { authTokenKey, authUserKey } from "../../utils/api";
 
 export const InvigilatorLayout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const menuItems = [
     { text: "Home", path: "/invigilator" },
@@ -12,6 +13,12 @@ export const InvigilatorLayout: React.FC = () => {
     { text: "Availability", path: "/invigilator/availability" },
     { text: "Shifts", path: "/invigilator/shifts" }
   ];
+
+  const handleLogout = () => {
+    localStorage.removeItem(authTokenKey);
+    localStorage.removeItem(authUserKey);
+    navigate("/login");
+  };
     
   return (
     <>
@@ -43,9 +50,12 @@ export const InvigilatorLayout: React.FC = () => {
               ))}
             </Box>
 
-            <IconButton component={Link} to="/invigilator/profile">
-              <Avatar sx={{ bgcolor: "warning.light", width: 40, height: 40, color: "black", fontWeight: "bold" }}>I</Avatar>
-            </IconButton>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <IconButton component={Link} to="/invigilator/profile">
+                <Avatar sx={{ bgcolor: "warning.light", width: 40, height: 40, color: "black", fontWeight: "bold" }}>I</Avatar>
+              </IconButton>
+              <Button color="inherit" onClick={handleLogout}>Logout</Button>
+            </Box>
           </Box>
         </Toolbar>
       </AppBar>

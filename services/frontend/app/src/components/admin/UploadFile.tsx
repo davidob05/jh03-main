@@ -12,7 +12,7 @@ import {
   FormControl,
 } from "@mui/material";
 import { Upload as UploadIcon } from "@mui/icons-material";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 export const UploadFile: React.FC = () => {
   const [uploadType, setUploadType] = useState(""); // exam, provisions, invigilators
@@ -54,7 +54,7 @@ export const UploadFile: React.FC = () => {
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const response = await fetch(apiBaseUrl + apiMap[uploadType], {
+      const response = await apiFetch(apiBaseUrl + apiMap[uploadType], {
         method: "POST",
         body: formData,
       });

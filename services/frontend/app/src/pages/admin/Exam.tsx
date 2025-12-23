@@ -15,7 +15,7 @@ import {
 import Grid from "@mui/material/GridLegacy";
 import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 const PROVISION_CAPABILITIES = [
   { value: "separate_room_on_own", label: "Separate room on own" },
@@ -64,13 +64,13 @@ type VenueOption = {
 };
 
 const fetchExam = async (examId: string): Promise<ExamData> => {
-  const response = await fetch(`${apiBaseUrl}/exams/${examId}/`);
+  const response = await apiFetch(`${apiBaseUrl}/exams/${examId}/`);
   if (!response.ok) throw new Error("Unable to load exam");
   return response.json();
 };
 
 const fetchVenues = async (): Promise<VenueOption[]> => {
-  const response = await fetch(`${apiBaseUrl}/venues/`);
+  const response = await apiFetch(`${apiBaseUrl}/venues/`);
   if (!response.ok) throw new Error("Unable to load venues");
   return response.json();
 };
@@ -209,7 +209,7 @@ export const AdminExamEdit: React.FC = () => {
 
       // Delete removed venues
       for (const id of toDelete) {
-        const resp = await fetch(`${apiBaseUrl}/exam-venues/${id}/`, { method: "DELETE" });
+        const resp = await apiFetch(`${apiBaseUrl}/exam-venues/${id}/`, { method: "DELETE" });
         if (!resp.ok) {
           const detail = await resp.text();
           throw new Error(detail || `Failed to delete venue ${id}`);
@@ -218,7 +218,7 @@ export const AdminExamEdit: React.FC = () => {
 
       // Create new venues
       for (const venue of createPayloads) {
-        const resp = await fetch(`${apiBaseUrl}/exam-venues/`, {
+        const resp = await apiFetch(`${apiBaseUrl}/exam-venues/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -238,7 +238,7 @@ export const AdminExamEdit: React.FC = () => {
 
       // Update existing venues
       for (const venue of updatePayloads) {
-        const resp = await fetch(`${apiBaseUrl}/exam-venues/${venue.id}/`, {
+        const resp = await apiFetch(`${apiBaseUrl}/exam-venues/${venue.id}/`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

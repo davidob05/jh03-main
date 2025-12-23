@@ -22,7 +22,7 @@ import { Close } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
 import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 const STEPS = ["Personal Details", "Qualifications", "Restrictions", "Availability"];
 
@@ -123,7 +123,7 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
   const { data, isLoading, isError } = useQuery<InvigilatorData>({
     queryKey: ["invigilator", invigilatorId],
     queryFn: async () => {
-      const response = await fetch(`${apiBaseUrl}/invigilators/${invigilatorId}/`);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${invigilatorId}/`);
       if (!response.ok) throw new Error("Unable to load invigilator");
       return response.json();
     },
@@ -161,7 +161,7 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${apiBaseUrl}/invigilators/${invigilatorId}/`, {
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${invigilatorId}/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
