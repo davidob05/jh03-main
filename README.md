@@ -9,7 +9,7 @@ CI builds each service image with Kaniko and runs the frontend Vitest suite plus
 
 ---
 
-## How uploads work (today)
+## How uploads work
 
 1) **Venue uploads** (extra rooms sheet, venue-style Excel)  
    - Creates/updates `Venue` rows.  
@@ -138,14 +138,26 @@ CI mirrors these commands via `.gitlab-ci.yml`.
 
 ---
 
-## Create a Django superuser
+## Authentication & roles
 
-1. Ensure the Django container is running (`make up` or `make django`).
-2. Run:
-   ```bash
-   docker compose -f ops/compose/docker-compose.dev.yml exec django bash -lc '. /app/.venv/bin/activate && python manage.py createsuperuser'
-   ```
-3. Follow the prompts for username/email/password. The user will exist in the embedded PostgreSQL data dir (`services/django/lithium/.postgres-data/`).
+- **Default admin** — seeded automatically by migration:  
+  - username: `test1`  
+  - email: `test1@example.com`  
+  - password: `test2test2`  
+  This account is staff + superuser and has an API token created for it.
+- **Login endpoint** — `POST /api/auth/token/login/` with `{ "username": "<email or username>", "password": "<password>" }` returns `{ token, user, role }`.  
+  - `role` is `admin` for staff/superuser, otherwise `invigilator`.
+- **Who can access what**  
+  - Admin routes and API endpoints (`/admin/*` React pages, `/api/*` except auth) require an authenticated admin (is_staff/superuser).  
+  - Invigilator routes (`/invigilator/*`) require an authenticated invigilator token.  
+  - Anonymous users are always redirected to `/login`.
+- **Frontend storage** — tokens and user info are stored in `localStorage` (`authToken`, `authUser`). Logout clears both.
+- **Creating more users** — run `createsuperuser` (for admins) or create a regular user + `Invigilator` profile via Django admin to grant invigilator access.
+- **CSRF / cookies** — secure/HTTP-only cookies can be toggled for prod via env:
+  - `DJANGO_SECURE_COOKIES=1` makes session/CSRF cookies secure-only.
+  - `DJANGO_CSRF_HTTPONLY=1` (default) hides the CSRF cookie from JavaScript.
+  - `DJANGO_SECURE_SSL_REDIRECT=1` forces HTTPS.
+  - `DJANGO_SESSION_COOKIE_SAMESITE` / `DJANGO_CSRF_COOKIE_SAMESITE` default to `Lax`; override as needed.
 
 ---
 

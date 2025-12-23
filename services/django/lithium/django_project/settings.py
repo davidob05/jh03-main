@@ -23,6 +23,10 @@ ALLOWED_HOSTS = os.getenv(
 ).split(",")
 
 
+def env_flag(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
 # Application definition
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = [
@@ -234,3 +238,13 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",  # React dev server
     "http://127.0.0.1:3000",  # Alternative React dev server
 ]
+
+# CSRF & cookie hardening (toggle secure cookies via env to keep local dev workable)
+DJANGO_SECURE_COOKIES = env_flag("DJANGO_SECURE_COOKIES", "false")
+CSRF_COOKIE_SECURE = DJANGO_SECURE_COOKIES
+SESSION_COOKIE_SECURE = DJANGO_SECURE_COOKIES
+CSRF_COOKIE_HTTPONLY = env_flag("DJANGO_CSRF_HTTPONLY", "true")
+SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
+SECURE_SSL_REDIRECT = env_flag("DJANGO_SECURE_SSL_REDIRECT", "false")
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
