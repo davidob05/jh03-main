@@ -5,11 +5,12 @@ import {
   CircularProgress,
   Paper,
   Typography,
-  Alert,
   MenuItem,
   Select,
   InputLabel,
   FormControl,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { Upload as UploadIcon } from "@mui/icons-material";
 import { apiBaseUrl } from "../../utils/api";
@@ -18,7 +19,7 @@ export const UploadFile: React.FC = () => {
   const [uploadType, setUploadType] = useState(""); // exam, provisions, invigilators
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<{
+  const [snackbar, setSnackbar] = useState<{
     type: "success" | "error" | null;
     message: string;
   }>({ type: null, message: "" });
@@ -33,22 +34,22 @@ export const UploadFile: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      setUploadStatus({ type: null, message: "" });
+      setSnackbar({ type: null, message: "" });
     }
   };
 
   const handleUpload = async () => {
     if (!uploadType) {
-      setUploadStatus({ type: "error", message: "Please select a file type." });
+      setSnackbar({ type: "error", message: "Please select a file type." });
       return;
     }
     if (!selectedFile) {
-      setUploadStatus({ type: "error", message: "Please select a file first." });
+      setSnackbar({ type: "error", message: "Please select a file first." });
       return;
     }
 
     setUploading(true);
-    setUploadStatus({ type: null, message: "" });
+    setSnackbar({ type: null, message: "" });
 
     try {
       const formData = new FormData();
@@ -62,18 +63,32 @@ export const UploadFile: React.FC = () => {
       if (!response.ok) throw new Error("Upload failed");
 
       const result = await response.json();
-      setUploadStatus({
+      const created = result.records_created ?? result.created ?? result.count ?? 0;
+      const updated = result.records_updated ?? result.updated ?? 0;
+      const deleted = result.records_deleted ?? result.deleted ?? 0;
+      const parts = [
+        `Added ${created}`,
+        `Updated ${updated}`,
+        deleted ? `Deleted ${deleted}` : null,
+      ].filter(Boolean);
+
+      const typeLabel =
+        uploadType === "exam"
+          ? "Exam timetable"
+          : uploadType === "provisions"
+          ? "Student provisions"
+          : "Invigilator data";
+
+      setSnackbar({
         type: "success",
-        message: `Successfully uploaded ${selectedFile.name}. ${
-          result.count || 0
-        } records added to database.`,
+        message: `Upload complete: ${typeLabel} (${selectedFile.name}). ${parts.join(", ")}.`,
       });
 
       setSelectedFile(null);
       const fileInput = document.getElementById("file-upload") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
     } catch (err) {
-      setUploadStatus({
+      setSnackbar({
         type: "error",
         message: err instanceof Error ? err.message : "Failed to upload file",
       });
@@ -145,7 +160,31 @@ export const UploadFile: React.FC = () => {
           {uploading ? "Uploading..." : "Upload"}
         </Button>
 
-        {uploadStatus.type && <Alert severity={uploadStatus.type}>{uploadStatus.message}</Alert>}
+        <Snackbar
+          open={Boolean(snackbar.type)}
+          autoHideDuration={6000}
+          onClose={() => setSnackbar({ type: null, message: "" })}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
+            onClose={() => setSnackbar({ type: null, message: "" })}
+            severity={snackbar.type || undefined}
+            variant="filled"
+            sx={
+              snackbar.type === "success"
+                ? {
+                    backgroundColor: "#d4edda",
+                    color: "#155724",
+                    border: "1px solid #155724",
+                    borderRadius: "50px",
+                    fontWeight: 500,
+                  }
+                : undefined
+            }
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </Paper>
   );
