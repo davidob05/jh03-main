@@ -11,6 +11,7 @@ import {
   Grid,
   Fab,
   Tooltip,
+  Snackbar,
 } from "@mui/material";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -73,6 +74,8 @@ export const AdminVenuePage: React.FC = () => {
   const [popupOpen, setPopupOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<PopupExamDetails | null>(null);
   const [visibleCount, setVisibleCount] = useState(4);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const { data, isLoading, isError, error, refetch } = useQuery<VenueData>({
     queryKey: ["venue", venueKey],
@@ -271,7 +274,9 @@ export const AdminVenuePage: React.FC = () => {
         open={editOpen}
         venueId={venueKey || null}
         onClose={() => setEditOpen(false)}
-        onSuccess={() => {
+        onSuccess={(name?: string) => {
+          setSuccessMessage(`${name || venueKey} updated successfully!`);
+          setSuccessOpen(true);
           setEditOpen(false);
           refetch();
         }}
@@ -282,6 +287,28 @@ export const AdminVenuePage: React.FC = () => {
         onClose={() => setPopupOpen(false)}
         exam={selectedExam}
       />
+
+      <Snackbar
+        open={successOpen}
+        autoHideDuration={3000}
+        onClose={() => setSuccessOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSuccessOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
