@@ -14,7 +14,7 @@ import {
   Chip,
 } from "@mui/material";
 import { Upload as UploadIcon, InsertDriveFile, Eject } from "@mui/icons-material";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 
 export const UploadFile: React.FC = () => {
@@ -63,7 +63,7 @@ export const UploadFile: React.FC = () => {
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const response = await fetch(apiBaseUrl + apiMap[uploadType], {
+      const response = await apiFetch(apiBaseUrl + apiMap[uploadType], {
         method: "POST",
         body: formData,
       });

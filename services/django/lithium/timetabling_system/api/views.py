@@ -1,4 +1,4 @@
-from rest_framework import status, viewsets
+from rest_framework import permissions, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -42,6 +42,7 @@ def log_notification(type_: str, message: str, when=None):
 class ExamViewSet(viewsets.ModelViewSet):
     queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
     serializer_class = ExamSerializer
+    permission_classes = [permissions.IsAdminUser]
 
     def perform_update(self, serializer):
         instance = serializer.save()
@@ -52,6 +53,7 @@ class ExamViewSet(viewsets.ModelViewSet):
 class VenueViewSet(viewsets.ModelViewSet):
     queryset = Venue.objects.all().prefetch_related("examvenue_set__exam")
     serializer_class = VenueSerializer
+    permission_classes = [permissions.IsAdminUser]
 
     def get_serializer_class(self):
         if self.action in {"create", "update", "partial_update"}:
@@ -83,6 +85,7 @@ class ExamVenueViewSet(viewsets.ModelViewSet):
     """
 
     queryset = ExamVenue.objects.select_related("exam", "venue").all()
+    permission_classes = [permissions.IsAdminUser]
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
@@ -120,6 +123,7 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
         "availabilities",
     )
     serializer_class = InvigilatorSerializer
+    permission_classes = [permissions.IsAdminUser]
 
     def perform_update(self, serializer):
         instance = serializer.save()
@@ -135,6 +139,7 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         "exam_venue__venue",
     ).all()
     serializer_class = InvigilatorAssignmentSerializer
+    permission_classes = [permissions.IsAdminUser]
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -153,6 +158,7 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
 class TimetableUploadView(APIView):
     """Accepts an uploaded Excel file and routes it through the parser helpers."""
     parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [permissions.IsAdminUser]
 
 
     def post(self, request, *args, **kwargs):

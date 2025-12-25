@@ -15,6 +15,9 @@ class TimetableUploadViewTests(TestCase):
             email="uploader@example.com",
             password="secret",
         )
+        self.user.is_staff = True
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_staff", "is_superuser"])
         self.client.force_authenticate(self.user)
         self.url = reverse("api-exam-upload")
 

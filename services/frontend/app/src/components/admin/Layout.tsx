@@ -1,11 +1,11 @@
 import { AppBar, Toolbar, Box, Button, Avatar, IconButton } from "@mui/material";
 import React from "react";
-import { Link, useLocation, Outlet } from "react-router-dom";
-import { text } from "stream/consumers";
-import { Upload as UploadIcon } from "@mui/icons-material";
+import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
+import { authTokenKey, authUserKey } from "../../utils/api";
 
 export const AdminLayout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const menuItems = [
     { text: "Home", path: "/admin" },
@@ -14,6 +14,12 @@ export const AdminLayout: React.FC = () => {
     { text: "Calendar", path: "/admin/calendar" },
     { text: "Invigilators", path: "/admin/invigilators" }
   ];
+
+  const handleLogout = () => {
+    localStorage.removeItem(authTokenKey);
+    localStorage.removeItem(authUserKey);
+    navigate("/login");
+  };
     
   return (
     <>
@@ -45,9 +51,12 @@ export const AdminLayout: React.FC = () => {
               ))}
             </Box>
 
-            <IconButton component={Link} to="/admin/profile">
-              <Avatar sx={{ bgcolor: "secondary.main", width: 40, height: 40, color: "black", fontWeight: "bold" }}>A</Avatar>
-            </IconButton>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <IconButton component={Link} to="/admin/profile">
+                <Avatar sx={{ bgcolor: "secondary.main", width: 40, height: 40, color: "black", fontWeight: "bold" }}>A</Avatar>
+              </IconButton>
+              <Button color="inherit" onClick={handleLogout}>Logout</Button>
+            </Box>
           </Box>
         </Toolbar>
       </AppBar>

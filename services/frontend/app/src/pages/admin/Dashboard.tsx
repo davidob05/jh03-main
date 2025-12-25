@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Box, Grid, Typography, Paper, Button } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { NotificationsPanel, NotificationItem } from "../../components/admin/NotificationsPanel";
 import { PillButton } from "../../components/PillButton";
 
@@ -35,7 +35,7 @@ export const AdminDashboard: React.FC = () => {
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
     queryFn: async () => {
-      const res = await fetch(`${apiBaseUrl}/exams/`);
+      const res = await apiFetch(`${apiBaseUrl}/exams/`);
       if (!res.ok) throw new Error("Unable to load exams");
       return res.json();
     },
@@ -56,7 +56,7 @@ export const AdminDashboard: React.FC = () => {
   const { data: invigilators = [], isLoading: loadingInvigilators } = useQuery<InvigilatorData[]>({
     queryKey: ["dashboard-invigilators"],
     queryFn: async () => {
-      const res = await fetch(`${apiBaseUrl}/invigilators/`);
+      const res = await apiFetch(`${apiBaseUrl}/invigilators/`);
       if (!res.ok) throw new Error("Unable to load invigilators");
       return res.json();
     },
@@ -65,7 +65,7 @@ export const AdminDashboard: React.FC = () => {
   const { data: venues = [], isLoading: loadingVenues } = useQuery<VenueData[]>({
     queryKey: ["dashboard-venues"],
     queryFn: async () => {
-      const res = await fetch(`${apiBaseUrl}/venues/`);
+      const res = await apiFetch(`${apiBaseUrl}/venues/`);
       if (!res.ok) throw new Error("Unable to load venues");
       return res.json();
     },

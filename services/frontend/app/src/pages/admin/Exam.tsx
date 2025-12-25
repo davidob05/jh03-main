@@ -12,11 +12,11 @@ import {
   Fab,
   Tooltip,
   Snackbar,
+  Grid,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
-import Grid from "@mui/material/Grid";
 import { Edit, Delete } from "@mui/icons-material";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { EditExamDialog } from "../../components/admin/EditExamDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 
@@ -46,7 +46,7 @@ type ExamRouteParams = {
 };
 
 const fetchExam = async (examId: string): Promise<ExamData> => {
-  const response = await fetch(`${apiBaseUrl}/exams/${examId}/`);
+  const response = await apiFetch(`${apiBaseUrl}/exams/${examId}/`);
   if (!response.ok) throw new Error("Unable to load exam");
   return response.json();
 };
@@ -228,7 +228,7 @@ export const AdminExamDetails: React.FC = () => {
           if (!examId) return;
           try {
             setDeleting(true);
-            const res = await fetch(`${apiBaseUrl}/exams/${examId}/`, { method: "DELETE" });
+            const res = await apiFetch(`${apiBaseUrl}/exams/${examId}/`, { method: "DELETE" });
             if (!res.ok) {
               const text = await res.text();
               throw new Error(text || "Delete failed");

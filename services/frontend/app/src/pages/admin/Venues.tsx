@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
 import {
   Box,
-  Button,
   Table,
   TableBody,
   TableCell,
@@ -27,13 +26,12 @@ import {
   Snackbar,
   Alert,
   Fab,
+  Link as MUILink,
 } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, AddLocationAlt as AddLocationAltIcon } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
-import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
-
-import { apiBaseUrl } from '../../utils/api';
+import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
 import { PillButton } from '../../components/PillButton';
 
@@ -90,7 +88,7 @@ const headCells: readonly HeadCell[] = [
 ];
 
 const fetchVenues = async (): Promise<VenueData[]> => {
-  const response = await fetch(apiBaseUrl + "/venues/");
+  const response = await apiFetch(apiBaseUrl + "/venues/");
   if (!response.ok) throw new Error('Unable to load venues');
   return response.json();
 };

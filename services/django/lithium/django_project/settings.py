@@ -23,6 +23,17 @@ ALLOWED_HOSTS = os.getenv(
 ).split(",")
 
 
+def env_flag(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: str = "") -> list[str]:
+    raw = os.getenv(name, default)
+    if not raw:
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
 # Application definition
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = [
@@ -36,6 +47,7 @@ INSTALLED_APPS = [
     "django.contrib.sites",
     # Third-party
     "rest_framework",
+    "rest_framework.authtoken",
     "allauth",
     "allauth.account",
     "crispy_forms",
@@ -105,12 +117,16 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 12},
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+    {
+        "NAME": "accounts.validators.ComplexityPasswordValidator",
     },
 ]
 
@@ -199,6 +215,24 @@ ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_EMAIL_REQUIRED = True
 
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.getenv("DRF_THROTTLE_ANON_RATE", "20/min"),
+        "user": os.getenv("DRF_THROTTLE_USER_RATE", "60/min"),
+    },
+}
+
 # Allow bulk admin actions (e.g., deleting many ExamVenue rows) without hitting the
 # default per-request field cap.
 DATA_UPLOAD_MAX_NUMBER_FIELDS = int(os.getenv("DJANGO_DATA_UPLOAD_MAX_NUMBER_FIELDS", "50000"))
@@ -217,9 +251,27 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#csrf-trusted-origins
-CSRF_TRUSTED_ORIGINS = [
+_cors_env = env_list("DJANGO_CORS_ALLOWED_ORIGINS")
+_csrf_env = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+
+CORS_ALLOWED_ORIGINS = _cors_env or [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+CSRF_TRUSTED_ORIGINS = _csrf_env or [
     "http://localhost:8000",  # Default Django dev server
     "http://127.0.0.1:8000",  # Alternative local address
     "http://localhost:3000",  # React dev server
     "http://127.0.0.1:3000",  # Alternative React dev server
 ]
+
+# CSRF & cookie hardening (toggle secure cookies via env to keep local dev workable)
+DJANGO_SECURE_COOKIES = env_flag("DJANGO_SECURE_COOKIES", "false")
+CSRF_COOKIE_SECURE = DJANGO_SECURE_COOKIES
+SESSION_COOKIE_SECURE = DJANGO_SECURE_COOKIES
+CSRF_COOKIE_HTTPONLY = env_flag("DJANGO_CSRF_HTTPONLY", "true")
+SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
+SECURE_SSL_REDIRECT = env_flag("DJANGO_SECURE_SSL_REDIRECT", "false")
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

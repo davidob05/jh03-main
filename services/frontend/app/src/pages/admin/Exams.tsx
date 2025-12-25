@@ -28,7 +28,7 @@ import {
 import { visuallyHidden } from '@mui/utils';
 import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiBaseUrl } from '../../utils/api';
+import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
@@ -92,7 +92,7 @@ const headCells: readonly HeadCell[] = [
 ];
 
 const fetchExams = async (): Promise<ExamData[]> => {
-  const response = await fetch(`${apiBaseUrl}/exams/`);
+  const response = await apiFetch(`${apiBaseUrl}/exams/`);
   if (!response.ok) throw new Error('Unable to load exams');
   return response.json();
 };

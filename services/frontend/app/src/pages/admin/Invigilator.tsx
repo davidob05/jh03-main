@@ -27,7 +27,7 @@ import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { StaticDatePicker } from "@mui/x-date-pickers/StaticDatePicker";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
@@ -106,7 +106,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const { data, isLoading, isError, error, refetch } = useQuery<InvigilatorData, Error>({
     queryKey: ["invigilator", id],
     queryFn: async () => {
-      const response = await fetch(`${apiBaseUrl}/invigilators/${id}/`);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`);
       if (!response.ok) throw new Error("Unable to load invigilator");
       return response.json();
     },
@@ -169,7 +169,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
     if (!id) return;
     try {
       setDeleting(true);
-      const response = await fetch(`${apiBaseUrl}/invigilators/${id}/`, { method: "DELETE" });
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`, { method: "DELETE" });
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || "Failed to delete invigilator");

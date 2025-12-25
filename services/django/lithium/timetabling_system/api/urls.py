@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from timetabling_system.views import upload_timetable_file
 
+from accounts.api import CurrentUserView, ObtainAuthTokenView
 from .views import (
     ExamVenueViewSet,
     ExamViewSet,
@@ -21,6 +22,8 @@ router.register("invigilators", InvigilatorViewSet, basename="invigilator")
 router.register("invigilator-assignments", InvigilatorAssignmentViewSet, basename="invigilator-assignment")
 
 urlpatterns = [
+    path("auth/token/login/", ObtainAuthTokenView.as_view(), name="api-login"),
+    path("auth/me/", CurrentUserView.as_view(), name="api-auth-me"),
     path("exams-upload", TimetableUploadView.as_view(), name="api-exam-upload"),
     path("notifications/", NotificationsView.as_view(), name="api-notifications"),
 ]
