@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 
 const VENUE_TYPES = [
@@ -70,7 +70,7 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
   const { data, isLoading, isError } = useQuery<VenueData>({
     queryKey: ["venue", venueId],
     queryFn: async () => {
-      const res = await fetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueId || "")}/`);
+      const res = await apiFetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueId || "")}/`);
       if (!res.ok) throw new Error("Unable to load venue");
       return res.json();
     },
@@ -94,7 +94,7 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${apiBaseUrl}/venues/${venueId}/`, {
+      const res = await apiFetch(`${apiBaseUrl}/venues/${venueId}/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

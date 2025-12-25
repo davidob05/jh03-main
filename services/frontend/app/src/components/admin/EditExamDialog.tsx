@@ -18,7 +18,7 @@ import {
 } from "@mui/material";
 import { Add, Close, Delete } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 
 type ExamVenue = {
@@ -62,13 +62,13 @@ type Props = {
 };
 
 const fetchExam = async (examId: number): Promise<ExamData> => {
-  const response = await fetch(`${apiBaseUrl}/exams/${examId}/`);
+  const response = await apiFetch(`${apiBaseUrl}/exams/${examId}/`);
   if (!response.ok) throw new Error("Unable to load exam");
   return response.json();
 };
 
 const fetchVenues = async (): Promise<VenueOption[]> => {
-  const response = await fetch(`${apiBaseUrl}/venues/`);
+  const response = await apiFetch(`${apiBaseUrl}/venues/`);
   if (!response.ok) throw new Error("Unable to load venues");
   return response.json();
 };
@@ -173,7 +173,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
       if (!examId) throw new Error("Missing exam id");
 
       // Update exam details
-      const examRes = await fetch(`${apiBaseUrl}/exams/${examId}/`, {
+      const examRes = await apiFetch(`${apiBaseUrl}/exams/${examId}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -192,7 +192,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
 
       // Handle main venue only if none exists yet (cannot modify existing core via API).
       if (!coreVenue && mainVenue) {
-        const mainRes = await fetch(`${apiBaseUrl}/exam-venues/`, {
+        const mainRes = await apiFetch(`${apiBaseUrl}/exam-venues/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -215,7 +215,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
       const toDelete = Array.from(initialExtraIds).filter((id) => !currentIds.has(id));
 
       for (const id of toDelete) {
-        const delRes = await fetch(`${apiBaseUrl}/exam-venues/${id}/`, { method: "DELETE" });
+        const delRes = await apiFetch(`${apiBaseUrl}/exam-venues/${id}/`, { method: "DELETE" });
         if (!delRes.ok) {
           const text = await delRes.text();
           throw new Error(text || `Failed to delete venue ${id}`);
@@ -232,7 +232,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
           provision_capabilities: [],
         };
         if (typeof v.id === "number") {
-          const putRes = await fetch(`${apiBaseUrl}/exam-venues/${v.id}/`, {
+          const putRes = await apiFetch(`${apiBaseUrl}/exam-venues/${v.id}/`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -242,7 +242,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
             throw new Error(text || `Failed to update venue ${v.id}`);
           }
         } else {
-          const postRes = await fetch(`${apiBaseUrl}/exam-venues/`, {
+          const postRes = await apiFetch(`${apiBaseUrl}/exam-venues/`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),

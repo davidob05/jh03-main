@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { EditVenueDialog } from "../../components/admin/EditVenueDialog";
 import { Edit, Delete } from "@mui/icons-material";
 import { ExamDetailsPopup, ExamDetails as PopupExamDetails, ExamVenueInfo as PopupExamVenueInfo } from "../../components/admin/ExamDetailsPopup";
@@ -86,7 +86,7 @@ export const AdminVenuePage: React.FC = () => {
   const { data, isLoading, isError, error, refetch } = useQuery<VenueData>({
     queryKey: ["venue", venueKey],
     queryFn: async () => {
-      const res = await fetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueKey)}/`);
+      const res = await apiFetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueKey)}/`);
       if (!res.ok) throw new Error("Unable to load venue");
       return res.json();
     },
@@ -127,7 +127,7 @@ export const AdminVenuePage: React.FC = () => {
     if (!venueKey) return;
     try {
       setDeleting(true);
-      const res = await fetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueKey)}/`, { method: "DELETE" });
+      const res = await apiFetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueKey)}/`, { method: "DELETE" });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || "Delete failed");

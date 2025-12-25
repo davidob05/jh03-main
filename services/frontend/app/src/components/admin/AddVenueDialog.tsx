@@ -18,7 +18,7 @@ import {
 import { Close } from "@mui/icons-material";
 import IconButton from "@mui/material/IconButton";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiBaseUrl } from "../../utils/api";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 
 const VENUE_TYPES = [
@@ -67,7 +67,7 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
 
   const addMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${apiBaseUrl}/venues/`, {
+      const response = await apiFetch(`${apiBaseUrl}/venues/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

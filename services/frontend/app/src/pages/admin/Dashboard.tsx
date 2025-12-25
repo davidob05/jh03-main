@@ -47,7 +47,7 @@ export const AdminDashboard: React.FC = () => {
   } = useQuery<NotificationItem[]>({
     queryKey: ["dashboard-notifications"],
     queryFn: async () => {
-      const res = await fetch(`${apiBaseUrl}/notifications/`);
+      const res = await apiFetch(`${apiBaseUrl}/notifications/`);
       if (!res.ok) throw new Error("Unable to load notifications");
       return res.json();
     },

@@ -206,6 +206,7 @@ class NotificationsView(APIView):
     """
     Return notifications stored in the Notification table.
     """
+    permission_classes = [permissions.IsAdminUser]
 
     def get(self, request, *args, **kwargs):
         cutoff = timezone.now() - timedelta(days=7)
