@@ -200,6 +200,28 @@ class Provisions(models.Model):
         verbose_name = "Provisions"
         verbose_name_plural = "Provisions"
 
+
+# ---------- NOTIFICATIONS ----------
+
+class Notification(models.Model):
+    class NotificationType(models.TextChoices):
+        AVAILABILITY = "availability", "Availability"
+        CANCELLATION = "cancellation", "Cancellation"
+        SHIFT_PICKUP = "shiftPickup", "Shift pickup"
+        EXAM_CHANGE = "examChange", "Exam change"
+        INVIGILATOR_UPDATE = "invigilatorUpdate", "Invigilator update"
+
+    id = models.AutoField(primary_key=True)
+    type = models.CharField(max_length=30, choices=NotificationType.choices)
+    message = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.get_type_display()}: {self.message[:40]}"
+
     def __str__(self):
         return f"Provisions for {self.student} in {self.exam}"
 

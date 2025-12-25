@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Chip, Divider, Stack, Typography, Paper } from "@mui/material";
-import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle } from "@mui/icons-material";
+import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined } from "@mui/icons-material";
 
 export type NotificationType =
   | "availability"
@@ -93,47 +93,67 @@ export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }>
       <Divider sx={{ mb: 2 }} />
 
       <Stack spacing={1.5}>
-        {notifications.map((n) => {
-          const style = typeStyles[n.type];
-          return (
-            <Box
-              key={n.id}
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                backgroundColor: style.bg,
-              }}
-            >
-              <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Chip
-                    icon={style.icon}
-                    label={style.label}
-                    size="small"
-                    sx={{
-                      backgroundColor: "#fff",
-                      color: style.color,
-                      fontWeight: 700,
-                      border: `1px solid ${style.color}`,
-                      "& .MuiChip-icon": {
+        {notifications.length === 0 ? (
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: "1px dashed",
+              borderColor: "divider",
+              backgroundColor: "#f9fafb",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            <InfoOutlined fontSize="small" sx={{ color: "text.secondary" }} />
+            <Typography variant="body2" color="text.secondary">
+              No notifications yet.
+            </Typography>
+          </Box>
+        ) : (
+          notifications.map((n) => {
+            const style = typeStyles[n.type];
+            return (
+              <Box
+                key={n.id}
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  backgroundColor: style.bg,
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Chip
+                      icon={style.icon}
+                      label={style.label}
+                      size="small"
+                      sx={{
+                        backgroundColor: "#fff",
                         color: style.color,
-                      },
-                    }}
-                  />
-                  <Typography variant="body2" sx={{ color: "text.primary" }}>
-                    {n.message}
-                  </Typography>
+                        fontWeight: 700,
+                        border: `1px solid ${style.color}`,
+                        "& .MuiChip-icon": {
+                          color: style.color,
+                        },
+                      }}
+                    />
+                    <Typography variant="body2" sx={{ color: "text.primary" }}>
+                      {n.message}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary" }}>
+                    <AccessTime fontSize="small" />
+                    <Typography variant="caption">{formatDate(n.timestamp)}</Typography>
+                  </Stack>
                 </Stack>
-                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary" }}>
-                  <AccessTime fontSize="small" />
-                  <Typography variant="caption">{formatDate(n.timestamp)}</Typography>
-                </Stack>
-              </Stack>
-            </Box>
-          );
-        })}
+              </Box>
+            );
+          })
+        )}
       </Stack>
     </Paper>
   );

@@ -29,74 +29,7 @@ interface VenueData {
   venue_name: string;
 }
 
-const mockNotifications: NotificationItem[] = [
-  {
-    id: 1,
-    type: "availability",
-    message: "Invigilator Alex Chen submitted restrictions for 2025-11-20",
-    timestamp: "2025-11-19T09:15:00Z",
-  },
-  {
-    id: 2,
-    type: "cancellation",
-    message: "Invigilator Rajesh Kumar cancelled a shift for 2025-11-18",
-    timestamp: "2025-11-18T14:30:00Z",
-  },
-  {
-    id: 3,
-    type: "examChange",
-    message: "Exam 'Calculus 101' on 2025-11-20 has changed time",
-    timestamp: "2025-11-17T10:00:00Z",
-  },
-  {
-    id: 4,
-    type: "invigilatorUpdate",
-    message: "Invigilator Maria Garcia updated qualifications",
-    timestamp: "2025-11-16T08:45:00Z",
-  },
-  {
-    id: 5,
-    type: "shiftPickup",
-    message: "Invigilator Ben Okoro picked up a shift on 2025-11-19",
-    timestamp: "2025-11-15T16:20:00Z",
-  },
-  {
-    id: 6,
-    type: "availability",
-    message: "Invigilator Li Wei submitted restrictions for 2025-11-22",
-    timestamp: "2025-11-14T11:10:00Z",
-  },
-  {
-    id: 7,
-    type: "cancellation",
-    message: "Invigilator Sarah Johnson cancelled a shift for 2025-11-21",
-    timestamp: "2025-11-13T13:55:00Z",
-  },
-  {
-    id: 8,
-    type: "examChange",
-    message: "Exam 'Physics 201' on 2025-11-23 venue has changed",
-    timestamp: "2025-11-12T09:05:00Z",
-  },
-  {
-    id: 9,
-    type: "invigilatorUpdate",
-    message: "Invigilator Ahmed Hassan updated contact information",
-    timestamp: "2025-11-11T15:40:00Z",
-  },
-  {
-    id: 10,
-    type: "shiftPickup",
-    message: "Invigilator Emma Wilson picked up a shift on 2025-11-24",
-    timestamp: "2025-11-10T12:25:00Z",
-  },
-  {
-    id: 11,
-    type: "availability",
-    message: "Invigilator Carlos Martinez submitted restrictions for 2025-11-25",
-    timestamp: "2025-11-09T10:50:00Z",
-  },
-];
+const mockNotifications: NotificationItem[] = [];
 
 export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
@@ -105,6 +38,18 @@ export const AdminDashboard: React.FC = () => {
     queryFn: async () => {
       const res = await fetch(`${apiBaseUrl}/exams/`);
       if (!res.ok) throw new Error("Unable to load exams");
+      return res.json();
+    },
+  });
+
+  const {
+    data: notificationsFromApi,
+    isError: notificationsError,
+  } = useQuery<NotificationItem[]>({
+    queryKey: ["dashboard-notifications"],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/notifications/`);
+      if (!res.ok) throw new Error("Unable to load notifications");
       return res.json();
     },
   });
@@ -157,6 +102,8 @@ export const AdminDashboard: React.FC = () => {
     };
   }, [exams, invigilators, venues]);
 
+  const notifications = (notificationsError ? [] : notificationsFromApi) || [];
+
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
       <Typography variant="h4" fontWeight={700}>Dashboard</Typography>
@@ -202,8 +149,8 @@ export const AdminDashboard: React.FC = () => {
       </Grid>
 
       {/* Notifications */}
-      <NotificationsPanel notifications={mockNotifications.slice(0, visibleCount)} />
-      {mockNotifications.length > 0 && (
+      <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
+      {notifications.length > 0 && (
         <Box sx={{ textAlign: "center", mt: 3, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
           <Button
             variant="outlined"
@@ -220,8 +167,8 @@ export const AdminDashboard: React.FC = () => {
           </Button>
           <Button
             variant="contained"
-            onClick={() => setVisibleCount((prev) => Math.min(prev + 4, mockNotifications.length))}
-            disabled={visibleCount >= mockNotifications.length}
+            onClick={() => setVisibleCount((prev) => Math.min(prev + 4, notifications.length))}
+            disabled={visibleCount >= notifications.length}
             sx={{
               borderRadius: "999px",
               textTransform: "none",
@@ -229,7 +176,7 @@ export const AdminDashboard: React.FC = () => {
               px: 2.5,
             }}
           >
-            {`Show ${Math.min(4, mockNotifications.length - visibleCount)} more`}
+            {`Show ${Math.min(4, Math.max(notifications.length - visibleCount, 0))} more`}
           </Button>
         </Box>
       )}

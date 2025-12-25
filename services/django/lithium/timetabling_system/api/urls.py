@@ -8,6 +8,7 @@ from .views import (
     ExamViewSet,
     InvigilatorAssignmentViewSet,
     InvigilatorViewSet,
+    NotificationsView,
     TimetableUploadView,
     VenueViewSet,
 )
@@ -21,6 +22,7 @@ router.register("invigilator-assignments", InvigilatorAssignmentViewSet, basenam
 
 urlpatterns = [
     path("exams-upload", TimetableUploadView.as_view(), name="api-exam-upload"),
+    path("notifications/", NotificationsView.as_view(), name="api-notifications"),
 ]
 
 urlpatterns += router.urls
