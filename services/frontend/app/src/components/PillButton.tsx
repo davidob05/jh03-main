@@ -13,7 +13,7 @@ export const PillButton: React.FC<ButtonProps> = ({ children, sx, ...props }) =>
         borderRadius: "999px",
         textTransform: "none",
         letterSpacing: 0.2,
-        fontWeight: 700,
+        fontWeight: 600,
         px: 2.3,
         py: 0.7,
         boxShadow: "none",

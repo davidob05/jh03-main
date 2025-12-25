@@ -53,8 +53,8 @@ const typeStyles: Record<
   },
   venueChange: {
     label: "Venue Change",
-    color: "#0d47a1",
-    bg: "rgba(13,71,161,0.08)",
+    color: "#f9a825",
+    bg: "rgba(249,168,37,0.12)",
     icon: <Place fontSize="small" />,
   },
 };
