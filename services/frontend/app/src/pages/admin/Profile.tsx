@@ -17,28 +17,39 @@ import {
   Select,
   MenuItem,
   InputAdornment,
+  CircularProgress,
 } from "@mui/material";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { PillButton } from "../../components/PillButton";
 import { PhotoCamera, Visibility, VisibilityOff, Logout } from "@mui/icons-material";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 export const AdminProfile: React.FC = () => {
   const navigate = useNavigate();
 
-  const [profileDetails] = useState({
-    name: "Test Name",
-    email: "test@example.com",
-    phone: "07123 456789",
+  const { data: userData, isLoading, isError, error } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/auth/me/`);
+      if (!res.ok) throw new Error("Unable to load profile");
+      return res.json();
+    },
   });
 
-  const [name, setName] = useState(profileDetails.name);
-  const [email, setEmail] = useState(profileDetails.email);
-  const [phone, setPhone] = useState(profileDetails.phone);
+  const displayFallbackName = useMemo(
+    () => userData?.username || userData?.email || "User",
+    [userData]
+  );
+
+  const [name, setName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [phone, setPhone] = useState<string>(""); // No phone in API; kept for future use
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
   const [lastUpdated, setLastUpdated] = useState("Just now");
-  const [lastLogin] = useState("2025-12-25 09:12 (Glasgow, UK)");
+  const [lastLogin, setLastLogin] = useState<string | null>(null);
 
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
@@ -85,8 +96,8 @@ export const AdminProfile: React.FC = () => {
   };
 
   const handleSaveProfile = () => {
-    setSnackbar({ open: true, message: "Profile details updated", severity: "success" });
-    setLastUpdated("Just now");
+    // No update endpoint yet; inform the user.
+    setSnackbar({ open: true, message: "Profile updates are not available yet.", severity: "error" });
   };
 
   const handleSavePassword = () => {
@@ -94,7 +105,7 @@ export const AdminProfile: React.FC = () => {
       setSnackbar({ open: true, message: "New passwords do not match", severity: "error" });
       return;
     }
-    setSnackbar({ open: true, message: "Password updated", severity: "success" });
+    setSnackbar({ open: true, message: "Password updates are not available yet.", severity: "error" });
     setPasswords({ current: "", next: "", confirm: "" });
   };
 
@@ -114,6 +125,33 @@ export const AdminProfile: React.FC = () => {
     setSnackbar({ open: true, message: "Signed out of all sessions", severity: "success" });
   };
 
+  useEffect(() => {
+    if (!userData) return;
+    setName(userData.username || userData.email || "");
+    setEmail(userData.email || userData.username || "");
+    setLastLogin(userData.last_login || null);
+    setLastUpdated("Just now");
+  }, [userData]);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ maxWidth: 900, mx: "auto", mt: 6, textAlign: "center" }}>
+        <CircularProgress />
+        <Typography sx={{ mt: 2 }}>Loading profile...</Typography>
+      </Box>
+    );
+  }
+
+  if (isError || !userData) {
+    return (
+      <Box sx={{ maxWidth: 900, mx: "auto", mt: 6 }}>
+        <Alert severity="error">{(error as any)?.message || "Failed to load profile"}</Alert>
+      </Box>
+    );
+  }
+
+  const displayName = name || displayFallbackName;
+
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, pb: 6 }}>
 
@@ -130,15 +168,15 @@ export const AdminProfile: React.FC = () => {
             }}
             src={photoPreview || undefined}
           >
-            {getInitials(profileDetails.name)}
+            {getInitials(displayName)}
           </Avatar>
 
           <Typography variant="h5" sx={{ mt: 2, fontWeight: 600 }}>
-            {profileDetails.name}
+            {displayName}
           </Typography>
 
           <Typography variant="body1" sx={{ color: "text.secondary" }}>
-            {profileDetails.email}
+            {email || displayFallbackName}
           </Typography>
 
           <Stack direction="row" spacing={1} justifyContent="center" mt={2}>
@@ -164,7 +202,7 @@ export const AdminProfile: React.FC = () => {
           </Stack>
 
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-            Last updated: {lastUpdated} • Last login: {lastLogin}
+            Last updated: {lastUpdated} • Last login: {lastLogin || "N/A"}
           </Typography>
         </Box>
       </Card>
