@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Box, Grid, Card, Typography, Paper, Button } from "@mui/material";
+import { Box, Grid, Typography, Paper, Button } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl } from "../../utils/api";
@@ -99,7 +99,7 @@ const mockNotifications: NotificationItem[] = [
 ];
 
 export const AdminDashboard: React.FC = () => {
-  const [visibleCount, setVisibleCount] = useState(4); // show 4 by default
+  const [visibleCount, setVisibleCount] = useState(4);
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
     queryFn: async () => {
@@ -159,94 +159,46 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
-      <Typography variant="h4" gutterBottom>
-        Dashboard
-      </Typography>
+      <Typography variant="h4" fontWeight={700}>Dashboard</Typography>
+      <Typography variant="body2" color="text.secondary">Browse and manage the exam scheduling system.</Typography>
 
       {/* UploadTimetable Component */}
       <UploadFile />
 
       {/* Statistics */}
-      <Typography variant="h6" sx={{ mb: 2 }}>
+      <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
         Statistics
       </Typography>
-      <Grid container spacing={7} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Total Exams
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              {loadingExams ? "…" : stats.totalExams}
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Total Invigilators
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              {loadingInvigilators ? "…" : stats.totalInvigilators}
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Active Venues
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              {loadingVenues ? "…" : stats.totalVenues}
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Upcoming Exams
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              {loadingExams ? "…" : stats.upcomingExams}
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Exams for Allocation
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              {loadingExams ? "…" : stats.examsForAllocation}
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Slots to Allocate
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              {stats.slotsToAllocate ?? "—"}
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Contracts Fulfilled
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              {stats.contractsFulfilled ?? "—"}
-            </Typography>
-          </Card>
-        </Grid>
+      <Grid container spacing={2.5} sx={{ mb: 4 }}>
+        {[
+          { label: "Total Exams", value: loadingExams ? "…" : stats.totalExams, tone: "#0c57a4" },
+          { label: "Exams for Allocation", value: loadingExams ? "…" : stats.examsForAllocation, tone: "#0d47a1" },
+          { label: "Upcoming Exams", value: loadingExams ? "…" : stats.upcomingExams, tone: "#e65100" },
+          { label: "Active Venues", value: loadingVenues ? "…" : stats.totalVenues, tone: "#1b5e20" },
+          { label: "Total Invigilators", value: loadingInvigilators ? "…" : stats.totalInvigilators, tone: "#4a148c" },
+          { label: "Slots to Allocate", value: stats.slotsToAllocate ?? "—", tone: "#455a64" },
+          { label: "Contracts Fulfilled", value: stats.contractsFulfilled ?? "—", tone: "#2e7d32" },
+        ].map((item, idx) => (
+          <Grid item xs={12} sm={6} md={3} key={idx}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                borderRadius: 3,
+                border: "1px solid",
+                borderColor: "divider",
+                backgroundColor: "#fff",
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ color: item.tone, fontWeight: 700, mb: 0.5 }}>
+                {item.label}
+              </Typography>
+              <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
+                {item.value}
+              </Typography>
+            </Paper>
+          </Grid>
+        ))}
       </Grid>
 
       {/* Notifications */}
@@ -268,11 +220,7 @@ export const AdminDashboard: React.FC = () => {
           </Button>
           <Button
             variant="contained"
-            onClick={() =>
-              setVisibleCount((prev) =>
-                Math.min(prev + 4, mockNotifications.length)
-              )
-            }
+            onClick={() => setVisibleCount((prev) => Math.min(prev + 4, mockNotifications.length))}
             disabled={visibleCount >= mockNotifications.length}
             sx={{
               borderRadius: "999px",

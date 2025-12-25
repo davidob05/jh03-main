@@ -11,12 +11,14 @@ import {
   FormControl,
   Snackbar,
   Alert,
+  Stack,
+  Chip,
 } from "@mui/material";
-import { Upload as UploadIcon } from "@mui/icons-material";
+import { Upload as UploadIcon, InsertDriveFile } from "@mui/icons-material";
 import { apiBaseUrl } from "../../utils/api";
 
 export const UploadFile: React.FC = () => {
-  const [uploadType, setUploadType] = useState(""); // exam, provisions, invigilators
+  const [uploadType, setUploadType] = useState(""); // exam, provisions, venues
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [snackbar, setSnackbar] = useState<{
@@ -27,7 +29,13 @@ export const UploadFile: React.FC = () => {
   const apiMap: Record<string, string> = {
     exam: "/exams-upload",
     provisions: "/provisions-upload",
-    invigilators: "/invigilators-upload",
+    venues: "/venues-upload",
+  };
+
+  const acceptMap: Record<string, string> = {
+    exam: ".csv,.xlsx,.xls",
+    provisions: ".csv,.xlsx,.xls",
+    venues: ".csv,.xlsx,.xls",
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,7 +85,7 @@ export const UploadFile: React.FC = () => {
           ? "Exam timetable"
           : uploadType === "provisions"
           ? "Student provisions"
-          : "Invigilator data";
+          : "Venue data";
 
       setSnackbar({
         type: "success",
@@ -99,56 +107,63 @@ export const UploadFile: React.FC = () => {
 
   return (
     <Paper
-      elevation={2}
+      elevation={0}
       sx={{
         p: 3,
         mt: 3,
         mb: 3,
         width: "auto",
-        maxWidth: "100%"
+        maxWidth: "100%",
+        borderRadius: 3,
+        border: "1px solid",
+        borderColor: "divider",
+        backgroundColor: "#fff",
       }}
     >
-      <Typography variant="h6" gutterBottom>
-        Upload Data
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Select a file type and upload a CSV or Excel file to populate the database.
-      </Typography>
+      <Stack spacing={1.5}>
+        <Typography variant="h6" fontWeight={700}>
+          Upload Data
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Select a file type and upload a CSV or Excel file to populate the database.
+        </Typography>
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <FormControl fullWidth size="small">
           <InputLabel>Select file type...</InputLabel>
-          <Select
-            value={uploadType}
-            onChange={(e) => setUploadType(e.target.value)}
-            label="Select file type..."
-          >
+          <Select value={uploadType} onChange={(e) => setUploadType(e.target.value)} label="Select file type...">
             <MenuItem value="">
               <em>Choose...</em>
             </MenuItem>
             <MenuItem value="exam">Exam Timetable</MenuItem>
             <MenuItem value="provisions">Student Provisions</MenuItem>
-            <MenuItem value="invigilators">Invigilator Data</MenuItem>
+            <MenuItem value="venues">Venue Data</MenuItem>
           </Select>
         </FormControl>
 
-        <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-          <Button variant="outlined" component="label" disabled={!uploadType || uploading} sx={{ width: "100%" }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center" sx={{ width: "100%" }}>
+          <Button
+            variant="outlined"
+            component="label"
+            disabled={!uploadType || uploading}
+            sx={{ borderRadius: "999px", textTransform: "none", fontWeight: 600, width: "100%", minHeight: 44 }}
+          >
             Choose File
             <input
               id="file-upload"
               type="file"
               hidden
-              accept=".csv,.xlsx,.xls"
+              accept={acceptMap[uploadType] || ".csv,.xlsx,.xls"}
               onChange={handleFileChange}
             />
           </Button>
           {selectedFile && (
-            <Typography variant="body2" sx={{ flex: 1 }}>
-              {selectedFile.name}
-            </Typography>
+            <Chip
+              icon={<InsertDriveFile fontSize="small" />}
+              label={selectedFile.name}
+              sx={{ maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" } }}
+            />
           )}
-        </Box>
+        </Stack>
 
         <Button
           variant="contained"
@@ -156,36 +171,37 @@ export const UploadFile: React.FC = () => {
           onClick={handleUpload}
           disabled={!uploadType || !selectedFile || uploading}
           startIcon={uploading ? <CircularProgress size={20} /> : <UploadIcon />}
+          sx={{ borderRadius: "999px", textTransform: "none", fontWeight: 700, width: "100%", minHeight: 46 }}
         >
           {uploading ? "Uploading..." : "Upload"}
         </Button>
+      </Stack>
 
-        <Snackbar
-          open={Boolean(snackbar.type)}
-          autoHideDuration={6000}
+      <Snackbar
+        open={Boolean(snackbar.type)}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ type: null, message: "" })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
           onClose={() => setSnackbar({ type: null, message: "" })}
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          severity={snackbar.type || undefined}
+          variant="filled"
+          sx={
+            snackbar.type === "success"
+              ? {
+                  backgroundColor: "#d4edda",
+                  color: "#155724",
+                  border: "1px solid #155724",
+                  borderRadius: "50px",
+                  fontWeight: 500,
+                }
+              : undefined
+          }
         >
-          <Alert
-            onClose={() => setSnackbar({ type: null, message: "" })}
-            severity={snackbar.type || undefined}
-            variant="filled"
-            sx={
-              snackbar.type === "success"
-                ? {
-                    backgroundColor: "#d4edda",
-                    color: "#155724",
-                    border: "1px solid #155724",
-                    borderRadius: "50px",
-                    fontWeight: 500,
-                  }
-                : undefined
-            }
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Box>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 };
