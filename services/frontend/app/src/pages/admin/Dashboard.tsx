@@ -29,8 +29,6 @@ interface VenueData {
   venue_name: string;
 }
 
-const mockNotifications: NotificationItem[] = [];
-
 export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({

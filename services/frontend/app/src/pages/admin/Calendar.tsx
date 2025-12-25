@@ -261,9 +261,10 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
     <Box sx={{ p: 4, maxWidth: "1400px", mx: "auto" }}>
       {/* Header */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={4}>
-        <Typography variant="h4" fontWeight={700}>
-          Exams Calendar
-        </Typography>
+        <Stack direction="column">
+          <Typography variant="h4" fontWeight={700}>Exams Calendar</Typography>
+          <Typography variant="body2" color="text.secondary">Browse and manage the exam scheduling system.</Typography>
+        </Stack>
         <Typography variant="h6" color="text.secondary" data-testid="date-header">
           {formatDate(currentDate)}
         </Typography>

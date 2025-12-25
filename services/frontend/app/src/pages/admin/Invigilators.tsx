@@ -326,7 +326,10 @@ export const AdminInvigilators: React.FC = () => {
       <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
         {/* Header */}
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h4">Invigilators</Typography>
+          <Stack direction="column">
+            <Typography variant="h4" fontWeight={700}>Invigilators</Typography>
+            <Typography variant="body2" color="text.secondary">Browse and manage invigilator details, availability, and scheduling.</Typography>
+          </Stack>
           <ToggleButtonGroup value={viewMode} exclusive onChange={handleViewChange} color="primary">
             <ToggleButton value="grid"><GridView /></ToggleButton>
             <ToggleButton value="list"><ViewList /></ToggleButton>

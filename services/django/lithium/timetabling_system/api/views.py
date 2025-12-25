@@ -58,6 +58,22 @@ class VenueViewSet(viewsets.ModelViewSet):
             return VenueWriteSerializer
         return VenueSerializer
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was created.")
+        return instance
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was updated.")
+        return instance
+
+    def perform_destroy(self, instance):
+        venue_name = instance.venue_name
+        response = super().perform_destroy(instance)
+        log_notification("venueChange", f"Venue '{venue_name}' was deleted.")
+        return response
+
 
 class ExamVenueViewSet(viewsets.ModelViewSet):
     """

@@ -14,7 +14,7 @@ import {
   Stack,
   Chip,
 } from "@mui/material";
-import { Upload as UploadIcon, InsertDriveFile } from "@mui/icons-material";
+import { Upload as UploadIcon, InsertDriveFile, Eject } from "@mui/icons-material";
 import { apiBaseUrl } from "../../utils/api";
 
 export const UploadFile: React.FC = () => {
@@ -145,6 +145,7 @@ export const UploadFile: React.FC = () => {
             variant="outlined"
             component="label"
             disabled={!uploadType || uploading}
+            startIcon={<Eject />}
             sx={{ borderRadius: "999px", textTransform: "none", fontWeight: 600, width: "100%", minHeight: 44 }}
           >
             Choose File

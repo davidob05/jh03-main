@@ -1,13 +1,14 @@
 import React from "react";
 import { Box, Chip, Divider, Stack, Typography, Paper } from "@mui/material";
-import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined } from "@mui/icons-material";
+import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined, Place } from "@mui/icons-material";
 
 export type NotificationType =
   | "availability"
   | "cancellation"
   | "shiftPickup"
   | "examChange"
-  | "invigilatorUpdate";
+  | "invigilatorUpdate"
+  | "venueChange";
 
 export interface NotificationItem {
   id: number;
@@ -49,6 +50,12 @@ const typeStyles: Record<
     color: "#4a148c",
     bg: "rgba(74,20,140,0.08)",
     icon: <EditNote fontSize="small" />,
+  },
+  venueChange: {
+    label: "Venue Change",
+    color: "#0d47a1",
+    bg: "rgba(13,71,161,0.08)",
+    icon: <Place fontSize="small" />,
   },
 };
 
