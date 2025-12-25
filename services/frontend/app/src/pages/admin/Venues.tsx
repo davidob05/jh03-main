@@ -35,6 +35,7 @@ import { Link } from 'react-router-dom';
 
 import { apiBaseUrl } from '../../utils/api';
 import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
+import { PillButton } from '../../components/PillButton';
 
 interface ExamVenueData {
   exam_name: string;
@@ -255,17 +256,21 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
       {numSelected > 0 && (
         <Box sx={{ display: 'flex', gap: 1 }}>
           {numSelected === 1 && (
-            <Tooltip title="Edit">
-              <IconButton>
-                <EditIcon />
-              </IconButton>
-            </Tooltip>
+            <PillButton
+              variant="contained"
+              color="primary"
+              startIcon={<EditIcon />}
+            >
+              Edit
+            </PillButton>
           )}
-          <Tooltip title="Delete">
-            <IconButton>
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
+          <PillButton
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+          >
+            Delete
+          </PillButton>
         </Box>
       )}
     </Toolbar>

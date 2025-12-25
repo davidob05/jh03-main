@@ -30,6 +30,7 @@ import { StaticDatePicker } from "@mui/x-date-pickers/StaticDatePicker";
 import { apiBaseUrl } from "../../utils/api";
 import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { PillButton } from "../../components/PillButton";
 
 const baseDietOptions = [
   { code: "DEC_2025", label: "December 2025" },
@@ -631,32 +632,20 @@ export const AdminInvigilatorProfile: React.FC = () => {
               </Grid>
               {(sortedAvailabilityEntries.length > availabilityLimit || availabilityLimit > 4) && (
                 <Box sx={{ mt: 2, display: "flex", gap: 1.5, justifyContent: "flex-end" }}>
-                  <Button
+                  <PillButton
                     variant="outlined"
                     onClick={() => setAvailabilityLimit(4)}
                     disabled={availabilityLimit <= 4}
-                    sx={{
-                      borderRadius: "999px",
-                      textTransform: "none",
-                      fontWeight: 600,
-                      px: 2.5,
-                    }}
                   >
                     Show less
-                  </Button>
-                  <Button
+                  </PillButton>
+                  <PillButton
                     variant="contained"
                     onClick={() => setAvailabilityLimit((prev) => Math.min(prev + 4, sortedAvailabilityEntries.length))}
                     disabled={availabilityLimit >= sortedAvailabilityEntries.length}
-                    sx={{
-                      borderRadius: "999px",
-                      textTransform: "none",
-                      fontWeight: 600,
-                      px: 2.5,
-                    }}
                   >
                     {`Show ${Math.min(4, sortedAvailabilityEntries.length - availabilityLimit)} more`}
-                  </Button>
+                  </PillButton>
                 </Box>
               )}
             </Paper>

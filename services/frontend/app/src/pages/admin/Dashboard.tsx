@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl } from "../../utils/api";
 import { NotificationsPanel, NotificationItem } from "../../components/admin/NotificationsPanel";
+import { PillButton } from "../../components/PillButton";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -150,32 +151,20 @@ export const AdminDashboard: React.FC = () => {
       <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
       {notifications.length > 0 && (
         <Box sx={{ textAlign: "center", mt: 3, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
-          <Button
+          <PillButton
             variant="outlined"
             onClick={() => setVisibleCount(4)}
             disabled={visibleCount <= 4}
-            sx={{
-              borderRadius: "999px",
-              textTransform: "none",
-              fontWeight: 600,
-              px: 2.5,
-            }}
           >
             Show less
-          </Button>
-          <Button
+          </PillButton>
+          <PillButton
             variant="contained"
             onClick={() => setVisibleCount((prev) => Math.min(prev + 4, notifications.length))}
             disabled={visibleCount >= notifications.length}
-            sx={{
-              borderRadius: "999px",
-              textTransform: "none",
-              fontWeight: 600,
-              px: 2.5,
-            }}
           >
             {`Show ${Math.min(4, Math.max(notifications.length - visibleCount, 0))} more`}
-          </Button>
+          </PillButton>
         </Box>
       )}
     </Box>

@@ -4,7 +4,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button,
   List,
   ListItem,
   ListItemAvatar,
@@ -14,9 +13,11 @@ import {
   Chip,
   Box,
   Link as MUILink,
+  IconButton,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import dayjs, { Dayjs } from "dayjs";
+import { Close } from "@mui/icons-material";
 
 interface Invigilator {
   id: number;
@@ -84,8 +85,15 @@ export const InvigilatorAvailabilityModal: React.FC<Props> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
+      <DialogTitle sx={{ pr: 6 }}>
         Available on {date.format("D MMMM YYYY")}
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", right: 12, top: 10 }}
+        >
+          <Close />
+        </IconButton>
       </DialogTitle>
 
       <DialogContent dividers>
@@ -182,9 +190,7 @@ export const InvigilatorAvailabilityModal: React.FC<Props> = ({
         )}
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
+      <DialogActions />
     </Dialog>
   );
 };

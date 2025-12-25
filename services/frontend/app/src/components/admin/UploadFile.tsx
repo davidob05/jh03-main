@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   Box,
-  Button,
   CircularProgress,
   Paper,
   Typography,
@@ -16,6 +15,7 @@ import {
 } from "@mui/material";
 import { Upload as UploadIcon, InsertDriveFile, Eject } from "@mui/icons-material";
 import { apiBaseUrl } from "../../utils/api";
+import { PillButton } from "../PillButton";
 
 export const UploadFile: React.FC = () => {
   const [uploadType, setUploadType] = useState(""); // exam, provisions, venues
@@ -141,12 +141,12 @@ export const UploadFile: React.FC = () => {
         </FormControl>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center" sx={{ width: "100%" }}>
-          <Button
+          <PillButton
             variant="outlined"
             component="label"
             disabled={!uploadType || uploading}
             startIcon={<Eject />}
-            sx={{ borderRadius: "999px", textTransform: "none", fontWeight: 600, width: "100%", minHeight: 44 }}
+            sx={{ width: "100%", minHeight: 44 }}
           >
             Choose File
             <input
@@ -156,7 +156,7 @@ export const UploadFile: React.FC = () => {
               accept={acceptMap[uploadType] || ".csv,.xlsx,.xls"}
               onChange={handleFileChange}
             />
-          </Button>
+          </PillButton>
           {selectedFile && (
             <Chip
               icon={<InsertDriveFile fontSize="small" />}
@@ -166,16 +166,16 @@ export const UploadFile: React.FC = () => {
           )}
         </Stack>
 
-        <Button
+        <PillButton
           variant="contained"
           color="primary"
           onClick={handleUpload}
           disabled={!uploadType || !selectedFile || uploading}
           startIcon={uploading ? <CircularProgress size={20} /> : <UploadIcon />}
-          sx={{ borderRadius: "999px", textTransform: "none", fontWeight: 700, width: "100%", minHeight: 46 }}
+          sx={{ width: "100%", minHeight: 46 }}
         >
           {uploading ? "Uploading..." : "Upload"}
-        </Button>
+        </PillButton>
       </Stack>
 
       <Snackbar

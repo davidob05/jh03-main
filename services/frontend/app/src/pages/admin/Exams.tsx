@@ -32,6 +32,7 @@ import { apiBaseUrl } from '../../utils/api';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
+import { PillButton } from "../../components/PillButton";
 
 interface ExamData {
   exam_id: number;
@@ -197,13 +198,22 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEdit
       {numSelected > 0 && (
         <Box sx={{ display: 'flex', gap: 1 }}>
           {numSelected === 1 && (
-            <Tooltip title="Edit">
-              <IconButton onClick={onEditSelected}><EditIcon /></IconButton>
-            </Tooltip>
+            <PillButton
+              variant="contained"
+              color="primary"
+              startIcon={<EditIcon />}
+              onClick={onEditSelected}
+            >
+              Edit
+            </PillButton>
           )}
-          <Tooltip title="Delete">
-            <IconButton><DeleteIcon /></IconButton>
-          </Tooltip>
+          <PillButton
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+          >
+            Delete
+          </PillButton>
         </Box>
       )}
     </Toolbar>

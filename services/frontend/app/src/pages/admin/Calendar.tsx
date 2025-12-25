@@ -26,6 +26,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl } from "../../utils/api";
+import { PillButton } from "../../components/PillButton";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -297,7 +298,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             sx={{ minWidth: 180 }}
           />
 
-          <Button
+          <PillButton
             variant="outlined"
             size="medium"
             startIcon={<ArrowBack />}
@@ -310,11 +311,11 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             }
           >
             Previous
-          </Button>
-          <Button variant="contained" size="medium" startIcon={<Today />} onClick={() => setCurrentDate(new Date())}>
+          </PillButton>
+          <PillButton variant="contained" size="medium" startIcon={<Today />} onClick={() => setCurrentDate(new Date())}>
             Today
-          </Button>
-          <Button
+          </PillButton>
+          <PillButton
             variant="outlined"
             size="medium"
             endIcon={<ArrowForward />}
@@ -327,7 +328,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             }
           >
             Next
-          </Button>
+          </PillButton>
         </Stack>
 
         <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && setViewMode(v)} color="primary">

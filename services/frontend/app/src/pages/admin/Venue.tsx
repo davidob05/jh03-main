@@ -21,6 +21,7 @@ import { EditVenueDialog } from "../../components/admin/EditVenueDialog";
 import { Edit, Delete } from "@mui/icons-material";
 import { ExamDetailsPopup, ExamDetails as PopupExamDetails, ExamVenueInfo as PopupExamVenueInfo } from "../../components/admin/ExamDetailsPopup";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { PillButton } from "../../components/PillButton";
 
 interface ExamVenueData {
   exam_name: string;
@@ -254,32 +255,20 @@ export const AdminVenuePage: React.FC = () => {
             </Box>
 
             <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, mt: 3 }}>
-              <Button
+              <PillButton
                 variant="outlined"
                 onClick={() => setVisibleCount(4)}
                 disabled={visibleCount <= 4}
-                sx={{
-                  borderRadius: "999px",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  px: 2.5,
-                }}
               >
                 Show less
-              </Button>
-              <Button
+              </PillButton>
+              <PillButton
                 variant="contained"
                 onClick={() => setVisibleCount((prev) => Math.min(prev + 4, examCount))}
                 disabled={visibleCount >= examCount}
-                sx={{
-                  borderRadius: "999px",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  px: 2.5,
-                }}
               >
                 {`Show ${Math.min(4, examCount - visibleCount)} more`}
-              </Button>
+              </PillButton>
             </Box>
           </>
         )}

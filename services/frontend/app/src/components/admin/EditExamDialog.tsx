@@ -5,7 +5,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Button,
   Stack,
   MenuItem,
   Grid,
@@ -20,6 +19,7 @@ import {
 import { Add, Close, Delete } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiBaseUrl } from "../../utils/api";
+import { PillButton } from "../PillButton";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -413,14 +413,14 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button
+        <PillButton
           variant="contained"
           onClick={() => mutation.mutate()}
           disabled={!canSave || mutation.isPending}
           startIcon={mutation.isPending ? <CircularProgress size={18} /> : undefined}
         >
           Save
-        </Button>
+        </PillButton>
       </DialogActions>
     </Dialog>
   );

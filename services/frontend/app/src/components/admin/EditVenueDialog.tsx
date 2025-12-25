@@ -5,7 +5,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Button,
   Stack,
   FormControlLabel,
   Checkbox,
@@ -21,6 +20,7 @@ import {
 import { Close } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiBaseUrl } from "../../utils/api";
+import { PillButton } from "../PillButton";
 
 const VENUE_TYPES = [
   { value: "main_hall", label: "Main Hall" },
@@ -180,14 +180,14 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
         )}
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button
+        <PillButton
           variant="contained"
           onClick={() => updateMutation.mutate()}
           disabled={!mandatoryFilled || updateMutation.isPending}
           startIcon={updateMutation.isPending ? <CircularProgress size={18} /> : undefined}
         >
           Save
-        </Button>
+        </PillButton>
       </DialogActions>
     </Dialog>
   );

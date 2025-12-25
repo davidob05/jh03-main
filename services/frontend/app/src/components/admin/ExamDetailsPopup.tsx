@@ -1,5 +1,6 @@
 import React from "react";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Stack, Button, Paper, Chip } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, IconButton, Typography, Stack, Paper, Chip } from "@mui/material";
+import { Close } from "@mui/icons-material";
 
 export interface ExamVenueInfo {
   venue: string;
@@ -31,7 +32,7 @@ export const ExamDetailsPopup: React.FC<ExamDetailsPopupProps> = ({ open, onClos
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
+      <DialogTitle sx={{ pr: 6 }}>
         {exam.code} - {exam.subject}{" "}
         {exam.department && (
           <Chip
@@ -39,6 +40,13 @@ export const ExamDetailsPopup: React.FC<ExamDetailsPopupProps> = ({ open, onClos
             sx={{ ml: 1, bgcolor: departmentColors?.[exam.department] || "#9e9e9e", color: "#fff" }}
           />
         )}
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", right: 12, top: 10 }}
+        >
+          <Close />
+        </IconButton>
       </DialogTitle>
       <DialogContent dividers>
         {exam.mainVenue && exam.mainStartTime && exam.mainEndTime && (
@@ -73,9 +81,6 @@ export const ExamDetailsPopup: React.FC<ExamDetailsPopupProps> = ({ open, onClos
           ))}
         </Stack>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
     </Dialog>
   );
 };
