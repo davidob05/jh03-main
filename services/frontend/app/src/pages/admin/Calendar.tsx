@@ -26,6 +26,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { PillButton } from "../../components/PillButton";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -261,9 +262,10 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
     <Box sx={{ p: 4, maxWidth: "1400px", mx: "auto" }}>
       {/* Header */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={4}>
-        <Typography variant="h4" fontWeight={700}>
-          Exams Calendar
-        </Typography>
+        <Stack direction="column">
+          <Typography variant="h4" fontWeight={700}>Exams Calendar</Typography>
+          <Typography variant="body2" color="text.secondary">Browse and manage the exam scheduling system.</Typography>
+        </Stack>
         <Typography variant="h6" color="text.secondary" data-testid="date-header">
           {formatDate(currentDate)}
         </Typography>
@@ -296,7 +298,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             sx={{ minWidth: 180 }}
           />
 
-          <Button
+          <PillButton
             variant="outlined"
             size="medium"
             startIcon={<ArrowBack />}
@@ -309,11 +311,11 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             }
           >
             Previous
-          </Button>
-          <Button variant="contained" size="medium" startIcon={<Today />} onClick={() => setCurrentDate(new Date())}>
+          </PillButton>
+          <PillButton variant="contained" size="medium" startIcon={<Today />} onClick={() => setCurrentDate(new Date())}>
             Today
-          </Button>
-          <Button
+          </PillButton>
+          <PillButton
             variant="outlined"
             size="medium"
             endIcon={<ArrowForward />}
@@ -326,7 +328,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             }
           >
             Next
-          </Button>
+          </PillButton>
         </Stack>
 
         <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && setViewMode(v)} color="primary">

@@ -9,6 +9,7 @@ from timetabling_system.models import (
     InvigilatorRestriction,
     InvigilatorAvailability,
     InvigilatorAssignment,
+    Notification,
     SlotChoices
 )
 from timetabling_system.constants import DIET_DATE_RANGES
@@ -150,6 +151,12 @@ class VenueWriteSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         return VenueSerializer(instance).data
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ("id", "type", "message", "timestamp")
 
 
 class InvigilatorAssignmentSerializer(serializers.ModelSerializer):

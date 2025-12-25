@@ -9,6 +9,7 @@ from .views import (
     ExamViewSet,
     InvigilatorAssignmentViewSet,
     InvigilatorViewSet,
+    NotificationsView,
     TimetableUploadView,
     VenueViewSet,
 )
@@ -24,6 +25,7 @@ urlpatterns = [
     path("auth/token/login/", ObtainAuthTokenView.as_view(), name="api-login"),
     path("auth/me/", CurrentUserView.as_view(), name="api-auth-me"),
     path("exams-upload", TimetableUploadView.as_view(), name="api-exam-upload"),
+    path("notifications/", NotificationsView.as_view(), name="api-notifications"),
 ]
 
 urlpatterns += router.urls

@@ -30,6 +30,7 @@ import { StaticDatePicker } from "@mui/x-date-pickers/StaticDatePicker";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { PillButton } from "../../components/PillButton";
 
 const baseDietOptions = [
   { code: "DEC_2025", label: "December 2025" },
@@ -630,17 +631,21 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 ))}
               </Grid>
               {(sortedAvailabilityEntries.length > availabilityLimit || availabilityLimit > 4) && (
-                <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-                  {sortedAvailabilityEntries.length > availabilityLimit && (
-                    <Button variant="text" onClick={() => setAvailabilityLimit((prev) => prev + 4)}>
-                      Show 4 more
-                    </Button>
-                  )}
-                  {availabilityLimit > 4 && (
-                    <Button variant="text" onClick={() => setAvailabilityLimit(4)}>
-                      Show less
-                    </Button>
-                  )}
+                <Box sx={{ mt: 2, display: "flex", gap: 1.5, justifyContent: "flex-end" }}>
+                  <PillButton
+                    variant="outlined"
+                    onClick={() => setAvailabilityLimit(4)}
+                    disabled={availabilityLimit <= 4}
+                  >
+                    Show less
+                  </PillButton>
+                  <PillButton
+                    variant="contained"
+                    onClick={() => setAvailabilityLimit((prev) => Math.min(prev + 4, sortedAvailabilityEntries.length))}
+                    disabled={availabilityLimit >= sortedAvailabilityEntries.length}
+                  >
+                    {`Show ${Math.min(4, sortedAvailabilityEntries.length - availabilityLimit)} more`}
+                  </PillButton>
                 </Box>
               )}
             </Paper>

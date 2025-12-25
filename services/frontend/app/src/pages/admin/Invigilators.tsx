@@ -19,7 +19,6 @@ import {
   Avatar,
   ListItemAvatar,
   Stack,
-  Button,
   FormControl,
   InputLabel,
   Select,
@@ -44,7 +43,6 @@ import {
   Download,
   Notifications,
   PersonAddAlt1,
-  PersonRemove,
   Search,
   ArrowUpward,
   ArrowDownward,
@@ -64,6 +62,7 @@ import { InvigilatorAvailabilityModal } from "../../components/admin/Invigilator
 import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialog';
 import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
+import { PillButton } from "../../components/PillButton";
 
 interface Invigilator {
   id: number;
@@ -326,7 +325,10 @@ export const AdminInvigilators: React.FC = () => {
       <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
         {/* Header */}
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h4">Invigilators</Typography>
+          <Stack direction="column">
+            <Typography variant="h4" fontWeight={700}>Invigilators</Typography>
+            <Typography variant="body2" color="text.secondary">Browse and manage invigilator details, availability, and scheduling.</Typography>
+          </Stack>
           <ToggleButtonGroup value={viewMode} exclusive onChange={handleViewChange} color="primary">
             <ToggleButton value="grid"><GridView /></ToggleButton>
             <ToggleButton value="list"><ViewList /></ToggleButton>
@@ -356,7 +358,7 @@ export const AdminInvigilators: React.FC = () => {
           </Box>
 
           {/* Sort by First Name */}
-          <Button
+          <PillButton
             variant="outlined"
             size="medium"
             endIcon={
@@ -375,15 +377,13 @@ export const AdminInvigilators: React.FC = () => {
             sx={{
               minWidth: 160,
               justifyContent: 'space-between',
-              textTransform: 'none',
-              fontWeight: 500,
             }}
           >
-            FIRST NAME
-          </Button>
+            First Name
+          </PillButton>
 
           {/* Sort by Last Name */}
-          <Button
+          <PillButton
             variant="outlined"
             size="medium"
             endIcon={
@@ -402,12 +402,10 @@ export const AdminInvigilators: React.FC = () => {
             sx={{
               minWidth: 160,
               justifyContent: 'space-between',
-              textTransform: 'none',
-              fontWeight: 500,
             }}
           >
-            LAST NAME
-          </Button>
+            Last Name
+          </PillButton>
         </Stack>
 
         {/* A-Z Filters */}
@@ -534,22 +532,22 @@ export const AdminInvigilators: React.FC = () => {
 
             {/* Navigation */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-              <Button
+              <PillButton
                 variant="contained"
                 startIcon={<ArrowBack />}
                 onClick={() => setCurrentMonthIndex(prev => prev - 1)}
                 size="large"
               >
                 Previous
-              </Button>
-              <Button
+              </PillButton>
+              <PillButton
                 variant="contained"
                 endIcon={<ArrowForward />}
                 onClick={() => setCurrentMonthIndex(prev => prev + 1)}
                 size="large"
               >
                 Next
-              </Button>
+              </PillButton>
             </Box>
           </Paper>
         ) : viewMode === 'list' ? (
@@ -682,11 +680,15 @@ export const AdminInvigilators: React.FC = () => {
         {/* Pagination & Bulk Actions */}
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3} mt={4}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<Clear />) : (<Done />)} onClick={toggleSelectAll}>
+            <PillButton
+              variant="outlined"
+              startIcon={selected.length === filtered.length ? (<Clear />) : (<Done />)}
+              onClick={toggleSelectAll}
+            >
               {selected.length === filtered.length
                 ? "Deselect all invigilators"
                 : `Select all ${filtered.length} invigilators`}
-            </Button>
+            </PillButton>
             <FormControl size="small" sx={{ minWidth: 200 }}>
               <InputLabel>With all selected users...</InputLabel>
               <Select
@@ -782,13 +784,21 @@ export const AdminInvigilators: React.FC = () => {
 
         {/* Show All Button */}
         {filtered.length > itemsPerPage && (
-          <Box sx={{ textAlign: 'center', mt: 2 }}>
-            <Button
-              variant="text"
-              onClick={() => setShowAll(prev => !prev)}
+          <Box sx={{ textAlign: 'center', mt: 2, display: 'flex', justifyContent: 'center', gap: 1.5 }}>
+            <PillButton
+              variant="outlined"
+              onClick={() => setShowAll(false)}
+              disabled={!showAll}
             >
-              {showAll ? `Show less` : `Show all ${filtered.length} invigilators`}
-            </Button>
+              Show less
+            </PillButton>
+            <PillButton
+              variant="contained"
+              onClick={() => setShowAll(true)}
+              disabled={showAll}
+            >
+              {`Show all ${filtered.length}`}
+            </PillButton>
           </Box>
         )}
 

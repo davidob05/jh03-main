@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Button,
   CircularProgress,
   Stack,
   Chip,
@@ -23,6 +22,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
 import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { PillButton } from "../PillButton";
 
 const STEPS = ["Personal Details", "Qualifications", "Restrictions", "Availability"];
 
@@ -385,23 +385,27 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
       </DialogContent>
 
       <DialogActions>
-        {activeStep > 0 && <Button onClick={() => setActiveStep(s => s - 1)}>Back</Button>}
+        {activeStep > 0 && (
+          <PillButton onClick={() => setActiveStep(s => s - 1)}>
+            Back
+          </PillButton>
+        )}
         {activeStep < STEPS.length - 1 ? (
-          <Button
+          <PillButton
             variant="contained"
             onClick={() => setActiveStep(s => s + 1)}
             disabled={activeStep === 0 && !mandatoryFieldsFilled}
           >
             Next
-          </Button>
+          </PillButton>
         ) : (
-          <Button
+          <PillButton
             variant="contained"
             onClick={() => updateMutation.mutate()}
             disabled={updateMutation.isPending || !mandatoryFieldsFilled}
           >
             {updateMutation.isPending ? <CircularProgress size={22} /> : "Save"}
-          </Button>
+          </PillButton>
         )}
       </DialogActions>
     </Dialog>

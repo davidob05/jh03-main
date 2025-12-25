@@ -77,3 +77,7 @@ export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
   const headers = withAuthHeader(init.headers);
   return fetch(input, { ...init, headers });
 };
+
+// Convenience helper for unauthenticated public reads when auth is not set.
+export const apiFetchPublic = (input: RequestInfo | URL, init: RequestInit = {}) =>
+  fetch(input, { ...init, headers: normalizeHeaders(init.headers) });

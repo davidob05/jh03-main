@@ -4,12 +4,12 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button,
   Typography,
   CircularProgress,
   IconButton,
 } from "@mui/material";
 import { Close } from "@mui/icons-material";
+import { PillButton } from "../PillButton";
 
 type Props = {
   open: boolean;
@@ -53,10 +53,7 @@ export const DeleteConfirmationDialog: React.FC<Props> = ({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={loading}>
-          {cancelText}
-        </Button>
-        <Button
+        <PillButton
           variant="contained"
           color={destructive ? "error" : "primary"}
           onClick={onConfirm}
@@ -64,7 +61,7 @@ export const DeleteConfirmationDialog: React.FC<Props> = ({
           startIcon={loading ? <CircularProgress size={18} /> : undefined}
         >
           {confirmText}
-        </Button>
+        </PillButton>
       </DialogActions>
     </Dialog>
   );
