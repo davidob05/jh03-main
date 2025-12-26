@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -374,9 +375,9 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
                   arrow
                   placement="top"
                 >
-                  <Paper
+                  <Panel
                     data-testid={`exam-${exam.id}`}
-                    elevation={3}
+                    disableDivider
                     onClick={() => handleExamClick(exam)}
                     sx={{
                       height: "100%",
@@ -417,7 +418,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
                         {exam.venues.length} venue{exam.venues.length > 1 ? "s" : ""}
                       </Typography>
                     </Box>
-                  </Paper>
+                  </Panel>
                 </Tooltip>
               </Grid>
             ))}

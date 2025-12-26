@@ -22,6 +22,7 @@ import { Edit, Delete } from "@mui/icons-material";
 import { ExamDetailsPopup, ExamDetails as PopupExamDetails, ExamVenueInfo as PopupExamVenueInfo } from "../../components/admin/ExamDetailsPopup";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
 interface ExamVenueData {
   exam_name: string;
@@ -155,7 +156,9 @@ export const AdminVenuePage: React.FC = () => {
   if (isError || !data) {
     return (
       <Box sx={{ p: 4 }}>
-        <Alert severity="error">{error?.message || "Failed to load venue"}</Alert>
+        <Panel>
+          <Alert severity="error">{error?.message || "Failed to load venue"}</Alert>
+        </Panel>
       </Box>
     );
   }
@@ -175,8 +178,7 @@ export const AdminVenuePage: React.FC = () => {
         </Stack>
       </Stack>
 
-      <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-        <Typography variant="h6" fontWeight={700} gutterBottom>Details</Typography>
+      <Panel title="Venue details">
         <Stack spacing={1.5}>
           <Typography variant="body2"><strong>Capacity:</strong> {data.capacity}</Typography>
           <Typography variant="body2"><strong>Accessible:</strong> {data.is_accessible ? "Yes" : "No"}</Typography>
@@ -189,11 +191,9 @@ export const AdminVenuePage: React.FC = () => {
             </Stack>
           </Box>
         </Stack>
-      </Paper>
+      </Panel>
 
-      <Paper sx={{ p: 3, borderRadius: 3 }}>
-        <Typography variant="h6" fontWeight={700} gutterBottom>Exams in this venue</Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Exams in this venue">
         {examCount === 0 ? (
           <Typography variant="body2" color="text.secondary">No exams scheduled for this venue.</Typography>
         ) : (
@@ -210,10 +210,12 @@ export const AdminVenuePage: React.FC = () => {
               }}
             >
               {visibleExams.map((ex, idx) => (
-                <Paper
+                <Panel
                   key={`${ex.exam_name}-${idx}`}
+                  disableDivider
                   sx={{
                     p: 2,
+                    mb: 0,
                     borderRadius: 2,
                     height: "100%",
                     width: "100%",
@@ -226,7 +228,6 @@ export const AdminVenuePage: React.FC = () => {
                     boxSizing: "border-box",
                     "&:hover": { boxShadow: 3 },
                   }}
-                  variant="outlined"
                   onClick={() => handleExamClick(ex)}
                 >
                   <Typography
@@ -250,7 +251,7 @@ export const AdminVenuePage: React.FC = () => {
                   <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
                     View details
                   </Typography>
-                </Paper>
+                </Panel>
               ))}
             </Box>
 
@@ -272,7 +273,7 @@ export const AdminVenuePage: React.FC = () => {
             </Box>
           </>
         )}
-      </Paper>
+      </Panel>
 
       <Box
         sx={{

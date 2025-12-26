@@ -1,12 +1,10 @@
 import React from "react";
-import { Paper, Stack, Typography, Divider } from "@mui/material";
+import { Paper, Stack, Typography, Divider, PaperProps } from "@mui/material";
 import { SxProps, Theme } from "@mui/system";
 
-type PanelProps = {
+type PanelProps = PaperProps & {
   title?: React.ReactNode;
   actions?: React.ReactNode;
-  children: React.ReactNode;
-  sx?: SxProps<Theme>;
   disableDivider?: boolean;
 };
 
@@ -19,10 +17,17 @@ const baseSx: SxProps<Theme> = {
   backgroundColor: "#fff",
 };
 
-export const Panel: React.FC<PanelProps> = ({ title, actions, children, sx, disableDivider = false }) => {
+export const Panel: React.FC<PanelProps> = ({
+  title,
+  actions,
+  children,
+  sx,
+  disableDivider = false,
+  ...paperProps
+}) => {
   const hasHeader = Boolean(title) || Boolean(actions);
   return (
-    <Paper sx={{ ...baseSx, ...sx }}>
+    <Paper sx={[baseSx, sx]} {...paperProps}>
       {hasHeader && (
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems="flex-start" mb={2} spacing={1}>
           {title && (

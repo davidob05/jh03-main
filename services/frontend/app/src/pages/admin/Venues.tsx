@@ -34,6 +34,7 @@ import { Link } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
 import { PillButton } from '../../components/PillButton';
+import { Panel } from '../../components/Panel';
 
 interface ExamVenueData {
   exam_name: string;
@@ -228,8 +229,6 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 100%' }}>
-          <Typography variant="h6">Venues</Typography>
-
           <Box
             sx={{
               display: 'flex',
@@ -397,11 +396,11 @@ export const AdminVenues: React.FC = () => {
   if (isError)
     return (
       <Box sx={{ width: '100%', maxWidth: 1050, mx: 'auto', p: 3 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Panel>
           <Typography color="error" variant="h6">
             {error?.message || 'Failed to load venues'}
           </Typography>
-        </Paper>
+        </Panel>
       </Box>
     );
 
@@ -419,7 +418,7 @@ export const AdminVenues: React.FC = () => {
         </Stack>
       </Stack>
 
-      <Paper sx={{ width: '100%', mb: 2, borderRadius: 3, overflow: 'hidden', boxShadow: 3 }}>
+      <Panel disableDivider sx={{ width: '100%', mb: 2, p: 0, overflow: 'hidden' }}>
         <EnhancedTableToolbar
           numSelected={selected.length}
           searchQuery={searchQuery}
@@ -551,7 +550,7 @@ export const AdminVenues: React.FC = () => {
             setPage(0);
           }}
         />
-      </Paper>
+      </Panel>
       <AddVenueDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}

@@ -33,6 +33,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
 import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
 interface ExamData {
   exam_id: number;
@@ -188,7 +189,6 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEdit
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 100%' }}>
-          <Typography variant="h6" id="tableTitle" component="div">Exams</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', backgroundColor: 'action.hover', borderRadius: 1, px: 2, py: 0.5 }}>
             <SearchIcon sx={{ color: 'action.active', mr: 1 }} />
             <InputBase placeholder="Search exams..." value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: 250 }} />
@@ -319,7 +319,7 @@ export const AdminExams: React.FC = () => {
         <Typography sx={{ mt: 2 }}>Loading exams…</Typography>
       </Box>
     );
-  if (isError) return <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}><Paper sx={{ width: '100%', p: 4, textAlign: 'center' }}><Typography color="error" variant="h6">{error?.message || 'Failed to load exams'}</Typography></Paper></Box>;
+  if (isError) return <Box sx={{ width: '100%', maxWidth: 1050, p: 3, mx: 'auto' }}><Panel><Typography color="error" variant="h6">{error?.message || 'Failed to load exams'}</Typography></Panel></Box>;
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -336,7 +336,7 @@ export const AdminExams: React.FC = () => {
           </Stack>
         </Stack>
 
-        <Paper sx={{ width: '100%', borderRadius: 3, overflow: 'hidden', boxShadow: 3 }}>
+        <Panel disableDivider sx={{ p: 0, overflow: 'hidden'}}>
           <EnhancedTableToolbar numSelected={selected.length} searchQuery={searchQuery} onSearchChange={handleSearchChange} onEditSelected={handleEditSelected} />
           <Divider />
           <TableContainer>
@@ -407,7 +407,7 @@ export const AdminExams: React.FC = () => {
           </TableContainer>
           <Divider />
           <TablePagination rowsPerPageOptions={[5, 10, 25]} component="div" count={filteredRows.length} rowsPerPage={rowsPerPage} page={page} onPageChange={handleChangePage} onRowsPerPageChange={handleChangeRowsPerPage} />
-        </Paper>
+        </Panel>
       </Box>
     </LocalizationProvider>
   );

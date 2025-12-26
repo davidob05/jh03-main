@@ -19,6 +19,7 @@ import { Edit, Delete } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { EditExamDialog } from "../../components/admin/EditExamDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { Panel } from "../../components/Panel";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -123,18 +124,15 @@ export const AdminExamDetails: React.FC = () => {
         </Stack>
       </Stack>
 
-      <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-        <Typography variant="h6" fontWeight={700} gutterBottom>Exam details</Typography>
+      <Panel title="Exam details">
         <Stack spacing={1.2}>
           <Typography variant="body2"><strong>Course code:</strong> {data.course_code}</Typography>
           <Typography variant="body2"><strong>Exam type:</strong> {formatExamType(data.exam_type)}</Typography>
           <Typography variant="body2"><strong>School contact:</strong> {data.school_contact || "N/A"}</Typography>
         </Stack>
-      </Paper>
+      </Panel>
 
-      <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-        <Typography variant="h6" fontWeight={700} gutterBottom>Main venue</Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Main venue">
         {coreVenue ? (
           <Stack spacing={1}>
             <Typography variant="subtitle1" fontWeight={600}>{coreVenue.venue_name || "Unassigned"}</Typography>
@@ -144,26 +142,22 @@ export const AdminExamDetails: React.FC = () => {
         ) : (
           <Typography variant="body2" color="text.secondary">No venue assigned.</Typography>
         )}
-      </Paper>
+      </Panel>
 
-      <Paper sx={{ p: 3, borderRadius: 3 }}>
-        <Typography variant="h6" fontWeight={700} gutterBottom>Additional venues</Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Additional venues">
         {extraVenues.length === 0 ? (
           <Typography variant="body2" color="text.secondary">No additional venues.</Typography>
         ) : (
           <Grid container spacing={2} alignItems="stretch">
             {extraVenues.map((ev) => (
               <Grid item xs={12} sm={6} md={4} key={ev.examvenue_id} sx={{ display: "flex" }}>
-                <Paper
-                  variant="outlined"
+                <Panel
+                  disableDivider
                   sx={{
                     p: 2,
-                    borderRadius: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 0.5,
+                    mb: 0,
                     width: "100%",
+                    borderRadius: 2,
                   }}
                 >
                   <Typography variant="subtitle1" fontWeight={600}>
@@ -171,12 +165,12 @@ export const AdminExamDetails: React.FC = () => {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">{formatDisplayDate(ev.start_time)}</Typography>
                   <Typography variant="body2">Duration: {formatDuration(ev.exam_length)}</Typography>
-                </Paper>
+                </Panel>
               </Grid>
             ))}
           </Grid>
         )}
-      </Paper>
+      </Panel>
 
       <Box
         sx={{
