@@ -209,6 +209,7 @@ class Notification(models.Model):
         CANCELLATION = "cancellation", "Cancellation"
         SHIFT_PICKUP = "shiftPickup", "Shift pickup"
         EXAM_CHANGE = "examChange", "Exam change"
+        VENUE_CHANGE = "venueChange", "Venue change"
         INVIGILATOR_UPDATE = "invigilatorUpdate", "Invigilator update"
 
     id = models.AutoField(primary_key=True)
@@ -221,9 +222,6 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.get_type_display()}: {self.message[:40]}"
-
-    def __str__(self):
-        return f"Provisions for {self.student} in {self.exam}"
 
 
 class UploadLog(models.Model):  # This gives a view of upload history
