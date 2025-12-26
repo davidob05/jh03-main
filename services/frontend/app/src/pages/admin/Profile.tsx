@@ -1,7 +1,5 @@
 import {
   Box,
-  Card,
-  CardContent,
   Typography,
   Avatar,
   Divider,
@@ -18,6 +16,8 @@ import {
   MenuItem,
   InputAdornment,
   CircularProgress,
+  Card,
+  CardContent,
 } from "@mui/material";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +26,7 @@ import { PillButton } from "../../components/PillButton";
 import { PhotoCamera, Visibility, VisibilityOff, Logout } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch, authUserKey } from "../../utils/api";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { Panel } from "../../components/Panel";
 
 export const AdminProfile: React.FC = () => {
   const navigate = useNavigate();
@@ -224,7 +225,7 @@ export const AdminProfile: React.FC = () => {
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, pb: 6 }}>
 
       {/* Profile overview */}
-      <Card sx={{ p: 3, mb: 3 }}>
+      <Panel>
         <Box sx={{ textAlign: "center" }}>
           <Avatar
             sx={{
@@ -278,14 +279,10 @@ export const AdminProfile: React.FC = () => {
             Last updated: {lastUpdated} • Last login: {lastLogin || "N/A"}
           </Typography>
         </Box>
-      </Card>
+      </Panel>
 
       {/* Personal information */}
-      <Card sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Personal Information
-        </Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Personal Information">
 
         <Stack spacing={3}>
           {/* Display Name */}
@@ -324,14 +321,10 @@ export const AdminProfile: React.FC = () => {
             </Stack>
           </Box>
         </Stack>
-      </Card>
+      </Panel>
 
       {/* Security */}
-      <Card sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Password & Security
-        </Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Password & Security">
 
         <Stack spacing={3}>
           <Stack spacing={1.5}>
@@ -437,14 +430,10 @@ export const AdminProfile: React.FC = () => {
             </PillButton>
           </Stack>
         </Stack>
-      </Card>
+      </Panel>
 
       {/* Preferences */}
-      <Card sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Preferences
-        </Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Preferences" disableDivider>
 
         <Stack spacing={3}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -502,7 +491,7 @@ export const AdminProfile: React.FC = () => {
             </PillButton>
           </Stack>
         </Stack>
-      </Card>
+      </Panel>
 
       <Snackbar
         open={snackbar.open}
