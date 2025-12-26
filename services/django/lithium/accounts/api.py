@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from rest_framework import serializers, status
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -114,6 +116,9 @@ class CurrentUserView(APIView):
         email = request.data.get("email")
         phone = request.data.get("phone")
         avatar = request.data.get("avatar")
+        current_password = request.data.get("current_password")
+        new_password = request.data.get("new_password")
+        confirm_password = request.data.get("confirm_password")
 
         # Basic validation
         if username is not None:
@@ -160,6 +165,25 @@ class CurrentUserView(APIView):
             updated = True
             update_fields.append("avatar")
 
+        password_updated = False
+        if current_password or new_password or confirm_password:
+            # Ensure all fields are present
+            if not current_password or not new_password:
+                return Response({"detail": "Current password and new password are required."}, status=status.HTTP_400_BAD_REQUEST)
+            if new_password != confirm_password:
+                return Response({"detail": "New passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+            if not user.check_password(current_password):
+                return Response({"detail": "Current password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                validate_password(new_password, user)
+            except ValidationError as exc:
+                return Response({"detail": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
+            user.set_password(new_password)
+            updated = True
+            password_updated = True
+            # set_password handles hashing; ensure password updated even if no other fields change
+            update_fields.append("password")
+
         if updated:
             # Remove duplicates if any
             update_fields = list(dict.fromkeys(update_fields))
@@ -176,6 +200,7 @@ class CurrentUserView(APIView):
                 "phone": phone if phone is not None else getattr(getattr(user, "invigilator_profile", None), "alt_phone", None),
                 "phone_updated": phone_updated,
                 "avatar": getattr(user, "avatar", None),
+                "password_updated": password_updated,
             },
             status=status.HTTP_200_OK,
         )

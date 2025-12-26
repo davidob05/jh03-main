@@ -84,10 +84,8 @@ export const AdminProfile: React.FC = () => {
     if (/[a-z]/.test(pwd)) score++;
     if (/\d/.test(pwd)) score++;
     if (/[^A-Za-z0-9]/.test(pwd)) score++;
-    if (score >= 4) return "Strong";
-    if (score >= 3) return "Medium";
-    if (score > 0) return "Weak";
-    return "Not set";
+    const label = score >= 4 ? "Strong" : score >= 3 ? "Medium" : score > 0 ? "Weak" : "Not set";
+    return { score: Math.min(score, 4), label };
   };
 
   const handlePhotoChange = (file?: File | null) => {
@@ -148,8 +146,31 @@ export const AdminProfile: React.FC = () => {
       setSnackbar({ open: true, message: "New passwords do not match", severity: "error" });
       return;
     }
-    setSnackbar({ open: true, message: "Password updates are not available yet.", severity: "error" });
-    setPasswords({ current: "", next: "", confirm: "" });
+    if (!passwords.current || !passwords.next) {
+      setSnackbar({ open: true, message: "Current and new passwords are required.", severity: "error" });
+      return;
+    }
+    apiFetch(`${apiBaseUrl}/auth/me/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        current_password: passwords.current,
+        new_password: passwords.next,
+        confirm_password: passwords.confirm,
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          const msg = Array.isArray(data?.detail) ? data.detail.join(" ") : data?.detail || "Failed to update password.";
+          throw new Error(msg);
+        }
+        setSnackbar({ open: true, message: "Password updated successfully.", severity: "success" });
+        setPasswords({ current: "", next: "", confirm: "" });
+      })
+      .catch((err: any) => {
+        setSnackbar({ open: true, message: err?.message || "Failed to update password.", severity: "error" });
+      });
   };
 
   const handleTestNotification = () => {
@@ -338,9 +359,39 @@ export const AdminProfile: React.FC = () => {
                 }}
               />
             ))}
-            <Typography variant="caption" color="text.secondary">
-              Strength: {passwordStrength(passwords.next)}
-            </Typography>
+            {(() => {
+              const strength = passwordStrength(passwords.next);
+              const colors = ["#d32f2f", "#ed6c02", "#f9a825", "#2e7d32", "#1b5e20"];
+              const barColor = colors[Math.min(strength.score, colors.length - 1)];
+              const percent = (strength.score / 4) * 100;
+              return (
+                <Box sx={{ mt: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Strength: {strength.label}
+                  </Typography>
+                  <Box
+                    sx={{
+                      mt: 0.5,
+                      height: 8,
+                      borderRadius: 999,
+                      backgroundColor: "#e0e0e0",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: `${percent}%`,
+                        maxWidth: "100%",
+                        height: "100%",
+                        borderRadius: 999,
+                        background: barColor,
+                        transition: "width 200ms ease",
+                      }}
+                    />
+                  </Box>
+                </Box>
+              );
+            })()}
             <PillButton variant="contained" onClick={handleSavePassword}>
               Update Password
             </PillButton>
