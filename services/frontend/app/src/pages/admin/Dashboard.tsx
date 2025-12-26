@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { Box, Grid, Typography, Paper, Button } from "@mui/material";
+import { Box, Grid, Typography, Paper } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { NotificationsPanel, NotificationItem } from "../../components/admin/NotificationsPanel";
 import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -32,6 +33,7 @@ interface VenueData {
 
 export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
+
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
     queryFn: async () => {
@@ -41,10 +43,7 @@ export const AdminDashboard: React.FC = () => {
     },
   });
 
-  const {
-    data: notificationsFromApi,
-    isError: notificationsError,
-  } = useQuery<NotificationItem[]>({
+  const { data: notificationsFromApi, isError: notificationsError } = useQuery<NotificationItem[]>({
     queryKey: ["dashboard-notifications"],
     queryFn: async () => {
       const res = await apiFetch(`${apiBaseUrl}/notifications/`);
@@ -112,40 +111,39 @@ export const AdminDashboard: React.FC = () => {
       <UploadFile />
 
       {/* Statistics */}
-      <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-        Statistics
-      </Typography>
-      <Grid container spacing={2.5} sx={{ mb: 4 }}>
-        {[
-          { label: "Total Exams", value: loadingExams ? "…" : stats.totalExams, tone: "#0c57a4" },
-          { label: "Exams for Allocation", value: loadingExams ? "…" : stats.examsForAllocation, tone: "#0d47a1" },
-          { label: "Upcoming Exams", value: loadingExams ? "…" : stats.upcomingExams, tone: "#e65100" },
-          { label: "Active Venues", value: loadingVenues ? "…" : stats.totalVenues, tone: "#1b5e20" },
-          { label: "Total Invigilators", value: loadingInvigilators ? "…" : stats.totalInvigilators, tone: "#4a148c" },
-          { label: "Slots to Allocate", value: stats.slotsToAllocate ?? "—", tone: "#455a64" },
-          { label: "Contracts Fulfilled", value: stats.contractsFulfilled ?? "—", tone: "#2e7d32" },
-        ].map((item, idx) => (
-          <Grid item xs={12} sm={6} md={3} key={idx}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2,
-                borderRadius: 3,
-                border: "1px solid",
-                borderColor: "divider",
-                backgroundColor: "#fff",
-              }}
-            >
-              <Typography variant="subtitle2" sx={{ color: item.tone, fontWeight: 700, mb: 0.5 }}>
-                {item.label}
-              </Typography>
-              <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
-                {item.value}
-              </Typography>
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
+      <Panel title="Statistics" disableDivider>
+        <Grid container spacing={2.5}>
+          {[
+            { label: "Total Exams", value: loadingExams ? "…" : stats.totalExams, tone: "#0c57a4" },
+            { label: "Exams for Allocation", value: loadingExams ? "…" : stats.examsForAllocation, tone: "#0d47a1" },
+            { label: "Upcoming Exams", value: loadingExams ? "…" : stats.upcomingExams, tone: "#e65100" },
+            { label: "Active Venues", value: loadingVenues ? "…" : stats.totalVenues, tone: "#1b5e20" },
+            { label: "Total Invigilators", value: loadingInvigilators ? "…" : stats.totalInvigilators, tone: "#4a148c" },
+            { label: "Slots to Allocate", value: stats.slotsToAllocate ?? "…", tone: "#455a64" },
+            { label: "Contracts Fulfilled", value: stats.contractsFulfilled ?? "…", tone: "#2e7d32" },
+          ].map((item, idx) => (
+            <Grid item xs={12} sm={6} md={3} key={idx}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  backgroundColor: "#fff",
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ color: item.tone, fontWeight: 700, mb: 0.5 }}>
+                  {item.label}
+                </Typography>
+                <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
+                  {item.value}
+                </Typography>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+      </Panel>
 
       {/* Notifications */}
       <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
