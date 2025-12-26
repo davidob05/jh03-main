@@ -25,6 +25,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../../components/PillButton";
 import { PhotoCamera, Visibility, VisibilityOff, Logout } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch, authUserKey } from "../../utils/api";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 
 export const AdminProfile: React.FC = () => {
   const navigate = useNavigate();
@@ -49,6 +50,8 @@ export const AdminProfile: React.FC = () => {
   const [phone, setPhone] = useState<string>("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [avatarData, setAvatarData] = useState<string | null>(null);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const [showPhotoSave, setShowPhotoSave] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
   const [lastUpdated, setLastUpdated] = useState("Just now");
   const [lastLogin, setLastLogin] = useState<string | null>(null);
@@ -99,6 +102,7 @@ export const AdminProfile: React.FC = () => {
       setPhotoPreview(result);
       setAvatarData(result);
       setSnackbar({ open: true, message: "Photo ready to save.", severity: "success" });
+      setShowPhotoSave(true);
     };
     reader.readAsDataURL(file);
   };
@@ -132,10 +136,10 @@ export const AdminProfile: React.FC = () => {
         queryClient.setQueryData(["me"], data);
       }
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      setSnackbar({ open: true, message: "Profile updated.", severity: "success" });
+      setSnackbar({ open: true, message: "Profile updated!", severity: "success" });
       setLastUpdated("Just now");
     } catch (err: any) {
-      setSnackbar({ open: true, message: err?.message || "Failed to update profile.", severity: "error" });
+      setSnackbar({ open: true, message: err?.message || "Failed to update profile!", severity: "error" });
     }
   };
 
@@ -171,6 +175,7 @@ export const AdminProfile: React.FC = () => {
     setPhone(userData.phone || "");
     setPhotoPreview(userData.avatar || null);
     setAvatarData(userData.avatar || null);
+    setShowPhotoSave(false);
     setLastLogin(userData.last_login || null);
     setLastUpdated("Just now");
   }, [userData]);
@@ -228,7 +233,7 @@ export const AdminProfile: React.FC = () => {
               startIcon={<PhotoCamera />}
               component="label"
             >
-              Upload / Change Photo
+              {photoPreview || userData.avatar ? "Change photo" : "Upload photo"}
               <input
                 type="file"
                 hidden
@@ -236,8 +241,13 @@ export const AdminProfile: React.FC = () => {
                 onChange={(e) => handlePhotoChange(e.target.files?.[0] || null)}
               />
             </PillButton>
+            {showPhotoSave && avatarData && (
+              <PillButton variant="outlined" color="primary" onClick={handleSaveProfile}>
+                Save
+              </PillButton>
+            )}
             {photoPreview && (
-              <PillButton variant="outlined" color="error" onClick={() => handlePhotoChange(null)}>
+              <PillButton variant="outlined" color="error" onClick={() => setConfirmRemoveOpen(true)}>
                 Remove
               </PillButton>
             )}
@@ -468,6 +478,37 @@ export const AdminProfile: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <DeleteConfirmationDialog
+        open={confirmRemoveOpen}
+        title="Remove profile photo?"
+        description="This will remove your current profile photo."
+        confirmText="Remove"
+        onClose={() => setConfirmRemoveOpen(false)}
+        onConfirm={async () => {
+          try {
+            const res = await apiFetch(`${apiBaseUrl}/auth/me/`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ avatar: "" }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              setSnackbar({ open: true, message: data?.detail || "Failed to remove photo.", severity: "error" });
+              return;
+            }
+            localStorage.setItem(authUserKey, JSON.stringify(data));
+            queryClient.setQueryData(["me"], data);
+            setPhotoPreview(null);
+            setAvatarData(null);
+            setSnackbar({ open: true, message: "Profile photo removed.", severity: "success" });
+          } catch (err: any) {
+            setSnackbar({ open: true, message: err?.message || "Failed to remove photo.", severity: "error" });
+          } finally {
+            setConfirmRemoveOpen(false);
+          }
+        }}
+      />
     </Box>
   );
 };
