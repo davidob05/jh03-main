@@ -65,7 +65,7 @@ export const InvigilatorLayout: React.FC = () => {
 
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Tooltip title={displayName}>
-                <IconButton onClick={openMenu}>
+                <IconButton onClick={openMenu} aria-label="Account menu">
                   <Avatar sx={{ bgcolor: "warning.light", width: 40, height: 40, color: "black", fontWeight: "bold" }}>
                     {initials}
                   </Avatar>

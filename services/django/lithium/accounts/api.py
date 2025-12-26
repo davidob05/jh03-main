@@ -95,3 +95,46 @@ class CurrentUserView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+    def patch(self, request, *_args, **_kwargs):
+        user = request.user
+        user_model = get_user_model()
+
+        username = request.data.get("username")
+        email = request.data.get("email")
+
+        # Basic validation
+        if username is not None:
+            username = username.strip()
+            if not username:
+                return Response({"detail": "Username cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
+            if user_model.objects.exclude(pk=user.pk).filter(username__iexact=username).exists():
+                return Response({"detail": "Username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if email is not None:
+            email = email.strip()
+            if email and user_model.objects.exclude(pk=user.pk).filter(email__iexact=email).exists():
+                return Response({"detail": "Email is already in use."}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated = False
+        if username is not None and username != user.username:
+            user.username = username
+            updated = True
+        if email is not None and email != user.email:
+            user.email = email
+            updated = True
+
+        if updated:
+            user.save(update_fields=["username", "email"])
+
+        return Response(
+            {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "is_staff": user.is_staff,
+                "is_superuser": user.is_superuser,
+                "role": _derive_role(user),
+            },
+            status=status.HTTP_200_OK,
+        )

@@ -66,7 +66,7 @@ export const AdminLayout: React.FC = () => {
 
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Tooltip title={displayName}>
-                <IconButton onClick={openMenu}>
+                <IconButton onClick={openMenu} aria-label="Account menu">
                   <Avatar sx={{ bgcolor: "secondary.main", width: 40, height: 40, color: "black", fontWeight: "bold" }}>
                     {initials}
                   </Avatar>

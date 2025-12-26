@@ -21,13 +21,14 @@ import {
 } from "@mui/material";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../../components/PillButton";
 import { PhotoCamera, Visibility, VisibilityOff, Logout } from "@mui/icons-material";
-import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { apiBaseUrl, apiFetch, authUserKey } from "../../utils/api";
 
 export const AdminProfile: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: userData, isLoading, isError, error } = useQuery({
     queryKey: ["me"],
@@ -95,9 +96,31 @@ export const AdminProfile: React.FC = () => {
     setSnackbar({ open: true, message: "Photo selected (not uploaded in demo)", severity: "success" });
   };
 
-  const handleSaveProfile = () => {
-    // No update endpoint yet; inform the user.
-    setSnackbar({ open: true, message: "Profile updates are not available yet.", severity: "error" });
+  const handleSaveProfile = async () => {
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/auth/me/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: name,
+          email: email,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSnackbar({ open: true, message: data?.detail || "Failed to update profile.", severity: "error" });
+        return;
+      }
+      // Update local cached user info
+      if (data) {
+        localStorage.setItem(authUserKey, JSON.stringify(data));
+      }
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      setSnackbar({ open: true, message: "Profile updated.", severity: "success" });
+      setLastUpdated("Just now");
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err?.message || "Failed to update profile.", severity: "error" });
+    }
   };
 
   const handleSavePassword = () => {
