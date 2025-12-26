@@ -73,6 +73,7 @@ class ObtainAuthTokenView(ObtainAuthToken):
                     "is_staff": user.is_staff,
                     "is_superuser": user.is_superuser,
                     "role": _derive_role(user),
+                    "avatar": getattr(user, "avatar", None),
                 },
             },
             status=status.HTTP_200_OK,
@@ -84,6 +85,13 @@ class CurrentUserView(APIView):
 
     def get(self, request, *_args, **_kwargs):
         user = request.user
+        phone = getattr(user, "phone", None)
+        avatar = getattr(user, "avatar", None)
+        try:
+            if not phone and hasattr(user, "invigilator_profile") and user.invigilator_profile:
+                phone = user.invigilator_profile.alt_phone
+        except Exception:
+            phone = phone
         return Response(
             {
                 "id": user.id,
@@ -92,6 +100,8 @@ class CurrentUserView(APIView):
                 "is_staff": user.is_staff,
                 "is_superuser": user.is_superuser,
                 "role": _derive_role(user),
+                "phone": phone,
+                "avatar": avatar,
             },
             status=status.HTTP_200_OK,
         )
@@ -102,6 +112,8 @@ class CurrentUserView(APIView):
 
         username = request.data.get("username")
         email = request.data.get("email")
+        phone = request.data.get("phone")
+        avatar = request.data.get("avatar")
 
         # Basic validation
         if username is not None:
@@ -117,15 +129,41 @@ class CurrentUserView(APIView):
                 return Response({"detail": "Email is already in use."}, status=status.HTTP_400_BAD_REQUEST)
 
         updated = False
+        update_fields = []
         if username is not None and username != user.username:
             user.username = username
             updated = True
+            update_fields.append("username")
         if email is not None and email != user.email:
             user.email = email
             updated = True
+            update_fields.append("email")
+
+        phone_updated = False
+        if phone is not None:
+            phone = phone.strip()
+            if getattr(user, "phone", None) != phone:
+                user.phone = phone
+                updated = True
+                update_fields.append("phone")
+                phone_updated = True
+            try:
+                if hasattr(user, "invigilator_profile") and user.invigilator_profile:
+                    if user.invigilator_profile.alt_phone != phone:
+                        user.invigilator_profile.alt_phone = phone
+                        user.invigilator_profile.save(update_fields=["alt_phone"])
+            except Exception:
+                pass
+
+        if avatar is not None and avatar != getattr(user, "avatar", None):
+            user.avatar = avatar
+            updated = True
+            update_fields.append("avatar")
 
         if updated:
-            user.save(update_fields=["username", "email"])
+            # Remove duplicates if any
+            update_fields = list(dict.fromkeys(update_fields))
+            user.save(update_fields=update_fields)
 
         return Response(
             {
@@ -135,6 +173,9 @@ class CurrentUserView(APIView):
                 "is_staff": user.is_staff,
                 "is_superuser": user.is_superuser,
                 "role": _derive_role(user),
+                "phone": phone if phone is not None else getattr(getattr(user, "invigilator_profile", None), "alt_phone", None),
+                "phone_updated": phone_updated,
+                "avatar": getattr(user, "avatar", None),
             },
             status=status.HTTP_200_OK,
         )

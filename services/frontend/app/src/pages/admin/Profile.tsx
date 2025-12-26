@@ -46,8 +46,9 @@ export const AdminProfile: React.FC = () => {
 
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
-  const [phone, setPhone] = useState<string>(""); // No phone in API; kept for future use
+  const [phone, setPhone] = useState<string>("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [avatarData, setAvatarData] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
   const [lastUpdated, setLastUpdated] = useState("Just now");
   const [lastLogin, setLastLogin] = useState<string | null>(null);
@@ -89,11 +90,17 @@ export const AdminProfile: React.FC = () => {
   const handlePhotoChange = (file?: File | null) => {
     if (!file) {
       setPhotoPreview(null);
+      setAvatarData(null);
       return;
     }
-    const url = URL.createObjectURL(file);
-    setPhotoPreview(url);
-    setSnackbar({ open: true, message: "Photo selected (not uploaded in demo)", severity: "success" });
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === "string" ? reader.result : null;
+      setPhotoPreview(result);
+      setAvatarData(result);
+      setSnackbar({ open: true, message: "Photo ready to save.", severity: "success" });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSaveProfile = async () => {
@@ -104,6 +111,8 @@ export const AdminProfile: React.FC = () => {
         body: JSON.stringify({
           username: name,
           email: email,
+          phone: phone,
+          avatar: avatarData ?? "",
         }),
       });
       const data = await res.json();
@@ -114,6 +123,13 @@ export const AdminProfile: React.FC = () => {
       // Update local cached user info
       if (data) {
         localStorage.setItem(authUserKey, JSON.stringify(data));
+        // keep in-memory state and react-query cache in sync
+        setName(data.username || name);
+        setEmail(data.email || email);
+        setPhone(data.phone || "");
+        setPhotoPreview(data.avatar || null);
+        setAvatarData(data.avatar || null);
+        queryClient.setQueryData(["me"], data);
       }
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       setSnackbar({ open: true, message: "Profile updated.", severity: "success" });
@@ -152,6 +168,9 @@ export const AdminProfile: React.FC = () => {
     if (!userData) return;
     setName(userData.username || userData.email || "");
     setEmail(userData.email || userData.username || "");
+    setPhone(userData.phone || "");
+    setPhotoPreview(userData.avatar || null);
+    setAvatarData(userData.avatar || null);
     setLastLogin(userData.last_login || null);
     setLastUpdated("Just now");
   }, [userData]);
@@ -189,9 +208,9 @@ export const AdminProfile: React.FC = () => {
               bgcolor: "primary.main",
               fontSize: "3rem",
             }}
-            src={photoPreview || undefined}
+            src={photoPreview || userData.avatar || undefined}
           >
-            {getInitials(displayName)}
+            {photoPreview || userData.avatar ? "" : getInitials(displayName)}
           </Avatar>
 
           <Typography variant="h5" sx={{ mt: 2, fontWeight: 600 }}>

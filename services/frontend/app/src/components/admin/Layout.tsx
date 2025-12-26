@@ -27,6 +27,7 @@ export const AdminLayout: React.FC = () => {
 
   const user = getStoredUser();
   const displayName = user?.username || user?.email || "User";
+  const avatarSrc = (user as any)?.avatar || undefined;
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
@@ -67,8 +68,11 @@ export const AdminLayout: React.FC = () => {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Tooltip title={displayName}>
                 <IconButton onClick={openMenu} aria-label="Account menu">
-                  <Avatar sx={{ bgcolor: "secondary.main", width: 40, height: 40, color: "black", fontWeight: "bold" }}>
-                    {initials}
+                  <Avatar
+                    src={avatarSrc}
+                    sx={{ bgcolor: avatarSrc ? "transparent" : "secondary.main", width: 40, height: 40, color: "black", fontWeight: "bold" }}
+                  >
+                    {avatarSrc ? "" : initials}
                   </Avatar>
                 </IconButton>
               </Tooltip>
