@@ -85,7 +85,9 @@ export const AdminDashboard: React.FC = () => {
           const start = new Date(ev.start_time);
           if (start > now) upcomingExamIds.add(exam.exam_id);
         }
-        if (!ev.venue_name) unallocatedExamVenueIds.add(ev.examvenue_id);
+        if (ev.venue_name === null || ev.venue_name === undefined) {
+          unallocatedExamVenueIds.add(ev.examvenue_id);
+        }
       });
     });
 

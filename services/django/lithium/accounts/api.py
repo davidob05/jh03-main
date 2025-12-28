@@ -65,6 +65,9 @@ class ObtainAuthTokenView(ObtainAuthToken):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
         token, _ = Token.objects.get_or_create(user=user)
+        if not getattr(token, "key", None):
+            token.delete()
+            token = Token.objects.create(user=user)
         return Response(
             {
                 "token": token.key,

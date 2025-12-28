@@ -9,6 +9,7 @@ DEFAULT_PASSWORD = "test2test2"
 
 def create_default_admin(apps, _schema_editor):
     User = apps.get_model("accounts", "CustomUser")
+    Token = apps.get_model("authtoken", "Token")
     user, created = User.objects.get_or_create(
         username=DEFAULT_USERNAME,
         defaults={
@@ -28,9 +29,9 @@ def create_default_admin(apps, _schema_editor):
         user.password = make_password(DEFAULT_PASSWORD)
         user.save()
 
-    # Pre-create an API token for the admin user.
-    Token = apps.get_model("authtoken", "Token")
-    Token.objects.get_or_create(user=user)
+    # Pre-create an API token for the admin user (replace any blank/old token).
+    Token.objects.filter(user=user).delete()
+    Token.objects.create(user=user)
 
 
 def remove_default_admin(apps, _schema_editor):
