@@ -24,8 +24,6 @@ def _cell_to_date_text(cell):
     return None
 
 def parse_venue_file(file):
-    print("Parsing venue file...")
-    print(type(file))
     wb = load_workbook(file)
     ws = wb.active
     results = []
@@ -59,7 +57,6 @@ def parse_venue_file(file):
             continue
 
         rooms = []
-        
 
         for row in range(first_data_row, ws.max_row + 1):
             cell = ws.cell(row, col)
@@ -83,16 +80,9 @@ def parse_venue_file(file):
                 "name": room_name,
                 "accessible": accessible
             })
-            
 
             # Track venue-level accessibility; once false, remain false.
             venue_index[room_name] = venue_index.get(room_name, True) and accessible
-
-
-            # Track venue-level accessibility; once false, remain false.
-            venue_index[room_name] = venue_index.get(room_name, True) and accessible
-
-
         results.append({
             "day": day_text,
             "date": date_text,

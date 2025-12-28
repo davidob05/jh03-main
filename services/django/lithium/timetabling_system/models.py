@@ -210,6 +210,7 @@ class Notification(models.Model):
         SHIFT_PICKUP = "shiftPickup", "Shift pickup"
         EXAM_CHANGE = "examChange", "Exam change"
         INVIGILATOR_UPDATE = "invigilatorUpdate", "Invigilator update"
+        VENUE_CHANGE = "venueChange", "Venue change"
 
     id = models.AutoField(primary_key=True)
     type = models.CharField(max_length=30, choices=NotificationType.choices)
@@ -221,9 +222,6 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.get_type_display()}: {self.message[:40]}"
-
-    def __str__(self):
-        return f"Provisions for {self.student} in {self.exam}"
 
 
 class UploadLog(models.Model):  # This gives a view of upload history
@@ -375,6 +373,11 @@ class InvigilatorAssignment(models.Model):
         return f"{self.invigilator} → {self.exam_venue}"
     
     def total_hours(self):
-        # Calculate duration (you can add this as a property)
-        delta = timezone.timedelta(hours=self.assigned_end.hour - self.assigned_start.hour, minutes=self.assigned_end.minute - self.assigned_start.minute)
-        return delta.total_seconds() / 3600 + (self.approved_additional_time / 60) - (self.break_time_minutes / 60)
+        """
+        Return total hours assigned, subtracting break_time_minutes.
+        """
+        if not self.assigned_start or not self.assigned_end:
+            return 0
+        delta = self.assigned_end - self.assigned_start
+        hours = delta.total_seconds() / 3600
+        return max(hours - (self.break_time_minutes or 0) / 60, 0)
