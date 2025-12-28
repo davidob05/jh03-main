@@ -209,6 +209,7 @@ class Notification(models.Model):
         CANCELLATION = "cancellation", "Cancellation"
         SHIFT_PICKUP = "shiftPickup", "Shift pickup"
         EXAM_CHANGE = "examChange", "Exam change"
+        VENUE_CHANGE = "venueChange", "Venue change"
         INVIGILATOR_UPDATE = "invigilatorUpdate", "Invigilator update"
         VENUE_CHANGE = "venueChange", "Venue change"
 

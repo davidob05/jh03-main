@@ -31,6 +31,7 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
 const baseDietOptions = [
   { code: "DEC_2025", label: "December 2025" },
@@ -211,8 +212,8 @@ export const AdminInvigilatorProfile: React.FC = () => {
             <Typography variant="h4" fontWeight={700}>
               {data.preferred_name || data.full_name}
             </Typography>
-            <Typography variant="h6" color="text.secondary">
-              {data.full_name} - {data.university_email || "No university email"}
+            <Typography variant="body2" color="text.secondary">
+              {data.full_name} • {data.university_email || "No university email"}
             </Typography>
           </Box>
         </Tooltip>
@@ -236,7 +237,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
       <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
         {/* Left Column - Contact, Qualifications, Diet, Restrictions */}
         <Box sx={{ flex: "0 0 450px" }}>
-          <Paper sx={{ p: 4, height: "fit-content" }}>
+          <Panel sx={{ p: 4, height: "fit-content", mb: 3 }}>
             <Stack spacing={5}>
               {/* Contact Details */}
               <Box>
@@ -595,14 +596,14 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 )}
               </Box>
             </Stack>
-          </Paper>
+          </Panel>
         </Box>
 
         {/* Right Column - Availability, Contract */}
         <Box sx={{ flex: 1, minWidth: 300 }}>
           {/* Availability */}
           {availabilityView === "list" ? (
-            <Paper sx={{ p: 4 }}>
+            <Panel sx={{ p: 4 }}>
               <Typography variant="h6" fontWeight={700} mb={3}>
                 Availability
               </Typography>
@@ -610,7 +611,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
               <Grid container spacing={3}>
                 {sortedAvailabilityEntries.slice(0, availabilityLimit).map(([date, slots]) => (
                   <Grid item xs={12} key={date}>
-                    <Paper sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2 }}>
+                    <Panel sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2, mb: 0 }}>
                       <Typography variant="subtitle1" fontWeight={600} mb={2}>
                         {dayjs(date).format("dddd, D MMMM YYYY")}
                       </Typography>
@@ -626,7 +627,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
                           </Tooltip>
                         ))}
                       </Stack>
-                    </Paper>
+                    </Panel>
                   </Grid>
                 ))}
               </Grid>
@@ -648,9 +649,9 @@ export const AdminInvigilatorProfile: React.FC = () => {
                   </PillButton>
                 </Box>
               )}
-            </Paper>
+            </Panel>
           ) : (
-            <Paper sx={{ p: 4 }}>
+            <Panel sx={{ p: 4 }}>
               <Typography variant="h6" fontWeight={700} mb={3}>
                 Availability Calendar
               </Typography>
@@ -733,7 +734,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
                   </Stack>
                 </Box>
               )}
-            </Paper>
+            </Panel>
           )}
 
           {/* Contracted Hours */}

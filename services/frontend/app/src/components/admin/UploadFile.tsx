@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   Box,
   CircularProgress,
-  Paper,
   Typography,
   MenuItem,
   Select,
@@ -16,6 +15,7 @@ import {
 import { Upload as UploadIcon, InsertDriveFile, Eject } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
+import { Panel } from "../Panel";
 
 export const UploadFile: React.FC = () => {
   const [uploadType, setUploadType] = useState(""); // exam, provisions, venues
@@ -106,24 +106,8 @@ export const UploadFile: React.FC = () => {
   };
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 3,
-        mt: 3,
-        mb: 3,
-        width: "auto",
-        maxWidth: "100%",
-        borderRadius: 3,
-        border: "1px solid",
-        borderColor: "divider",
-        backgroundColor: "#fff",
-      }}
-    >
+    <Panel title="Upload data" disableDivider sx={{ mt: 3, mb: 3 }}>
       <Stack spacing={1.5}>
-        <Typography variant="h6" fontWeight={700}>
-          Upload Data
-        </Typography>
         <Typography variant="body2" color="text.secondary">
           Select a file type and upload a CSV or Excel file to populate the database.
         </Typography>
@@ -203,6 +187,6 @@ export const UploadFile: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Paper>
+    </Panel>
   );
 };

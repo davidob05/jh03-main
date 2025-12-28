@@ -63,6 +63,7 @@ import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialo
 import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
 interface Invigilator {
   id: number;
@@ -551,7 +552,7 @@ export const AdminInvigilators: React.FC = () => {
             </Box>
           </Paper>
         ) : viewMode === 'list' ? (
-          <Paper>
+          <Panel disableDivider sx={{ p: 0, mb: 0, overflow: 'hidden' }}>
             <List>
               {paginated.map(i => (
                 <ListItem key={i.id} divider sx={{ pl: 1 }}>
@@ -591,20 +592,25 @@ export const AdminInvigilators: React.FC = () => {
                 </ListItem>
               ))}
             </List>
-          </Paper>
+          </Panel>
         ) : (
           <Grid container spacing={3}>
             {paginated.map(i => (
               // @ts-ignore
               <Grid component="div" item xs={12} sm={6} md={4} lg={3} key={i.id}>
-                <Card
+                <Panel
+                  disableDivider
                   sx={{
-                    width: 200,
+                    width: '100%',
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
-                    '&:hover': { boxShadow: 8 },
+                    p: 0,
+                    mb: 0,
+                    height: '100%',
+                    boxShadow: 1,
                     transition: '0.2s',
+                    '&:hover': { boxShadow: 8 },
                   }}
                 >
                   {/* Checkbox in top-right */}
@@ -620,7 +626,7 @@ export const AdminInvigilators: React.FC = () => {
                       p: 0.5
                     }}
                   />
-                  <CardContent sx={{ textAlign: 'center', pt: 4 }}>
+                  <Box sx={{ textAlign: 'center', pt: 4, px: 2, pb: 2 }}>
                     <Avatar sx={{ width: 80, height: 80, mx: 'auto', bgcolor: 'primary.main', fontSize: '2rem' }}>
                       {getInitials(i)}
                     </Avatar>
@@ -662,8 +668,8 @@ export const AdminInvigilators: React.FC = () => {
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontFamily: theme => theme.typography.fontFamily}}>
                       {i.university_email || i.personal_email || 'No email'}
                     </Typography>
-                  </CardContent>
-                </Card>
+                  </Box>
+                </Panel>
               </Grid>
             ))}
           </Grid>

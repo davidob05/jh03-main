@@ -1,11 +1,12 @@
-import { AppBar, Toolbar, Box, Button, Avatar, IconButton } from "@mui/material";
-import React from "react";
+import { AppBar, Toolbar, Box, Button, Avatar, IconButton, Tooltip, Menu, MenuItem, Divider, Typography } from "@mui/material";
+import React, { useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
-import { authTokenKey, authUserKey } from "../../utils/api";
+import { authTokenKey, authUserKey, getStoredUser } from "../../utils/api";
 
 export const AdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
   const menuItems = [
     { text: "Home", path: "/admin" },
@@ -20,6 +21,19 @@ export const AdminLayout: React.FC = () => {
     localStorage.removeItem(authUserKey);
     navigate("/login");
   };
+
+  const openMenu = (event: React.MouseEvent<HTMLElement>) => setMenuAnchor(event.currentTarget);
+  const closeMenu = () => setMenuAnchor(null);
+
+  const user = getStoredUser();
+  const displayName = user?.username || user?.email || "User";
+  const avatarSrc = (user as any)?.avatar || undefined;
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
     
   return (
     <>
@@ -52,10 +66,55 @@ export const AdminLayout: React.FC = () => {
             </Box>
 
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <IconButton component={Link} to="/admin/profile">
-                <Avatar sx={{ bgcolor: "secondary.main", width: 40, height: 40, color: "black", fontWeight: "bold" }}>A</Avatar>
-              </IconButton>
-              <Button color="inherit" onClick={handleLogout}>Logout</Button>
+              <Tooltip title={displayName}>
+                <IconButton onClick={openMenu} aria-label="Account menu">
+                  <Avatar
+                    src={avatarSrc}
+                    sx={{ bgcolor: avatarSrc ? "transparent" : "secondary.main", width: 40, height: 40, color: "black", fontWeight: "bold" }}
+                  >
+                    {avatarSrc ? "" : initials}
+                  </Avatar>
+                </IconButton>
+              </Tooltip>
+              <Menu
+                anchorEl={menuAnchor}
+                open={Boolean(menuAnchor)}
+                onClose={closeMenu}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                PaperProps={{
+                  elevation: 4,
+                  sx: {
+                    borderRadius: 3,
+                    minWidth: 220,
+                    p: 1,
+                  },
+                }}
+              >
+                <Box sx={{ px: 1.5, py: 1 }}>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    {displayName}
+                  </Typography>
+                  {user?.email && (
+                    <Typography variant="body2" color="text.secondary">
+                      {user.email}
+                    </Typography>
+                  )}
+                </Box>
+                <Divider sx={{ mb: 0.5 }} />
+                <MenuItem component={Link} to="/admin/profile" onClick={closeMenu} sx={{ borderRadius: 2 }}>
+                  Account
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    closeMenu();
+                    handleLogout();
+                  }}
+                  sx={{ borderRadius: 2, color: "error.main", fontWeight: 600 }}
+                >
+                  Logout
+                </MenuItem>
+              </Menu>
             </Box>
           </Box>
         </Toolbar>
