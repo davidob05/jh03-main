@@ -228,8 +228,9 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": os.getenv("DRF_THROTTLE_ANON_RATE", "20/min"),
-        "user": os.getenv("DRF_THROTTLE_USER_RATE", "60/min"),
+        # Relaxed defaults to avoid throttling bulk admin actions; override via env if needed.
+        "anon": os.getenv("DRF_THROTTLE_ANON_RATE", "1000/min"),
+        "user": os.getenv("DRF_THROTTLE_USER_RATE", "2000/min"),
     },
 }
 
