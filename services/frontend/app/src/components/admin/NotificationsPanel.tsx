@@ -79,7 +79,7 @@ export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }>
       actions={
         <Chip
           label={`${notifications.length} updates`}
-          size="small"
+          size="medium"
           sx={{
             backgroundColor: "#e3f2fd",
             color: "#0d47a1",

@@ -608,9 +608,9 @@ export const AdminInvigilators: React.FC = () => {
                     p: 0,
                     mb: 0,
                     height: '100%',
-                    boxShadow: 1,
+                    cursor: "pointer",
                     transition: '0.2s',
-                    '&:hover': { boxShadow: 8 },
+                    '&:hover': { transform: "translateY(-6px)", boxShadow: 8 },
                   }}
                 >
                   {/* Checkbox in top-right */}
