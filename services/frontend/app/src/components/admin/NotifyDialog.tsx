@@ -22,7 +22,7 @@ import { Panel } from "../Panel";
 import { PillButton } from "../PillButton";
 import { Close } from "@mui/icons-material";
 
-export type NotifyMethod = "email" | "sms" | "call";
+export type NotifyMethod = "email" | "sms";
 
 type Recipient = {
   id: number;
@@ -38,8 +38,7 @@ type NotifyDialogProps = {
 
 const METHOD_OPTIONS: { value: NotifyMethod; label: string; helper: string }[] = [
   { value: "email", label: "Email", helper: "Send to university/personal email" },
-  { value: "sms", label: "SMS", helper: "Text the provided mobile numbers" },
-  { value: "call", label: "Phone call", helper: "Place an automated call" },
+  { value: "sms", label: "SMS", helper: "Text the provided mobile numbers (where available)" },
 ];
 
 export const NotifyDialog: React.FC<NotifyDialogProps> = ({
@@ -71,12 +70,6 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
       });
 
       if (!res.ok) {
-        if (res.status === 405) {
-          throw new Error(
-            "Notifications not yet implemented."
-            // TODO: Implement notification methods in backend next
-          );
-        }
         const text = await res.text();
         throw new Error(text || "Failed to send notification");
       }
@@ -106,7 +99,9 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
       resetForm();
       notifyMutation.reset();
     }
-  }, [open, resetForm, notifyMutation]);
+    // Depend only on `open` to avoid re-running on each mutation object change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleToggleMethod = (method: NotifyMethod) => {
     setMethods((prev) =>
@@ -247,9 +242,9 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
         <PillButton
           variant="contained"
           onClick={handleSend}
-          disabled={sending || !recipients.length}
+          disabled
         >
-          {sending ? "Sending..." : "Send notification"}
+          Send notification
         </PillButton>
       </DialogActions>
     </Dialog>

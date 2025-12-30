@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 from datetime import timedelta
+from django.conf import settings
+from django.core.mail import EmailMessage
 from timetabling_system.models import (
     Exam,
     ExamVenue,
@@ -212,3 +214,140 @@ class NotificationsView(APIView):
         cutoff = timezone.now() - timedelta(days=7)
         qs = Notification.objects.filter(timestamp__gte=cutoff).order_by("-timestamp")[:50]
         return Response(NotificationSerializer(qs, many=True).data)
+
+    def post(self, request, *args, **kwargs):
+        payload = request.data or {}
+        invigilator_ids = payload.get("invigilator_ids") or []
+        methods = payload.get("methods") or []
+        subject = (payload.get("subject") or "").strip()
+        message = (payload.get("message") or "").strip()
+
+        if not isinstance(invigilator_ids, (list, tuple)):
+            return Response({"detail": "invigilator_ids must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            invigilator_ids = [int(i) for i in invigilator_ids]
+        except (TypeError, ValueError):
+            return Response({"detail": "invigilator_ids must contain numeric IDs."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not invigilator_ids:
+            return Response({"detail": "At least one invigilator ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not message:
+            return Response({"detail": "Message is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not isinstance(methods, (list, tuple)):
+            methods = []
+        allowed_methods = {"email", "sms"}
+        invalid_methods = [m for m in methods if m not in allowed_methods]
+        if invalid_methods:
+            return Response(
+                {"detail": f"Invalid methods: {', '.join(invalid_methods)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not methods:
+            return Response({"detail": "Choose at least one delivery method (email or sms)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        recipients = list(Invigilator.objects.filter(id__in=invigilator_ids))
+        if not recipients:
+            return Response({"detail": "No matching invigilators found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if settings.EMAIL_BACKEND in {
+            "django.core.mail.backends.console.EmailBackend",
+            "django.core.mail.backends.dummy.EmailBackend",
+        }:
+            return Response(
+                {
+                    "detail": "Email backend is set to console/dummy. Configure SMTP via EMAIL_* env vars to send messages.",
+                    "backend": settings.EMAIL_BACKEND,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        from django.core.mail import send_mail
+
+        subject_to_use = subject or "Notification from administrator"
+        sender_email = settings.DEFAULT_FROM_EMAIL
+        reply_to_email = getattr(request.user, "email", "") or None
+
+        email_recipients = []
+        sms_recipients = []
+        skipped_sms = []
+
+        for invigilator in recipients:
+            name = invigilator.preferred_name or invigilator.full_name or f"Invigilator #{invigilator.id}"
+            if "email" in methods:
+                email_recipients.extend(
+                    [
+                        e
+                        for e in [
+                            getattr(invigilator, "university_email", None),
+                            getattr(invigilator, "personal_email", None),
+                        ]
+                        if e
+                    ]
+                )
+            if "sms" in methods:
+                sms_candidate = getattr(invigilator, "janet_txt", None) or getattr(invigilator, "mobile_text_only", None)
+                if sms_candidate and "@" in sms_candidate:
+                    sms_recipients.append(sms_candidate)
+                else:
+                    skipped_sms.append(name)
+
+        send_results = {"email": 0, "sms": 0}
+        errors = []
+
+        if "email" in methods and email_recipients:
+            try:
+                email_msg = EmailMessage(
+                    subject=subject_to_use,
+                    body=message,
+                    from_email=sender_email,
+                    to=email_recipients,
+                    reply_to=[reply_to_email] if reply_to_email else None,
+                )
+                email_msg.send(fail_silently=False)
+                send_results["email"] = len(email_recipients)
+            except Exception as exc:
+                errors.append(f"Email send failed: {exc}")
+
+        if "sms" in methods and sms_recipients:
+            try:
+                sms_msg = EmailMessage(
+                    subject=subject_to_use,
+                    body=message,
+                    from_email=sender_email,
+                    to=sms_recipients,
+                    reply_to=[reply_to_email] if reply_to_email else None,
+                )
+                sms_msg.send(fail_silently=False)
+                send_results["sms"] = len(sms_recipients)
+            except Exception as exc:
+                errors.append(f"SMS send failed: {exc}")
+
+        if "email" in methods and not email_recipients:
+            errors.append("No email addresses found for selected invigilators.")
+        if "sms" in methods and not sms_recipients:
+            errors.append(
+                "No SMS-capable addresses (e.g. janet_txt/mobile_text_only with @) found for selected invigilators."
+            )
+        if skipped_sms and "sms" in methods:
+            errors.append(f"Skipped SMS for: {', '.join(skipped_sms)} (missing SMS address).")
+
+        if errors and send_results["email"] == 0 and send_results["sms"] == 0:
+            return Response({"detail": errors[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                "status": "ok",
+                "sent_email": send_results["email"],
+                "sent_sms": send_results["sms"],
+                "invigilator_ids": [i.id for i in recipients],
+                "methods": list(methods),
+                "subject": subject_to_use,
+                "message": message,
+                "warnings": errors,
+            },
+            status=status.HTTP_200_OK,
+        )
