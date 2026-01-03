@@ -1,4 +1,5 @@
 import pandas as pd
+from datetime import datetime
 from django.test import TestCase
 
 from timetabling_system.utils import file_classifier
@@ -39,6 +40,12 @@ class FileClassifierTests(TestCase):
         self.assertIn("exam_code", canonical)
         self.assertIn("exam_name", canonical)
 
+    def test_looks_like_date_cell_various_inputs(self):
+        self.assertTrue(file_classifier._looks_like_date_cell(datetime.now()))
+        self.assertTrue(file_classifier._looks_like_date_cell("2024-12-01"))
+        self.assertFalse(file_classifier._looks_like_date_cell(""))
+        self.assertFalse(file_classifier._looks_like_date_cell(float("nan")))
+
 
 class VenueParserTests(TestCase):
     def test_cell_to_date_text_handles_excel_serial_and_strings(self):
@@ -48,6 +55,8 @@ class VenueParserTests(TestCase):
         self.assertEqual(_cell_to_date_text(DummyCell(45866)), "2025-07-28")
         self.assertEqual(_cell_to_date_text(DummyCell("2025-07-29")), "2025-07-29")
         self.assertIsNone(_cell_to_date_text(DummyCell(None)))
+        # Non-date string falls back to stripped text
+        self.assertEqual(_cell_to_date_text(DummyCell("notadate")), "notadate")
 
     def test_parse_venue_file_errors_on_empty_sheet(self):
         from openpyxl import Workbook
