@@ -12,7 +12,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from accounts.adapters import AccountAdapter
-from accounts.api import AuthTokenSerializer
+from accounts.api import AuthTokenSerializer, _derive_role
 from accounts.admin import CustomUserAdmin
 from timetabling_system.models import Invigilator
 
@@ -64,6 +64,27 @@ class AccountAdapterTests(TestCase):
         allowed = self.adapter.is_login_allowed(user)
         self.assertTrue(allowed)
 
+    def test_invigilator_profile_error_allows_login(self):
+        class BrokenUser:
+            is_staff = False
+            is_superuser = False
+
+            def __getattr__(self, _name):
+                raise RuntimeError("boom")
+
+        allowed = self.adapter.is_login_allowed(BrokenUser())
+        self.assertTrue(allowed)
+
+    def test_derive_role_handles_exception(self):
+        class BrokenUser:
+            is_staff = False
+            is_superuser = False
+
+            def __getattr__(self, _name):
+                raise RuntimeError("boom")
+
+        self.assertEqual(_derive_role(BrokenUser()), "invigilator")
+
 
 class AuthApiEdgeTests(TestCase):
     def setUp(self):
@@ -73,6 +94,18 @@ class AuthApiEdgeTests(TestCase):
             email="admin@example.com",
             password="secret",
             is_active=True,
+        )
+        self.invigilator_user = get_user_model().objects.create_user(
+            username="invig",
+            email="invig@example.com",
+            password="secret",
+            is_active=True,
+        )
+        Invigilator.objects.create(
+            user=self.invigilator_user,
+            preferred_name="Invig",
+            full_name="Invigilator User",
+            alt_phone="07700",
         )
         self.other_user = get_user_model().objects.create_user(
             username="other",
@@ -86,6 +119,10 @@ class AuthApiEdgeTests(TestCase):
         with self.assertRaises(drf_serializers.ValidationError) as exc:
             serializer.validate({"username": "", "password": ""})
         self.assertIn("Unable to log in", str(exc.exception))
+
+    def test_token_login_missing_password_rejected(self):
+        with self.assertRaises(drf_serializers.ValidationError):
+            AuthTokenSerializer().validate({"username": "admin", "password": ""})
 
     def test_token_login_inactive_user_rejected(self):
         self.user.is_active = False
@@ -189,8 +226,45 @@ class AuthApiEdgeTests(TestCase):
         self.assertTrue(self.user.check_password("Newsecret123!"))
         self.assertTrue(response.data["password_updated"])
 
+    def test_patch_updates_avatar_only(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.patch(
+            reverse("api-auth-me"),
+            {"avatar": "path/to/avatar.png"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(getattr(self.user, "avatar", None), "path/to/avatar.png")
+
+    def test_current_user_falls_back_to_invigilator_phone(self):
+        self.invigilator_user.phone = None
+        self.invigilator_user.save(update_fields=["phone"])
+        self.client.force_authenticate(self.invigilator_user)
+        response = self.client.get(reverse("api-auth-me"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["phone"], self.invigilator_user.invigilator_profile.alt_phone)
+
 
 class MigrationTests(TestCase):
+    def test_create_default_admin_when_missing(self):
+        User = get_user_model()
+        User.objects.filter(username=DEFAULT_USERNAME).delete()
+        Token.objects.filter(user__username=DEFAULT_USERNAME).delete()
+
+        class FakeApps:
+            def get_model(self, app_label, model_name):
+                if app_label == "accounts" and model_name == "CustomUser":
+                    return User
+                if app_label == "authtoken" and model_name == "Token":
+                    return Token
+                raise LookupError
+
+        create_default_admin(FakeApps(), None)
+        user = User.objects.get(username=DEFAULT_USERNAME)
+        self.assertTrue(user.is_staff)
+        self.assertTrue(Token.objects.filter(user=user).exists())
+
     def test_create_default_admin_updates_existing_and_token(self):
         User = get_user_model()
         User.objects.filter(username=DEFAULT_USERNAME).delete()
@@ -223,6 +297,26 @@ class MigrationTests(TestCase):
         tokens = Token.objects.filter(user=existing)
         self.assertEqual(tokens.count(), 1)
         self.assertNotEqual(tokens.first().key, old_token.key)
+
+    def test_remove_default_admin_deletes(self):
+        User = get_user_model()
+        User.objects.filter(username=DEFAULT_USERNAME, email=DEFAULT_EMAIL).delete()
+        user = User.objects.create_user(
+            username=DEFAULT_USERNAME,
+            email=DEFAULT_EMAIL,
+            password="secret",
+        )
+        Token.objects.create(user=user)
+
+        class FakeApps:
+            def get_model(self, app_label, model_name):
+                if app_label == "accounts" and model_name == "CustomUser":
+                    return User
+                return Token
+
+        remove_default_admin = migration_module.remove_default_admin
+        remove_default_admin(FakeApps(), None)
+        self.assertFalse(User.objects.filter(username=DEFAULT_USERNAME, email=DEFAULT_EMAIL).exists())
 
 
 class AdminHasAvatarTests(TestCase):
