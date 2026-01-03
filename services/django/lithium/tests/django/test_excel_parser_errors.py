@@ -50,3 +50,15 @@ class ExcelParserErrorTests(TestCase):
 
         self.assertEqual(result["status"], "error")
         self.assertIn("Unrecognized file structure", result["message"])
+
+    def test_fallback_to_venue_parser_on_read_error(self):
+        fake_file = mock.Mock(name="file", spec=["name", "seek"])
+        fake_file.seek = mock.Mock()
+        with mock.patch("timetabling_system.utils.excel_parser.pd.read_excel", side_effect=Exception("boom")), mock.patch(
+            "timetabling_system.utils.excel_parser.parse_venue_file", return_value={"status": "ok", "type": "Venue"}
+        ) as venue_parse:
+            result = excel_parser.parse_excel_file(fake_file)
+
+        fake_file.seek.assert_called_once_with(0)
+        venue_parse.assert_called_once()
+        self.assertEqual(result["type"], "Venue")
