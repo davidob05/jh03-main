@@ -36,20 +36,19 @@ class NotificationViewTests(TestCase):
 
     def test_returns_recent_notifications_sorted_desc(self):
         cutoff = timezone.now() - timedelta(days=7, hours=1)
-        Notification.objects.create(
+        old = Notification.objects.create(
             type="availability",
             message="Old",
-            timestamp=cutoff - timedelta(hours=1),
         )
+        Notification.objects.filter(pk=old.pk).update(timestamp=cutoff - timedelta(hours=1))
         n1 = Notification.objects.create(
             type="examChange",
             message="Recent",
-            timestamp=timezone.now() - timedelta(days=2),
         )
+        Notification.objects.filter(pk=n1.pk).update(timestamp=timezone.now() - timedelta(days=2))
         n2 = Notification.objects.create(
             type="venueChange",
             message="Newest",
-            timestamp=timezone.now(),
         )
 
         self.client.force_authenticate(self.admin)
