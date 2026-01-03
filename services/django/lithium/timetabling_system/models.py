@@ -3,6 +3,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils import timezone
 
+
 # ---------- ENUM TYPES ----------
 
 class ProvisionType(models.TextChoices):
@@ -100,6 +101,7 @@ class AccessibilityFeatures(models.TextChoices):
 
 # ---------- MAIN TABLES ----------
 
+
 class Exam(models.Model):
     exam_id = models.AutoField(primary_key=True)
     exam_name = models.CharField(max_length=30)
@@ -169,6 +171,7 @@ class StudentExam(models.Model):
         null=True,
         blank=True,
     )
+
     class Meta:
         unique_together = ('student', 'exam')
 
@@ -202,6 +205,7 @@ class Provisions(models.Model):
 
 
 # ---------- NOTIFICATIONS ----------
+
 
 class Notification(models.Model):
     class NotificationType(models.TextChoices):
@@ -332,7 +336,7 @@ class InvigilatorAvailability(models.Model):
         indexes = [models.Index(fields=["date", "slot"])]
 
     def __str__(self):
-        return f"{self.invigilator} availability on {self.date} ({self.slot}): {'Available' if self.available else 'Unavailable'}" 
+        return f"{self.invigilator} availability on {self.date} ({self.slot}): {'Available' if self.available else 'Unavailable'}"
 
 
 class InvigilatorAssignment(models.Model):
@@ -371,7 +375,7 @@ class InvigilatorAssignment(models.Model):
 
     def __str__(self):
         return f"{self.invigilator} → {self.exam_venue}"
-    
+
     def total_hours(self):
         """
         Return total hours assigned, subtracting break_time_minutes.
