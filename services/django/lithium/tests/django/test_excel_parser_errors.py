@@ -51,6 +51,26 @@ class ExcelParserErrorTests(TestCase):
         self.assertEqual(result["status"], "error")
         self.assertIn("Unrecognized file structure", result["message"])
 
+    def test_missing_required_columns_for_provisions(self):
+        df = mock.MagicMock()
+        df.copy.return_value = df
+        with mock.patch("timetabling_system.utils.excel_parser.pd.read_excel", return_value=df), mock.patch(
+            "timetabling_system.utils.excel_parser.prepare_exam_provision_df"
+        ) as prep:
+            prep.return_value = df
+            with mock.patch(
+                "timetabling_system.utils.excel_parser.detect_provision_file",
+                return_value=True,
+            ), mock.patch(
+                "timetabling_system.utils.excel_parser.validate_required_columns",
+                return_value=["student_id"],
+            ):
+                result = excel_parser.parse_excel_file(mock.Mock(name="file", spec=["name"]))
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["type"], "Provisions")
+        self.assertIn("Missing required columns", result["message"])
+
     def test_fallback_to_venue_parser_on_read_error(self):
         fake_file = mock.Mock(name="file", spec=["name", "seek"])
         fake_file.seek = mock.Mock()
