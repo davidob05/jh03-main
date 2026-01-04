@@ -1,7 +1,7 @@
 import { AppBar, Toolbar, Box, Button, Avatar, IconButton, Tooltip, Menu, MenuItem, Divider, Typography } from "@mui/material";
 import React, { useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
-import { authTokenKey, authUserKey, getStoredUser } from "../../utils/api";
+import { clearAuthSession, getStoredUser } from "../../utils/api";
 
 export const InvigilatorLayout: React.FC = () => {
   const location = useLocation();
@@ -16,8 +16,7 @@ export const InvigilatorLayout: React.FC = () => {
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem(authTokenKey);
-    localStorage.removeItem(authUserKey);
+    clearAuthSession();
     navigate("/login");
   };
 

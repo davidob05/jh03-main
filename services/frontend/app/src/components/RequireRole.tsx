@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { authTokenKey, getStoredRole } from "../utils/api";
+import { getAuthToken, getStoredRole } from "../utils/api";
 
 interface RequireRoleProps {
   role: "admin" | "invigilator";
@@ -8,7 +8,7 @@ interface RequireRoleProps {
 
 export const RequireRole: React.FC<RequireRoleProps> = ({ role }) => {
   const location = useLocation();
-  const token = typeof localStorage !== "undefined" ? localStorage.getItem(authTokenKey) : null;
+  const token = getAuthToken();
   const storedRole = getStoredRole();
 
   if (!token) {

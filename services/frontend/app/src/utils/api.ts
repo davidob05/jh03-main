@@ -20,6 +20,76 @@ export const apiBaseUrl = normalisedBase.endsWith("/api")
 export const authTokenKey = "authToken";
 export const authUserKey = "authUser";
 
+const safeSessionStorage = (() => {
+  if (typeof window === "undefined") return null;
+  try {
+    const store = window.sessionStorage;
+    const probe = "__storage_probe__";
+    store.setItem(probe, "1");
+    store.removeItem(probe);
+    return store;
+  } catch (_err) {
+    return null;
+  }
+})();
+
+const safeLocalStorage = (() => {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch (_err) {
+    return null;
+  }
+})();
+
+const primaryStorage = safeSessionStorage || safeLocalStorage;
+
+const migrateLegacyStorage = () => {
+  if (!primaryStorage || !safeLocalStorage || primaryStorage === safeLocalStorage) return;
+  const token = safeLocalStorage.getItem(authTokenKey);
+  const user = safeLocalStorage.getItem(authUserKey);
+  if (token && !primaryStorage.getItem(authTokenKey)) {
+    primaryStorage.setItem(authTokenKey, token);
+  }
+  if (user && !primaryStorage.getItem(authUserKey)) {
+    primaryStorage.setItem(authUserKey, user);
+  }
+  safeLocalStorage.removeItem(authTokenKey);
+  safeLocalStorage.removeItem(authUserKey);
+};
+
+migrateLegacyStorage();
+
+const readItem = (key: string): string | null => {
+  if (primaryStorage) {
+    const value = primaryStorage.getItem(key);
+    if (value !== null) return value;
+  }
+  if (safeLocalStorage && safeLocalStorage !== primaryStorage) {
+    return safeLocalStorage.getItem(key);
+  }
+  return null;
+};
+
+const writeItem = (key: string, value: string) => {
+  if (primaryStorage) {
+    primaryStorage.setItem(key, value);
+  } else if (safeLocalStorage) {
+    safeLocalStorage.setItem(key, value);
+  }
+};
+
+const removeItem = (key: string) => {
+  if (primaryStorage) {
+    primaryStorage.removeItem(key);
+  }
+  if (safeLocalStorage && safeLocalStorage !== primaryStorage) {
+    safeLocalStorage.removeItem(key);
+  }
+};
+
+export const getAuthToken = (): string | null => readItem(authTokenKey);
+
 export type AuthUser = {
   id?: number;
   email?: string;
@@ -32,8 +102,7 @@ export type AuthUser = {
 };
 
 const parseStoredUser = (): AuthUser | null => {
-  if (typeof localStorage === "undefined") return null;
-  const raw = localStorage.getItem(authUserKey);
+  const raw = readItem(authUserKey);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as AuthUser;
@@ -68,7 +137,7 @@ const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
 
 const withAuthHeader = (headers?: HeadersInit): HeadersInit => {
   const base = normalizeHeaders(headers);
-  const token = typeof localStorage !== "undefined" ? localStorage.getItem(authTokenKey) : null;
+  const token = getAuthToken();
   if (token) {
     base.Authorization = `Token ${token}`;
   }
@@ -83,3 +152,15 @@ export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
 // Convenience helper for unauthenticated public reads when auth is not set.
 export const apiFetchPublic = (input: RequestInfo | URL, init: RequestInit = {}) =>
   fetch(input, { ...init, headers: normalizeHeaders(init.headers) });
+
+export const setAuthSession = (token: string, user?: AuthUser) => {
+  writeItem(authTokenKey, token);
+  if (user) {
+    writeItem(authUserKey, JSON.stringify(user));
+  }
+};
+
+export const clearAuthSession = () => {
+  removeItem(authTokenKey);
+  removeItem(authUserKey);
+};

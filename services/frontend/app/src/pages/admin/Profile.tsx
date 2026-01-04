@@ -24,7 +24,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../../components/PillButton";
 import { PhotoCamera, Visibility, VisibilityOff, Logout } from "@mui/icons-material";
-import { apiBaseUrl, apiFetch, authUserKey } from "../../utils/api";
+import { apiBaseUrl, apiFetch, getAuthToken, setAuthSession } from "../../utils/api";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { Panel } from "../../components/Panel";
 
@@ -125,7 +125,10 @@ export const AdminProfile: React.FC = () => {
       }
       // Update local cached user info
       if (data) {
-        localStorage.setItem(authUserKey, JSON.stringify(data));
+        const token = getAuthToken();
+        if (token) {
+          setAuthSession(token, data);
+        }
         // keep in-memory state and react-query cache in sync
         setName(data.username || name);
         setEmail(data.email || email);
@@ -537,7 +540,10 @@ export const AdminProfile: React.FC = () => {
               setSnackbar({ open: true, message: data?.detail || "Failed to remove photo.", severity: "error" });
               return;
             }
-            localStorage.setItem(authUserKey, JSON.stringify(data));
+            const token = getAuthToken();
+            if (token) {
+              setAuthSession(token, data);
+            }
             queryClient.setQueryData(["me"], data);
             setPhotoPreview(null);
             setAvatarData(null);
