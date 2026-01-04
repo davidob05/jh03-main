@@ -224,21 +224,16 @@ export const AdminInvigilators: React.FC = () => {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: number[]) => {
-      const results = await Promise.all(
-        ids.map(async (id) => {
-          const res = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`, {
-            method: "DELETE",
-          });
-
-          if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`Failed deleting #${id}: ${text}`);
-          }
-          return true;
-        })
-      );
-
-      return results;
+      const res = await apiFetch(`${apiBaseUrl}/invigilators/bulk-delete/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Bulk delete failed");
+      }
+      return true;
     },
     onSuccess: async (_data, ids) => {
       const count = ids?.length ?? 0;

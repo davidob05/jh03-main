@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
 import {
   Box,
@@ -210,9 +210,11 @@ interface EnhancedTableToolbarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onAddVenue: () => void;
+  onDeleteSelected: () => void;
+  deleteLoading: boolean;
 }
 
-const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddVenue }: EnhancedTableToolbarProps) => {
+const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddVenue, onDeleteSelected, deleteLoading }: EnhancedTableToolbarProps) => {
   return (
     <Toolbar
       sx={[
@@ -265,8 +267,10 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
             variant="outlined"
             color="error"
             startIcon={<DeleteIcon />}
+            disabled={deleteLoading}
+            onClick={onDeleteSelected}
           >
-            Delete
+            {deleteLoading ? "Deleting..." : "Delete"}
           </PillButton>
         </Box>
       )}
@@ -286,6 +290,7 @@ export const AdminVenues: React.FC = () => {
   const [addOpen, setAddOpen] = React.useState(false);
   const [successOpen, setSuccessOpen] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState('');
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const {
     data: venuesData = [],
@@ -316,6 +321,30 @@ export const AdminVenues: React.FC = () => {
       })),
     [venuesData],
   );
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiFetch(`${apiBaseUrl}/venues/bulk-delete/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Bulk delete failed");
+      }
+      return true;
+    },
+    onSuccess: async (_data, ids) => {
+      setSelected([]);
+      setSuccessMessage(`Deleted ${ids.length} venue${ids.length === 1 ? "" : "s"}.`);
+      setSuccessOpen(true);
+      await queryClient.invalidateQueries({ queryKey: ['venues'] });
+    },
+    onError: (err: any) => {
+      setErrorMessage(err?.message || "Failed to delete venues.");
+    },
+  });
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
@@ -424,6 +453,8 @@ export const AdminVenues: React.FC = () => {
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
           onAddVenue={() => setAddOpen(true)}
+          onDeleteSelected={() => bulkDeleteMutation.mutate([...selected])}
+          deleteLoading={bulkDeleteMutation.isPending}
         />
         <Divider />
 
@@ -580,6 +611,16 @@ export const AdminVenues: React.FC = () => {
           }}
         >
           {successMessage}
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={Boolean(errorMessage)}
+        autoHideDuration={4000}
+        onClose={() => setErrorMessage(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={() => setErrorMessage(null)} variant="filled">
+          {errorMessage}
         </Alert>
       </Snackbar>
       <Fab
