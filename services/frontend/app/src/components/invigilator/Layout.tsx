@@ -1,7 +1,7 @@
 import { AppBar, Toolbar, Box, Button, Avatar, IconButton, Tooltip, Menu, MenuItem, Divider, Typography } from "@mui/material";
 import React, { useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
-import { authTokenKey, authUserKey, getStoredUser } from "../../utils/api";
+import { apiBaseUrl, apiFetch, authTokenKey, authUserKey, getStoredUser } from "../../utils/api";
 
 export const InvigilatorLayout: React.FC = () => {
   const location = useLocation();
@@ -15,10 +15,16 @@ export const InvigilatorLayout: React.FC = () => {
     { text: "Shifts", path: "/invigilator/shifts" }
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem(authTokenKey);
-    localStorage.removeItem(authUserKey);
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await apiFetch(`${apiBaseUrl}/auth/logout/`, { method: "POST" });
+    } catch (_err) {
+      // Ignore failures; still clear local state.
+    } finally {
+      localStorage.removeItem(authTokenKey);
+      localStorage.removeItem(authUserKey);
+      navigate("/login");
+    }
   };
 
   const openMenu = (event: React.MouseEvent<HTMLElement>) => setMenuAnchor(event.currentTarget);

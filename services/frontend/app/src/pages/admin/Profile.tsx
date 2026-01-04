@@ -18,6 +18,7 @@ import {
   CircularProgress,
   Card,
   CardContent,
+  Chip,
 } from "@mui/material";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -66,10 +67,20 @@ export const AdminProfile: React.FC = () => {
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [showPasswords, setShowPasswords] = useState(false);
 
-  const sessions = [
-    { device: "Chrome on Windows", location: "Glasgow, UK", lastActive: "Today 09:45" },
-    { device: "Safari on iPhone", location: "Glasgow, UK", lastActive: "Yesterday 20:12" },
-  ];
+  const {
+    data: sessions,
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+    error: sessionsErrorObj,
+    refetch: refetchSessions,
+  } = useQuery({
+    queryKey: ["sessions"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/auth/sessions/`);
+      if (!res.ok) throw new Error("Unable to load sessions");
+      return res.json();
+    },
+  });
 
   const getInitials = (name: string) =>
     name
@@ -186,8 +197,32 @@ export const AdminProfile: React.FC = () => {
     setSnackbar({ open: true, message: "Account deletion flow not implemented in demo", severity: "error" });
   };
 
-  const handleSignOutAll = () => {
-    setSnackbar({ open: true, message: "Signed out of all sessions", severity: "success" });
+  const handleSignOutAll = async () => {
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/auth/sessions/revoke-others/`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || "Failed to sign out of other sessions.");
+      setSnackbar({ open: true, message: "Signed out of other sessions.", severity: "success" });
+      await refetchSessions();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err?.message || "Failed to sign out of other sessions.", severity: "error" });
+    }
+  };
+
+  const handleRevokeSession = async (key: string) => {
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/auth/sessions/revoke/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || "Failed to sign out of session.");
+      setSnackbar({ open: true, message: "Session signed out.", severity: "success" });
+      await refetchSessions();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err?.message || "Failed to sign out of session.", severity: "error" });
+    }
   };
 
   useEffect(() => {
@@ -198,7 +233,7 @@ export const AdminProfile: React.FC = () => {
     setPhotoPreview(userData.avatar || null);
     setAvatarData(userData.avatar || null);
     setShowPhotoSave(false);
-    setLastLogin(userData.last_login || null);
+    setLastLogin(userData.last_login ? new Date(userData.last_login).toLocaleString() : null);
     setLastUpdated("Just now");
   }, [userData]);
 
@@ -405,28 +440,74 @@ export const AdminProfile: React.FC = () => {
           <Stack spacing={1}>
             <Typography variant="subtitle2">Active sessions</Typography>
             <Stack spacing={1}>
-              {sessions.map((s, idx) => (
-                <Card key={idx} variant="outlined">
-                  <CardContent sx={{ py: 1.5 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Box>
-                        <Typography fontWeight={600}>{s.device}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {s.location} • Last active {s.lastActive}
-                        </Typography>
-                      </Box>
-                      <Tooltip title="Sign out this session (demo only)">
-                        <IconButton size="small">
-                          <Logout fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
+              {sessionsLoading && (
+                <Card variant="outlined">
+                  <CardContent sx={{ py: 1.5, textAlign: "center" }}>
+                    <CircularProgress size={20} />
                   </CardContent>
                 </Card>
-              ))}
+              )}
+              {sessionsError && (
+                <Alert severity="error">{(sessionsErrorObj as any)?.message || "Failed to load sessions."}</Alert>
+              )}
+              {!sessionsLoading && !sessionsError && Array.isArray(sessions) && sessions.length === 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  No active sessions.
+                </Typography>
+              )}
+              {!sessionsLoading &&
+                !sessionsError &&
+                Array.isArray(sessions) &&
+                sessions.map((s: any) => (
+                  <Card key={s.key} variant="outlined">
+                    <CardContent sx={{ py: 1.5 }}>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", sm: "center" }}
+                        spacing={1}
+                      >
+                        <Box>
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                            <Typography fontWeight={600}>Session</Typography>
+                            {s.is_current && <Chip size="small" sx={{ fontWeight: 600 }} color="primary" label="Current" />}
+                            {!s.is_active && <Chip size="small" sx={{ fontWeight: 600 }} color="default" label="Revoked" />}
+                          </Stack>
+                          <Typography variant="body2" color="text.secondary">
+                            Last active: {s.last_seen ? new Date(s.last_seen).toLocaleString() : "N/A"}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Created: {s.created_at ? new Date(s.created_at).toLocaleString() : "N/A"}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            IP: {s.ip_address || "Unknown"}
+                          </Typography>
+                          {s.user_agent && (
+                            <Typography variant="body2" color="text.secondary">
+                              Agent: {s.user_agent}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Tooltip
+                          title={s.is_current ? "You cannot sign out the current session here." : "Sign out this session"}
+                        >
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={s.is_current || !s.is_active}
+                              onClick={() => handleRevokeSession(s.key)}
+                            >
+                              <Logout fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                ))}
             </Stack>
             <PillButton variant="outlined" color="error" onClick={handleSignOutAll}>
-              Sign out of all sessions
+              Sign out of other sessions
             </PillButton>
           </Stack>
         </Stack>
@@ -441,12 +522,13 @@ export const AdminProfile: React.FC = () => {
             <Switch
               checked={darkMode}
               onChange={() => setDarkMode(!darkMode)}
+              disabled
             />
           </Stack>
 
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Email Notifications</Typography>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
+            <FormControl size="small" sx={{ minWidth: 180 }} disabled>
               <InputLabel>Email frequency</InputLabel>
               <Select
                 label="Email frequency"
@@ -455,6 +537,7 @@ export const AdminProfile: React.FC = () => {
               >
                 <MenuItem value="instant">Instant</MenuItem>
                 <MenuItem value="daily">Daily summary</MenuItem>
+                <MenuItem value="weekly">Weekly summary</MenuItem>
                 <MenuItem value="off">Off</MenuItem>
               </Select>
             </FormControl>
@@ -465,6 +548,7 @@ export const AdminProfile: React.FC = () => {
             <Switch
               checked={notifySms}
               onChange={() => setNotifySms(!notifySms)}
+              disabled
             />
           </Stack>
 
@@ -473,10 +557,11 @@ export const AdminProfile: React.FC = () => {
             <Switch
               checked={notifyPush}
               onChange={() => setNotifyPush(!notifyPush)}
+              disabled
             />
           </Stack>
 
-          <PillButton variant="contained" onClick={handleTestNotification}>
+          <PillButton variant="contained" onClick={handleTestNotification} disabled>
             Send test notification
           </PillButton>
 

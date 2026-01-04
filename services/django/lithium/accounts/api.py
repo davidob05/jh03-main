@@ -1,13 +1,16 @@
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.contrib.auth.models import update_last_login
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import serializers, status
-from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from accounts.models import UserSession
 
 
 def _derive_role(user):
@@ -19,6 +22,17 @@ def _derive_role(user):
     except Exception:
         pass
     return "invigilator"
+
+
+def _get_client_ip(request):
+    xff = request.META.get("HTTP_X_FORWARDED_FOR")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "")
+
+
+def _get_user_agent(request):
+    return request.META.get("HTTP_USER_AGENT", "")
 
 
 class AuthTokenSerializer(serializers.Serializer):
@@ -64,10 +78,18 @@ class ObtainAuthTokenView(ObtainAuthToken):
         serializer = self.serializer_class(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        token, _ = Token.objects.get_or_create(user=user)
+        # Manually bump last_login since we are not using django.contrib.auth.login here.
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login"])
+        user.refresh_from_db(fields=["last_login"])
+        session = UserSession.objects.create(
+            user=user,
+            user_agent=_get_user_agent(request),
+            ip_address=_get_client_ip(request),
+        )
         return Response(
             {
-                "token": token.key,
+                "token": session.key,
                 "user": {
                     "id": user.id,
                     "email": user.email,
@@ -76,6 +98,7 @@ class ObtainAuthTokenView(ObtainAuthToken):
                     "is_superuser": user.is_superuser,
                     "role": _derive_role(user),
                     "avatar": getattr(user, "avatar", None),
+                    "last_login": user.last_login.isoformat() if user.last_login else None,
                 },
             },
             status=status.HTTP_200_OK,
@@ -104,6 +127,7 @@ class CurrentUserView(APIView):
                 "role": _derive_role(user),
                 "phone": phone,
                 "avatar": avatar,
+                "last_login": user.last_login.isoformat() if user.last_login else None,
             },
             status=status.HTTP_200_OK,
         )
@@ -201,6 +225,72 @@ class CurrentUserView(APIView):
                 "phone_updated": phone_updated,
                 "avatar": getattr(user, "avatar", None),
                 "password_updated": password_updated,
+                "last_login": user.last_login.isoformat() if user.last_login else None,
             },
             status=status.HTTP_200_OK,
         )
+
+
+class SessionListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *_args, **_kwargs):
+        current_key = getattr(getattr(request, "auth", None), "key", None)
+        sessions = UserSession.objects.filter(user=request.user).order_by("-created_at")
+        payload = []
+        for session in sessions:
+            payload.append(
+                {
+                    "key": session.key,
+                    "created_at": session.created_at.isoformat(),
+                    "last_seen": session.last_seen.isoformat() if session.last_seen else None,
+                    "revoked_at": session.revoked_at.isoformat() if session.revoked_at else None,
+                    "user_agent": session.user_agent,
+                    "ip_address": session.ip_address,
+                    "is_current": session.key == current_key,
+                    "is_active": session.revoked_at is None,
+                }
+            )
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class SessionRevokeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *_args, **_kwargs):
+        key = request.data.get("key")
+        if not key:
+            return Response({"detail": "Session key is required."}, status=status.HTTP_400_BAD_REQUEST)
+        session = UserSession.objects.filter(user=request.user, key=key).first()
+        if not session:
+            return Response({"detail": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not session.revoked_at:
+            session.revoke()
+        return Response({"detail": "Session revoked.", "key": key}, status=status.HTTP_200_OK)
+
+
+class SessionRevokeOthersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *_args, **_kwargs):
+        current_key = getattr(getattr(request, "auth", None), "key", None)
+        qs = UserSession.objects.filter(user=request.user, revoked_at__isnull=True)
+        if current_key:
+            qs = qs.exclude(key=current_key)
+        revoked_count = qs.update(revoked_at=timezone.now())
+        return Response({"detail": "Other sessions revoked.", "revoked": revoked_count}, status=status.HTTP_200_OK)
+
+
+class SessionLogoutView(APIView):
+    """
+    Revoke the current session (used on logout).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *_args, **_kwargs):
+        current_session = getattr(request, "auth", None)
+        if isinstance(current_session, UserSession):
+            current_session.revoke()
+            return Response({"detail": "Session revoked."}, status=status.HTTP_200_OK)
+        return Response({"detail": "No active session to revoke."}, status=status.HTTP_400_BAD_REQUEST)
