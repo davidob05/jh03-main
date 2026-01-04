@@ -3,30 +3,24 @@ import {
   Alert,
   Box,
   Chip,
-  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
-  FormGroup,
   FormLabel,
   Stack,
   TextField,
   Typography,
   IconButton,
 } from "@mui/material";
-import { useMutation } from "@tanstack/react-query";
-import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../Panel";
 import { PillButton } from "../PillButton";
 import { Close } from "@mui/icons-material";
 
-export type NotifyMethod = "email" | "sms";
-
 type Recipient = {
   id: number;
   name: string;
+  emails: string[];
 };
 
 type NotifyDialogProps = {
@@ -36,11 +30,6 @@ type NotifyDialogProps = {
   onSent?: (count: number) => void;
 };
 
-const METHOD_OPTIONS: { value: NotifyMethod; label: string; helper: string }[] = [
-  { value: "email", label: "Email", helper: "Send to university/personal email" },
-  { value: "sms", label: "SMS", helper: "Text the provided mobile numbers (where available)" },
-];
-
 export const NotifyDialog: React.FC<NotifyDialogProps> = ({
   open,
   recipients,
@@ -49,85 +38,33 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
 }) => {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
-  const [methods, setMethods] = useState<NotifyMethod[]>(["email"]);
   const [error, setError] = useState<string | null>(null);
 
   const recipientIds = useMemo(() => recipients.map((r) => r.id), [recipients]);
-
-  const notifyMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiFetch(`${apiBaseUrl}/notifications/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          invigilator_ids: recipientIds,
-          subject: subject.trim() || "Message from administrator",
-          message: message.trim(),
-          methods,
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to send notification");
-      }
-      return res.json().catch(() => null);
-    },
-    onSuccess: () => {
-      onSent?.(recipientIds.length);
-      setSubject("");
-      setMessage("");
-      setMethods(["email"]);
-      setError(null);
-    },
-    onError: (err: any) => {
-      setError(err?.message || "Failed to send notification");
-    },
-  });
+  const recipientEmails = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          recipients
+            .flatMap((r) => r.emails || [])
+            .filter((email): email is string => Boolean(email))
+        )
+      ),
+    [recipients]
+  );
 
   const resetForm = React.useCallback(() => {
     setSubject("");
     setMessage("");
-    setMethods(["email"]);
     setError(null);
   }, []);
 
   useEffect(() => {
     if (!open) {
       resetForm();
-      notifyMutation.reset();
     }
-    // Depend only on `open` to avoid re-running on each mutation object change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  const handleToggleMethod = (method: NotifyMethod) => {
-    setMethods((prev) =>
-      prev.includes(method) ? prev.filter((m) => m !== method) : [...prev, method]
-    );
-  };
-
-  const handleSend = () => {
-    if (!message.trim()) {
-      setError("Message is required.");
-      return;
-    }
-    if (!methods.length) {
-      setError("Choose at least one delivery method.");
-      return;
-    }
-    if (!recipientIds.length) {
-      setError("Select at least one invigilator to notify.");
-      return;
-    }
-
-    setError(null);
-    notifyMutation.mutate();
-  };
-
-  const sending = notifyMutation.isPending;
+  const sending = false;
 
   return (
     <Dialog
@@ -135,7 +72,6 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
       onClose={() => {
         if (!sending) {
           resetForm();
-          notifyMutation.reset();
           onClose();
         }
       }}
@@ -150,7 +86,6 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
           onClick={() => {
             if (!sending) {
               resetForm();
-              notifyMutation.reset();
               onClose();
             }
           }}
@@ -205,31 +140,14 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
 
         <Panel sx={{ mt: 2, mb: 0, p: 2 }}>
           <FormLabel component="legend" sx={{ mb: 1, display: "block" }}>
-            Delivery methods
+            Delivery
           </FormLabel>
-          <FormGroup row>
-            {METHOD_OPTIONS.map((opt) => (
-              <FormControlLabel
-                key={opt.value}
-                control={
-                  <Checkbox
-                    checked={methods.includes(opt.value)}
-                    onChange={() => handleToggleMethod(opt.value)}
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="body2" fontWeight={600}>
-                      {opt.label}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {opt.helper}
-                    </Typography>
-                  </Box>
-                }
-              />
-            ))}
-          </FormGroup>
+          <Typography variant="body2">
+            Opens your default mail app with all selected invigilators as a mail merge.
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Recipients: {recipientEmails.length ? recipientEmails.join(", ") : "None found"}
+          </Typography>
         </Panel>
 
         {error ? (
@@ -241,8 +159,24 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
       <DialogActions sx={{ px: 3, py: 2 }}>
         <PillButton
           variant="contained"
-          onClick={handleSend}
-          disabled
+          onClick={() => {
+            if (!recipientEmails.length) {
+              setError("No email addresses found for selected invigilators.");
+              return;
+            }
+            if (!message.trim()) {
+              setError("Message is required.");
+              return;
+            }
+            const mailSubject = subject.trim() || "Message from administrator";
+            const mailBody = message.trim();
+            const mailto = `mailto:?bcc=${encodeURIComponent(
+              recipientEmails.join(",")
+            )}&subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(mailBody)}`;
+            window.location.href = mailto;
+            onSent?.(recipientIds.length);
+          }}
+          disabled={!recipients.length}
         >
           Send notification
         </PillButton>

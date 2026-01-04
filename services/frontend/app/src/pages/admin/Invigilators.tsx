@@ -329,6 +329,9 @@ export const AdminInvigilators: React.FC = () => {
         .map((inv) => ({
           id: inv.id,
           name: displayName(inv),
+          emails: [inv.university_email, inv.personal_email].filter(
+            (email): email is string => Boolean(email)
+          ),
         })),
     [invigilators, selected]
   );
