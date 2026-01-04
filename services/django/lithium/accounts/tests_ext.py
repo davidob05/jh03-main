@@ -12,7 +12,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from accounts.adapters import AccountAdapter
-from accounts.api import AuthTokenSerializer, _derive_role
+from accounts.api import AuthTokenSerializer, _derive_role, CurrentUserView
 from accounts.admin import CustomUserAdmin
 from timetabling_system.models import Invigilator
 
@@ -63,6 +63,22 @@ class AccountAdapterTests(TestCase):
         )
         allowed = self.adapter.is_login_allowed(user)
         self.assertTrue(allowed)
+
+    @override_settings(BLOCK_RESIGNED_INVIGILATORS=True)
+    def test_non_resigned_invigilator_allowed(self):
+        self.invigilator.resigned = False
+        self.invigilator.save(update_fields=["resigned"])
+        allowed = self.adapter.is_login_allowed(self.user)
+        self.assertTrue(allowed)
+
+    def test_super_can_disallow_login(self):
+        with mock.patch(
+            "accounts.adapters.DefaultAccountAdapter.is_login_allowed",
+            return_value=False,
+            create=True,
+        ):
+            allowed = self.adapter.is_login_allowed(self.user)
+            self.assertFalse(allowed)
 
     def test_invigilator_profile_error_allows_login(self):
         class BrokenUser:
@@ -244,6 +260,61 @@ class AuthApiEdgeTests(TestCase):
         response = self.client.get(reverse("api-auth-me"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["phone"], self.invigilator_user.invigilator_profile.alt_phone)
+
+    def test_patch_updates_username_and_email(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.patch(
+            reverse("api-auth-me"),
+            {"username": "newadmin", "email": "newadmin@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, "newadmin")
+        self.assertEqual(self.user.email, "newadmin@example.com")
+
+    def test_patch_phone_handles_invigilator_profile_exception(self):
+        # Patch the invigilator_profile to raise when updating phone
+        user = self.user
+        self.client.force_authenticate(user)
+        with mock.patch.object(
+            type(user),
+            "invigilator_profile",
+            new_callable=mock.PropertyMock,
+            side_effect=RuntimeError("boom"),
+            create=True,
+        ):
+            response = self.client.patch(
+                reverse("api-auth-me"),
+                {"phone": "09999"},
+                format="json",
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertEqual(user.phone, "09999")
+
+    def test_current_user_handles_invigilator_profile_exception(self):
+        class Dummy:
+            is_staff = False
+            is_superuser = False
+            id = 1
+            email = "d@example.com"
+            username = "dummy"
+            phone = None
+            avatar = None
+
+            def __getattr__(self, _name):
+                raise RuntimeError("boom")
+
+        from rest_framework.test import APIRequestFactory
+
+        factory = APIRequestFactory()
+        request = factory.get("/api/auth/me/")
+        request.user = Dummy()
+        view = CurrentUserView()
+        response = view.get(request)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["phone"])
 
 
 class MigrationTests(TestCase):
