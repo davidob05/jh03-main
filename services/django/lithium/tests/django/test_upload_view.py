@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
@@ -7,6 +8,17 @@ from rest_framework import status
 
 
 class UploadTimetableViewTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="admin",
+            email="admin@example.com",
+            password="StrongPass123!",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client.login(username="admin", password="StrongPass123!")
+
     def test_missing_file_returns_400(self):
         response = self.client.post(reverse("upload-exams"))
 
