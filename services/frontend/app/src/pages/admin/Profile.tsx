@@ -57,12 +57,13 @@ export const AdminProfile: React.FC = () => {
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
   const [lastUpdated, setLastUpdated] = useState("Just now");
   const [lastLogin, setLastLogin] = useState<string | null>(null);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
 
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [notifyEmail, setNotifyEmail] = useState<"instant" | "daily" | "off">("instant");
   const [notifySms, setNotifySms] = useState(false);
-  const [notifyPush, setNotifyPush] = useState(true);
+  const [notifyPush, setNotifyPush] = useState(false);
 
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [showPasswords, setShowPasswords] = useState(false);
@@ -193,8 +194,24 @@ export const AdminProfile: React.FC = () => {
     setSnackbar({ open: true, message: "Data export started", severity: "success" });
   };
 
-  const handleDeleteAccount = () => {
-    setSnackbar({ open: true, message: "Account deletion flow not implemented in demo", severity: "error" });
+  const handleDeleteAccount = async () => {
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/auth/me/`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const msg = data?.detail || "Failed to delete account.";
+        throw new Error(msg);
+      }
+      // Clear local auth state and redirect to login
+      localStorage.removeItem(authTokenKey);
+      localStorage.removeItem(authUserKey);
+      setSnackbar({ open: true, message: "Account deleted.", severity: "success" });
+      navigate("/login", { replace: true });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err?.message || "Failed to delete account.", severity: "error" });
+    } finally {
+      setDeleteAccountOpen(false);
+    }
   };
 
   const handleSignOutAll = async () => {
@@ -577,7 +594,7 @@ export const AdminProfile: React.FC = () => {
             <PillButton variant="outlined" onClick={handleExportData}>
               Export my data
             </PillButton>
-            <PillButton variant="outlined" color="error" onClick={handleDeleteAccount}>
+            <PillButton variant="outlined" color="error" onClick={() => setDeleteAccountOpen(true)}>
               Delete my account
             </PillButton>
           </Stack>
@@ -639,6 +656,14 @@ export const AdminProfile: React.FC = () => {
             setConfirmRemoveOpen(false);
           }
         }}
+      />
+      <DeleteConfirmationDialog
+        open={deleteAccountOpen}
+        title="Delete account?"
+        description="This will permanently delete your account and sign you out. This cannot be undone."
+        confirmText="Delete"
+        onClose={() => setDeleteAccountOpen(false)}
+        onConfirm={handleDeleteAccount}
       />
     </Box>
   );

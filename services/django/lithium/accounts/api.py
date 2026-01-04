@@ -230,6 +230,22 @@ class CurrentUserView(APIView):
             status=status.HTTP_200_OK,
         )
 
+    def delete(self, request, *_args, **_kwargs):
+        user = request.user
+        if not (user.is_staff or user.is_superuser):
+            return Response({"detail": "Only admin users can delete their own account."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Revoke all sessions for this user before deletion
+        UserSession.objects.filter(user=user).delete()
+
+        user_id = user.id
+        username = user.username
+        user.delete()
+        return Response(
+            {"detail": f"Account deleted: {username or user_id}"},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
 
 class SessionListView(APIView):
     permission_classes = [IsAuthenticated]
