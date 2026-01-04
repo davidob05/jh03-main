@@ -430,12 +430,15 @@ export const AdminProfile: React.FC = () => {
             <Stack direction="row" spacing={1} alignItems="center">
               <Switch disabled /> {/* placeholder */}
               <Tooltip title="Manage 2FA setup">
-                <PillButton variant="outlined" size="small" onClick={() => navigate("/admin/profile/two-factor")}>
+                <PillButton variant="outlined" size="small" onClick={() => navigate("/admin/profile/two-factor")} disabled>
                   Manage
                 </PillButton>
               </Tooltip>
             </Stack>
           </Stack>
+          <Alert severity="info">
+            Two-factor authentication controls are coming soon. This section is not yet available in the current build.
+          </Alert>
 
           <Stack spacing={1}>
             <Typography variant="subtitle2">Active sessions</Typography>
@@ -517,6 +520,9 @@ export const AdminProfile: React.FC = () => {
       <Panel title="Preferences" disableDivider>
 
         <Stack spacing={3}>
+          <Alert severity="info">
+            Notification and appearance preferences are coming soon. These controls are not active yet.
+          </Alert>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Dark Mode</Typography>
             <Switch
