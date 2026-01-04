@@ -88,8 +88,14 @@ class AccountAdapterTests(TestCase):
             def __getattr__(self, _name):
                 raise RuntimeError("boom")
 
-        allowed = self.adapter.is_login_allowed(BrokenUser())
-        self.assertTrue(allowed)
+        with override_settings(BLOCK_RESIGNED_INVIGILATORS=True):
+            with mock.patch(
+                "accounts.adapters.DefaultAccountAdapter.is_login_allowed",
+                return_value=True,
+                create=True,
+            ):
+                allowed = self.adapter.is_login_allowed(BrokenUser())
+                self.assertTrue(allowed)
 
     def test_derive_role_handles_exception(self):
         class BrokenUser:
@@ -146,6 +152,12 @@ class AuthApiEdgeTests(TestCase):
         serializer = AuthTokenSerializer(data={"username": "admin", "password": "secret"})
         self.assertFalse(serializer.is_valid())
         self.assertIn("disabled", serializer.errors["non_field_errors"][0])
+
+    def test_current_user_no_changes_returns_200(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.patch(reverse("api-auth-me"), {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["password_updated"])
 
     @mock.patch("accounts.api.Token.objects.create")
     @mock.patch("accounts.api.Token.objects.get_or_create")
