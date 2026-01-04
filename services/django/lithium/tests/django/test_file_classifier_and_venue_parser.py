@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 from django.test import TestCase
 
 from timetabling_system.utils import file_classifier
@@ -40,11 +40,40 @@ class FileClassifierTests(TestCase):
         self.assertIn("exam_code", canonical)
         self.assertIn("exam_name", canonical)
 
+    def test_normalized_columns_and_header_error_fallback(self):
+        df = pd.DataFrame(columns=["Exam Code", "Exam Name"])
+        self.assertEqual(
+            file_classifier._normalized_columns(df),
+            {"exam_code", "exam_name"},
+        )
+
+        class BoomDF:
+            columns = ["Exam Code"]
+            index = [0]
+
+            @property
+            def iloc(self):
+                raise RuntimeError("boom")
+
+        canonical = file_classifier._canonical_columns(BoomDF())
+        self.assertIn("exam_code", canonical)
+
     def test_looks_like_date_cell_various_inputs(self):
         self.assertTrue(file_classifier._looks_like_date_cell(datetime.now()))
         self.assertTrue(file_classifier._looks_like_date_cell("2024-12-01"))
+        self.assertFalse(file_classifier._looks_like_date_cell(None))
         self.assertFalse(file_classifier._looks_like_date_cell(""))
         self.assertFalse(file_classifier._looks_like_date_cell(float("nan")))
+        self.assertTrue(file_classifier._looks_like_date_cell("12345"))
+        self.assertFalse(file_classifier._looks_like_date_cell("123"))
+        # Value that cannot be coerced to float hits the exception path
+        class NoFloat:
+            def __str__(self):
+                return "not_a_number"
+        self.assertFalse(file_classifier._looks_like_date_cell(NoFloat()))
+
+    def test_detect_venue_file_handles_invalid_input(self):
+        self.assertFalse(file_classifier.detect_venue_file(None))
 
 
 class VenueParserTests(TestCase):
@@ -57,6 +86,16 @@ class VenueParserTests(TestCase):
         self.assertIsNone(_cell_to_date_text(DummyCell(None)))
         # Non-date string falls back to stripped text
         self.assertEqual(_cell_to_date_text(DummyCell("notadate")), "notadate")
+
+    def test_cell_to_date_text_handles_datetime_and_invalid_serial(self):
+        class DummyCell:
+            def __init__(self, value):
+                self.value = value
+        now = datetime(2025, 7, 30, 10, 0)
+        self.assertEqual(_cell_to_date_text(DummyCell(now)), now.date().isoformat())
+        self.assertEqual(_cell_to_date_text(DummyCell(date(2025, 7, 31))), "2025-07-31")
+        # Invalid excel serial falls back to string
+        self.assertEqual(_cell_to_date_text(DummyCell(float("nan"))), "nan")
 
     def test_parse_venue_file_errors_on_empty_sheet(self):
         from openpyxl import Workbook
@@ -92,3 +131,21 @@ class VenueParserTests(TestCase):
         venues = {v["name"]: v for v in result["venues"]}
         self.assertTrue(venues["Room A"]["is_accessible"])
         self.assertFalse(venues["Room B"]["is_accessible"])
+
+    def test_parse_venue_file_skips_empty_header_columns(self):
+        from openpyxl import Workbook
+        from tempfile import NamedTemporaryFile
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append([None, "Tuesday"])
+        ws.append([None, "2025-07-29"])
+        ws.append([None, "Room B"])
+
+        with NamedTemporaryFile(suffix=".xlsx") as tmp:
+            wb.save(tmp.name)
+            tmp.seek(0)
+            result = parse_venue_file(tmp.name)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(len(result["days"]), 1)
