@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Chip, Divider, Stack, Typography } from "@mui/material";
-import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined, Place } from "@mui/icons-material";
+import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined, Place, AlternateEmail } from "@mui/icons-material";
 import { Panel } from "../Panel";
 
 export type NotificationType =
@@ -9,7 +9,8 @@ export type NotificationType =
   | "shiftPickup"
   | "examChange"
   | "invigilatorUpdate"
-  | "venueChange";
+  | "venueChange"
+  | "mailMerge";
 
 export interface NotificationItem {
   id: number;
@@ -57,6 +58,12 @@ const typeStyles: Record<
     color: "#f9a825",
     bg: "rgba(249,168,37,0.12)",
     icon: <Place fontSize="small" />,
+  },
+  mailMerge: {
+    label: "Mail Merge",
+    color: "#00695c",
+    bg: "rgba(0,105,92,0.08)",
+    icon: <AlternateEmail fontSize="small" />,
   },
 };
 

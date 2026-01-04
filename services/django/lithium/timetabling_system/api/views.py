@@ -221,6 +221,7 @@ class NotificationsView(APIView):
         methods = payload.get("methods") or []
         subject = (payload.get("subject") or "").strip()
         message = (payload.get("message") or "").strip()
+        log_only = bool(payload.get("log_only"))
 
         if not isinstance(invigilator_ids, (list, tuple)):
             return Response({"detail": "invigilator_ids must be a list."}, status=status.HTTP_400_BAD_REQUEST)
@@ -233,7 +234,7 @@ class NotificationsView(APIView):
         if not invigilator_ids:
             return Response({"detail": "At least one invigilator ID is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not message:
+        if not message and not log_only:
             return Response({"detail": "Message is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         if not isinstance(methods, (list, tuple)):
@@ -253,6 +254,25 @@ class NotificationsView(APIView):
         if not recipients:
             return Response({"detail": "No matching invigilators found."}, status=status.HTTP_404_NOT_FOUND)
 
+        subject_to_use = subject or "Message from administrator"
+
+        if log_only:
+            count = len(recipients)
+            Notification.objects.create(
+                type=Notification.NotificationType.MAIL_MERGE,
+                message=f"Sent '{subject_to_use}' mail merge to {count} invigilator{'s' if count != 1 else ''}",
+                timestamp=timezone.now(),
+            )
+            return Response(
+                {
+                    "status": "ok",
+                    "logged": True,
+                    "invigilator_ids": [i.id for i in recipients],
+                    "count": count,
+                    "subject": subject_to_use,
+                }
+            )
+
         if settings.EMAIL_BACKEND in {
             "django.core.mail.backends.console.EmailBackend",
             "django.core.mail.backends.dummy.EmailBackend",
@@ -267,7 +287,6 @@ class NotificationsView(APIView):
 
         from django.core.mail import send_mail
 
-        subject_to_use = subject or "Notification from administrator"
         sender_email = settings.DEFAULT_FROM_EMAIL
         reply_to_email = getattr(request.user, "email", "") or None
 

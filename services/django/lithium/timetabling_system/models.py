@@ -211,6 +211,7 @@ class Notification(models.Model):
         EXAM_CHANGE = "examChange", "Exam change"
         VENUE_CHANGE = "venueChange", "Venue change"
         INVIGILATOR_UPDATE = "invigilatorUpdate", "Invigilator update"
+        MAIL_MERGE = "mailMerge", "Mail merge"
         ADMIN_MESSAGE = "adminMessage", "Admin message"
 
     id = models.AutoField(primary_key=True)

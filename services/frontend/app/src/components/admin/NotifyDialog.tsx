@@ -16,6 +16,7 @@ import {
 import { Panel } from "../Panel";
 import { PillButton } from "../PillButton";
 import { Close } from "@mui/icons-material";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 type Recipient = {
   id: number;
@@ -159,7 +160,7 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
       <DialogActions sx={{ px: 3, py: 2 }}>
         <PillButton
           variant="contained"
-          onClick={() => {
+          onClick={async () => {
             if (!recipientEmails.length) {
               setError("No email addresses found for selected invigilators.");
               return;
@@ -170,6 +171,26 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
             }
             const mailSubject = subject.trim() || "Message from administrator";
             const mailBody = message.trim();
+
+            try {
+              await apiFetch(`${apiBaseUrl}/notifications/`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  invigilator_ids: recipientIds,
+                  subject: mailSubject,
+                  message: mailBody,
+                  methods: ["email"],
+                  log_only: true,
+                }),
+              });
+            } catch (err: any) {
+              setError(err?.message || "Failed to record mail merge.");
+              // Still proceed to open the mail client
+            }
+
             const mailto = `mailto:?bcc=${encodeURIComponent(
               recipientEmails.join(",")
             )}&subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(mailBody)}`;

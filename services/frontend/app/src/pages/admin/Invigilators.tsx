@@ -963,8 +963,8 @@ export const AdminInvigilators: React.FC = () => {
           onSent={(count) => {
             setSuccessMessage(
               count === 1
-                ? "Notification sent to 1 invigilator."
-                : `Notification sent to ${count} invigilators.`
+                ? "Mail merge ready for 1 invigilator."
+                : `Mail merge ready for ${count} invigilators.`
             );
             setSuccessOpen(true);
             setNotifyOpen(false);
