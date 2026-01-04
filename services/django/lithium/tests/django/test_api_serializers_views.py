@@ -43,6 +43,10 @@ class ExamVenueSerializerTests(TestCase):
         with self.assertRaises(DRFValidationError):
             serializer.save()
 
+    def test_missing_exam_raises_validation_error(self):
+        serializer = ExamVenueWriteSerializer(data={"venue_name": ""})
+        self.assertFalse(serializer.is_valid())
+
     def test_core_examvenue_cannot_be_updated(self):
         venue = Venue.objects.create(
             venue_name="Hall A",
@@ -144,3 +148,7 @@ class ApiViewHelpersTests(TestCase):
         examvenue_view = api_views.ExamVenueViewSet()
         examvenue_view.action = "partial_update"
         self.assertIs(api_views.ExamVenueWriteSerializer, examvenue_view.get_serializer_class())
+
+    def test_log_notification_handles_exception(self):
+        with mock.patch("timetabling_system.api.views.Notification.objects.create", side_effect=Exception("boom")):
+            api_views.log_notification("test", "msg")
