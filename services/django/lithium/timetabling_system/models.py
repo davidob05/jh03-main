@@ -218,6 +218,13 @@ class Notification(models.Model):
     type = models.CharField(max_length=30, choices=NotificationType.choices)
     message = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    triggered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="triggered_notifications",
+    )
 
     class Meta:
         ordering = ["-timestamp"]

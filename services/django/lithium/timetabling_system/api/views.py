@@ -30,12 +30,13 @@ from .serializers import (
 )
 
 
-def log_notification(type_: str, message: str, when=None):
+def log_notification(type_: str, message: str, when=None, user=None):
     try:
         Notification.objects.create(
             type=type_,
             message=message,
             timestamp=when or timezone.now(),
+            triggered_by=user,
         )
     except Exception:
         # Do not break main flows if notification logging fails
@@ -48,7 +49,7 @@ class ExamViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        log_notification("examChange", f"Exam '{instance.exam_name}' was updated.")
+        log_notification("examChange", f"Exam '{instance.exam_name}' was updated.", user=self.request.user)
         return instance
 
 
@@ -64,18 +65,18 @@ class VenueViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        log_notification("venueChange", f"Venue '{instance.venue_name}' was created.")
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was created.", user=self.request.user)
         return instance
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        log_notification("venueChange", f"Venue '{instance.venue_name}' was updated.")
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was updated.", user=self.request.user)
         return instance
 
     def perform_destroy(self, instance):
         venue_name = instance.venue_name
         response = super().perform_destroy(instance)
-        log_notification("venueChange", f"Venue '{venue_name}' was deleted.")
+        log_notification("venueChange", f"Venue '{venue_name}' was deleted.", user=self.request.user)
         return response
 
 
@@ -107,14 +108,14 @@ class ExamVenueViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         exam_name = instance.exam.exam_name if instance.exam else "Exam"
         venue_name = instance.venue.venue_name if instance.venue else "Unassigned"
-        log_notification("examChange", f"Exam '{exam_name}' venue updated to {venue_name}.")
+        log_notification("examChange", f"Exam '{exam_name}' venue updated to {venue_name}.", user=self.request.user)
         return instance
 
     def perform_create(self, serializer):
         instance = serializer.save()
         exam_name = instance.exam.exam_name if instance.exam else "Exam"
         venue_name = instance.venue.venue_name if instance.venue else "Unassigned"
-        log_notification("examChange", f"Exam '{exam_name}' venue set to {venue_name}.")
+        log_notification("examChange", f"Exam '{exam_name}' venue set to {venue_name}.", user=self.request.user)
         return instance
 
 
@@ -130,7 +131,7 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         instance = serializer.save()
         name = instance.preferred_name or instance.full_name or "Invigilator"
-        log_notification("invigilatorUpdate", f"{name} updated their details.")
+        log_notification("invigilatorUpdate", f"{name} has updated details.", user=self.request.user)
         return instance
 
 
@@ -147,13 +148,13 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
         exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
-        log_notification("shiftPickup", f"{name} picked up a shift for {exam_name}.")
+        log_notification("shiftPickup", f"{name} picked up a shift for {exam_name}.", user=self.request.user)
         return instance
 
     def perform_destroy(self, instance):
         name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
         exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
-        log_notification("cancellation", f"{name} cancelled a shift for {exam_name}.")
+        log_notification("cancellation", f"{name} cancelled a shift for {exam_name}.", user=self.request.user)
         return super().perform_destroy(instance)
 
 
@@ -262,6 +263,7 @@ class NotificationsView(APIView):
                 type=Notification.NotificationType.MAIL_MERGE,
                 message=f"Sent '{subject_to_use}' mail merge to {count} invigilator{'s' if count != 1 else ''}",
                 timestamp=timezone.now(),
+                triggered_by=request.user,
             )
             return Response(
                 {
