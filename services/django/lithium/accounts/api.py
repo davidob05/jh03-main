@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers, status
+from rest_framework.authtoken import models as authtoken_models
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -13,15 +14,21 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from accounts.models import UserSession
 
+Token = authtoken_models.Token
+
+
+def _safe_attr(obj, name, default=None):
+    try:
+        return getattr(obj, name)
+    except Exception:
+        return default
+
 
 def _derive_role(user):
-    if user.is_staff or user.is_superuser:
+    if _safe_attr(user, "is_staff", False) or _safe_attr(user, "is_superuser", False):
         return "admin"
-    try:
-        if user.invigilator_profile:
-            return "invigilator"
-    except Exception:
-        pass
+    if _safe_attr(user, "invigilator_profile"):
+        return "invigilator"
     return "invigilator"
 
 
@@ -96,7 +103,9 @@ class ObtainAuthTokenView(ObtainAuthToken):
         )
         return Response(
             {
-                "token": session.key,
+                # Return DRF token (tested/expected), but still create a session for tracking.
+                "token": token.key,
+                "session": session.key,
                 "user": {
                     "id": user.id,
                     "email": user.email,
@@ -117,24 +126,32 @@ class CurrentUserView(APIView):
 
     def get(self, request, *_args, **_kwargs):
         user = request.user
-        phone = getattr(user, "phone", None)
-        avatar = getattr(user, "avatar", None)
-        try:
-            if not phone and hasattr(user, "invigilator_profile") and user.invigilator_profile:
-                phone = user.invigilator_profile.alt_phone
-        except Exception:
-            phone = phone
+        phone = _safe_attr(user, "phone")
+        avatar = _safe_attr(user, "avatar")
+        invigilator_profile = _safe_attr(user, "invigilator_profile")
+        if not phone and invigilator_profile:
+            try:
+                phone = invigilator_profile.alt_phone
+            except Exception:
+                phone = phone
+        last_login_iso = None
+        last_login_val = _safe_attr(user, "last_login")
+        if last_login_val:
+            try:
+                last_login_iso = last_login_val.isoformat()
+            except Exception:
+                last_login_iso = None
         return Response(
             {
                 "id": user.id,
                 "email": user.email,
                 "username": user.username,
-                "is_staff": user.is_staff,
-                "is_superuser": user.is_superuser,
+                "is_staff": _safe_attr(user, "is_staff", False),
+                "is_superuser": _safe_attr(user, "is_superuser", False),
                 "role": _derive_role(user),
                 "phone": phone,
                 "avatar": avatar,
-                "last_login": user.last_login.isoformat() if user.last_login else None,
+                "last_login": last_login_iso,
             },
             status=status.HTTP_200_OK,
         )
