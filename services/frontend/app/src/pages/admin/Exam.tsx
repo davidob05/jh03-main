@@ -74,6 +74,15 @@ const formatExamType = (code?: string) => {
   return code;
 };
 
+const formatSchool = (text?: string): string => {
+  if (!text) return "Unknown";
+
+  return text
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
 export const AdminExamDetails: React.FC = () => {
   const { examId } = useParams<ExamRouteParams>();
   const navigate = useNavigate();
@@ -119,8 +128,23 @@ export const AdminExamDetails: React.FC = () => {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Chip label={`Students: ${data.no_students}`} variant="outlined" />
-          <Chip label={data.exam_school || "School"} color="primary" variant="outlined" />
+          <Chip
+            label={`${data.no_students} Students`}
+            size="medium"
+            sx={{
+              backgroundColor: "#f0f0f0ff",
+              fontWeight: 600,
+            }}
+          />
+          <Chip
+            label={formatSchool(data.exam_school) || "School"}
+            size="medium"
+            sx={{
+              backgroundColor: "#e3f2fd",
+              color: "primary.main",
+              fontWeight: 600,
+            }}
+          />
         </Stack>
       </Stack>
 

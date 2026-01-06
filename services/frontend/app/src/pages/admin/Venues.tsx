@@ -441,9 +441,32 @@ export const AdminVenues: React.FC = () => {
           <Typography variant="body2" color="text.secondary">Browse and manage all exam venues.</Typography>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Chip label={`Total: ${summary.total}`} color="primary" variant="outlined" />
-          <Chip label={`Accessible: ${summary.accessible}`} color="secondary" variant="outlined" />
-          <Chip label={`Exam slots: ${summary.examCount}`} variant="outlined" />
+          <Chip
+            label={`${summary.total} Venues`}
+            size="medium"
+            sx={{
+              backgroundColor: "#e3f2fd",
+              color: "primary.main",
+              fontWeight: 600,
+            }}
+          />
+          <Chip
+            label={`${summary.accessible} Accessible`}
+            size="medium"
+            sx={{
+              backgroundColor: "#def3dbff",
+              color: "secondary.main",
+              fontWeight: 600,
+            }}
+          />
+          <Chip
+            label={`${summary.examCount} Exam slots`}
+            size="medium"
+            sx={{
+              backgroundColor: "#f0f0f0ff",
+              fontWeight: 600,
+            }}
+          />
         </Stack>
       </Stack>
 

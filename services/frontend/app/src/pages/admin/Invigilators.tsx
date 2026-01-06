@@ -61,6 +61,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { InvigilatorAvailabilityModal } from "../../components/admin/InvigilatorAvailabilityModal";
 import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialog';
 import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
+import { NotifyDialog } from '../../components/admin/NotifyDialog';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
@@ -80,6 +81,23 @@ interface Invigilator {
   availableDates?: string[]; // Optional legacy shape
   availableSlots?: string[]; // Optional legacy shape
   availabilities?: { date: string; slot: string; available: boolean }[]; // Newer shape from backend
+  assignments?: InvigilatorAssignment[];
+}
+
+interface InvigilatorAssignment {
+  id: number;
+  invigilator: number;
+  invigilator_name?: string | null;
+  exam_venue: number;
+  exam_name?: string | null;
+  venue_name?: string | null;
+  exam_start?: string | null;
+  exam_length?: number | null;
+  role?: string | null;
+  assigned_start: string;
+  assigned_end: string;
+  notes?: string | null;
+  break_time_minutes?: number | null;
 }
 
 const fetchInvigilators = async (): Promise<Invigilator[]> => {
@@ -91,6 +109,7 @@ const fetchInvigilators = async (): Promise<Invigilator[]> => {
 type ViewMode = 'list' | 'grid' | 'calendar';
 type SortField = 'firstName' | 'lastName';
 type SortOrder = 'asc' | 'desc';
+type NotifyMethod = 'email' | 'sms' | 'call';
 
 export const AdminInvigilators: React.FC = () => {
   const { data: invigilatorsData = [], isLoading, isError, error } = useQuery<Invigilator[], Error>({ queryKey: ['invigilators'], queryFn: fetchInvigilators });
@@ -137,6 +156,8 @@ export const AdminInvigilators: React.FC = () => {
 
   // Bulk action state
   const [bulkAction, setBulkAction] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
 
   // Sync fetched data to state
   useEffect(() => {
@@ -296,6 +317,106 @@ export const AdminInvigilators: React.FC = () => {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const selectedCount = selected.length;
   const selectionLabel = (singular: string, plural: string) => selectedCount === 1 ? singular : plural;
+  const selectedRecipients = React.useMemo(
+    () =>
+      invigilators
+        .filter((inv) => selected.includes(inv.id))
+        .map((inv) => ({
+          id: inv.id,
+          name: displayName(inv),
+          emails: [inv.university_email, inv.personal_email].filter(
+            (email): email is string => Boolean(email)
+          ),
+        })),
+    [invigilators, selected]
+  );
+
+  const escapeCsv = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined) return "";
+    const str = String(value);
+    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  };
+
+  const exportSelected = async (ids: number[]) => {
+    if (!ids.length || exporting) return;
+    setExporting(true);
+    try {
+      const invigilatorPayloads = await Promise.all(
+        ids.map(async (id) => {
+          const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`);
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `Failed to fetch timetable for invigilator #${id}`);
+          }
+          return (await response.json()) as Invigilator;
+        })
+      );
+
+      invigilatorPayloads.forEach((invigilator) => {
+        const assignments = invigilator.assignments || [];
+        const headers = [
+          "assignment_id",
+          "invigilator_id",
+          "invigilator_name",
+          "exam_name",
+          "venue_name",
+          "exam_venue_id",
+          "exam_start",
+          "exam_length",
+          "assigned_start",
+          "assigned_end",
+          "role",
+          "break_time_minutes",
+          "notes",
+        ];
+
+        const rows = assignments.map((assignment) =>
+          [
+            assignment.id,
+            invigilator.id,
+            invigilator.preferred_name || invigilator.full_name || `Invigilator ${invigilator.id}`,
+            assignment.exam_name || "",
+            assignment.venue_name || "",
+            assignment.exam_venue,
+            assignment.exam_start || "",
+            assignment.exam_length ?? "",
+            assignment.assigned_start,
+            assignment.assigned_end,
+            assignment.role || "",
+            assignment.break_time_minutes ?? "",
+            assignment.notes || "",
+          ]
+            .map(escapeCsv)
+            .join(",")
+        );
+
+        const csv = [headers.map(escapeCsv).join(","), ...rows].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const safeName = (invigilator.preferred_name || invigilator.full_name || `invigilator-${invigilator.id}`)
+          .replace(/[^a-z0-9]+/gi, "_")
+          .replace(/^_+|_+$/g, "")
+          .toLowerCase();
+        link.href = url;
+        link.download = `${safeName || "invigilator"}_timetable.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      });
+
+      setSuccessMessage(
+        ids.length === 1 ? "Timetable downloaded!" : `${ids.length} timetables downloaded!`
+      );
+      setSuccessOpen(true);
+      setBulkAction("");
+    } catch (err: any) {
+      alert(err?.message || "Failed to export timetables");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -603,9 +724,9 @@ export const AdminInvigilators: React.FC = () => {
                     p: 0,
                     mb: 0,
                     height: '100%',
-                    boxShadow: 1,
+                    cursor: "pointer",
                     transition: '0.2s',
-                    '&:hover': { boxShadow: 8 },
+                    '&:hover': { transform: "translateY(-6px)", boxShadow: 8 },
                   }}
                 >
                   {/* Checkbox in top-right */}
@@ -745,7 +866,7 @@ export const AdminInvigilators: React.FC = () => {
               <span>
                 <IconButton
                   size="small"
-                  disabled={selected.length === 0 || !bulkAction}
+                  disabled={selected.length === 0 || !bulkAction || exporting}
                   onClick={() => {
                     if (bulkAction === "delete") {
                       setDeleteError?.(null);
@@ -754,14 +875,12 @@ export const AdminInvigilators: React.FC = () => {
                     }
 
                     if (bulkAction === "export") {
-                      // TODO: run export action here
-                      // exportSelected(selected);
+                      exportSelected(selected);
                       return;
                     }
 
                     if (bulkAction === "notify") {
-                      // TODO: run notify action here
-                      // notifySelected(selected);
+                      setNotifyOpen(true);
                       return;
                     }
                   }}
@@ -826,6 +945,25 @@ export const AdminInvigilators: React.FC = () => {
           onSuccess={(name) => {
             setSuccessMessage(`${name} added successfully!`);
             setSuccessOpen(true);
+          }}
+        />
+
+        <NotifyDialog
+          open={notifyOpen}
+          recipients={selectedRecipients}
+          onClose={() => {
+            setNotifyOpen(false);
+            setBulkAction("");
+          }}
+          onSent={(count) => {
+            setSuccessMessage(
+              count === 1
+                ? "Mail merge ready for 1 invigilator."
+                : `Mail merge ready for ${count} invigilators.`
+            );
+            setSuccessOpen(true);
+            setNotifyOpen(false);
+            setBulkAction("");
           }}
         />
 

@@ -154,9 +154,21 @@ class VenueWriteSerializer(serializers.ModelSerializer):
 
 
 class NotificationSerializer(serializers.ModelSerializer):
+    triggered_by = serializers.SerializerMethodField()
+
     class Meta:
         model = Notification
-        fields = ("id", "type", "message", "timestamp")
+        fields = ("id", "type", "message", "timestamp", "triggered_by")
+
+    def get_triggered_by(self, obj):
+        user = getattr(obj, "triggered_by", None)
+        if not user:
+            return None
+        return {
+            "id": user.id,
+            "email": getattr(user, "email", None),
+            "username": getattr(user, "username", None),
+        }
 
 
 class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
