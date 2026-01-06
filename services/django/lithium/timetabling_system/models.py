@@ -382,6 +382,11 @@ class InvigilatorAssignment(models.Model):
         return f"{self.invigilator} → {self.exam_venue}"
     
     def total_hours(self):
-        # Calculate duration (you can add this as a property)
-        delta = timezone.timedelta(hours=self.assigned_end.hour - self.assigned_start.hour, minutes=self.assigned_end.minute - self.assigned_start.minute)
-        return delta.total_seconds() / 3600 + (self.approved_additional_time / 60) - (self.break_time_minutes / 60)
+        """
+        Return total hours assigned, subtracting break_time_minutes.
+        """
+        if not self.assigned_start or not self.assigned_end:
+            return 0
+        delta = self.assigned_end - self.assigned_start
+        hours = delta.total_seconds() / 3600
+        return max(hours - (self.break_time_minutes or 0) / 60, 0)

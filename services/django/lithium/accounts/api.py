@@ -78,6 +78,10 @@ class ObtainAuthTokenView(ObtainAuthToken):
         serializer = self.serializer_class(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
+        token, _ = Token.objects.get_or_create(user=user)
+        if not getattr(token, "key", None):
+            token.delete()
+            token = Token.objects.create(user=user)
         # Manually bump last_login since we are not using django.contrib.auth.login here.
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])

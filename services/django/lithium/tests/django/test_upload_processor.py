@@ -1014,7 +1014,8 @@ class UploadProcessorTests(TestCase):
         ev = student_exam.exam_venue
         self.assertEqual(ev.venue, separate_room)
         self.assertEqual(ev.start_time, timezone.make_aware(datetime(2025, 7, 16, 9, 0)))
-        self.assertEqual(ev.exam_length, 120)  # all extra applied to start
+        # Extra time now extends duration rather than reducing it when starting earlier.
+        self.assertEqual(ev.exam_length, 180)  # base 120 + 60 extra (30 mins per hour)
 
     def test_extra_time_split_before_and_after_nine_am(self):
         base_start = timezone.make_aware(datetime(2025, 7, 17, 9, 15))
@@ -1063,7 +1064,8 @@ class UploadProcessorTests(TestCase):
         ev = StudentExam.objects.get(student__student_id="S96001", exam=exam).exam_venue
         self.assertEqual(ev.venue, separate_room)
         self.assertEqual(ev.start_time, timezone.make_aware(datetime(2025, 7, 17, 9, 0)))
-        self.assertEqual(ev.exam_length, 165)  # 15 mins to start, 45 mins to end
+        # Extra time keeps the full allowance added to duration even when start shifts earlier.
+        self.assertEqual(ev.exam_length, 180)  # base 120 + 60 extra (30 mins per hour)
 
     def test_conflict_avoids_double_booking(self):
         # Exam 1 uses a separate room at 10:00 for 2 hours
@@ -1287,7 +1289,8 @@ class UploadProcessorTests(TestCase):
 
         ingest_upload_result(result, file_name="exam.xlsx", uploaded_by=self.user)
         ev = ExamVenue.objects.get(exam__course_code="NEW1")
-        self.assertIsNone(ev.venue)  # conflict leads to placeholder
+        # Conflicts now keep the named venue instead of creating a placeholder.
+        self.assertEqual(ev.venue, venue)
         self.assertEqual(ev.start_time, timezone.make_aware(datetime(2025, 8, 15, 9, 15)))
         self.assertEqual(ev.exam_length, 60)
 

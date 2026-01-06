@@ -205,6 +205,9 @@ def _coerce_int(value: Any) -> Optional[int]:
     if isinstance(value, float):
         if math.isnan(value):
             return None
+        if 0 < abs(value) < 1:
+            # Excel duration encoded as fraction of a day
+            return int(round(value * 24 * 60))
         return int(round(value))
     text = str(value).strip().lower()
     if not text:
@@ -218,6 +221,13 @@ def _coerce_int(value: Any) -> Optional[int]:
                 return hours * 60 + minutes
             except ValueError:
                 pass
+    try:
+        num = float(text)
+        if 0 < abs(num) < 1:
+            return int(round(num * 24 * 60))
+        return int(round(num))
+    except (ValueError, TypeError):
+        pass
     hour_match = re.search(r"(\d+)\s*h", text)
     minute_match = re.search(r"(\d+)\s*m", text)
     if hour_match or minute_match:
@@ -318,6 +328,8 @@ def _apply_extra_time(
     new_start = base_start
     remaining = extra_minutes
 
+    # Optionally start earlier (not before 09:00), but still keep the full extra time
+    # added to the duration so total = base_length + extra_minutes.
     if base_start:
         earliest = base_start.replace(hour=9, minute=0, second=0, microsecond=0)
         minutes_available = max(
@@ -326,12 +338,11 @@ def _apply_extra_time(
         shift = min(remaining, minutes_available)
         if shift:
             new_start = base_start - timedelta(minutes=shift)
-            remaining -= shift
 
     if base_length is None:
-        new_length = None if remaining == 0 else remaining
+        new_length = None if extra_minutes == 0 else extra_minutes
     else:
-        new_length = base_length + remaining
+        new_length = base_length + extra_minutes
 
     return new_start, new_length
 
@@ -572,7 +583,24 @@ def _create_provision_exam_venues():
 
 def _extract_venue_names(row: Dict[str, Any]) -> List[str]:
     raw_value = row.get("main_venue") or row.get("venue")
+    online_aliases = {
+        "online",
+        "online exam",
+        "digital",
+        "digital on campus",
+        "digital on campus exam",
+        "online/digital",
+    }
+
+    def _is_online_marker(val: str) -> bool:
+        lowered = val.strip().lower()
+        return lowered in online_aliases or "online" in lowered or "digital" in lowered
+
     if _is_missing(raw_value):
+        # Fall back to exam_type for online/digital entries.
+        exam_type_val = row.get("exam_type") or row.get("assessment_type")
+        if isinstance(exam_type_val, str) and _is_online_marker(exam_type_val):
+            return ["Online / Digital"]
         return []
     if isinstance(raw_value, (list, tuple, set)):
         tokens = raw_value
@@ -581,8 +609,15 @@ def _extract_venue_names(row: Dict[str, Any]) -> List[str]:
     normalized: List[str] = []
     for token in tokens:
         name = _clean_string(token, max_length=255)
-        if name:
-            normalized.append(name)
+        if not name:
+            continue
+        if _is_online_marker(name):
+            name = "Online / Digital"
+        normalized.append(name)
+    if not normalized:
+        exam_type_val = row.get("exam_type") or row.get("assessment_type")
+        if isinstance(exam_type_val, str) and _is_online_marker(exam_type_val):
+            normalized.append("Online / Digital")
     return normalized
 
 
@@ -860,52 +895,6 @@ def _create_exam_venue_links(
             venue_name=name,
             defaults=defaults,
         )
-
-        if not venue_is_available(venue, start_time):
-            # If the venue is not available on this date, fall back to a placeholder.
-            exam_venue = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
-            if not exam_venue:
-                ExamVenue.objects.create(
-                    exam=exam,
-                    venue=None,
-                    start_time=start_time,
-                    exam_length=exam_length,
-                    core=True,
-                )
-            continue
-
-        conflict = venue_has_timing_conflict(
-            venue, start_time, exam_length, ignore_exam_id=exam.exam_id
-        )
-
-        if conflict:
-            # If the requested venue clashes with an existing booking, fall back to a placeholder
-            # so downstream allocation can pick an alternative without tying the exam to a busy room.
-            exam_venue = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
-            if not exam_venue:
-                exam_venue = ExamVenue.objects.create(
-                    exam=exam,
-                    venue=None,
-                    start_time=start_time,
-                    exam_length=exam_length,
-                    core=True,
-                )
-            else:
-                updates = []
-                if start_time and exam_venue.start_time != start_time:
-                    exam_venue.start_time = start_time
-                    updates.append("start_time")
-                if exam_length is not None and exam_venue.exam_length != exam_length:
-                    exam_venue.exam_length = exam_length
-                    updates.append("exam_length")
-                if exam_venue.core is not True:
-                    exam_venue.core = True
-                    updates.append("core")
-                if updates:
-                    exam_venue.save(update_fields=updates)
-            # Make sure no conflicting venue link lingers for this exam.
-            ExamVenue.objects.filter(exam=exam, venue=venue).exclude(pk=exam_venue.pk).delete()
-            continue
 
         exam_venue, created = ExamVenue.objects.get_or_create(
             exam=exam,

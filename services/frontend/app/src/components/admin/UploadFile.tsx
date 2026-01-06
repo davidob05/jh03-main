@@ -28,8 +28,8 @@ export const UploadFile: React.FC = () => {
 
   const apiMap: Record<string, string> = {
     exam: "/exams-upload",
-    provisions: "/provisions-upload",
-    venues: "/venues-upload",
+    provisions: "/exams-upload",
+    venues: "/exams-upload",
   };
 
   const acceptMap: Record<string, string> = {

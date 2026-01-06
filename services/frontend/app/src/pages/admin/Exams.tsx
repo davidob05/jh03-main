@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
 import {
   Box,
@@ -178,9 +178,10 @@ interface EnhancedTableToolbarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onEditSelected: () => void;
+  onDeleteSelected: () => void;
 }
 
-function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEditSelected }: EnhancedTableToolbarProps) {
+function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEditSelected, onDeleteSelected }: EnhancedTableToolbarProps) {
   return (
     <Toolbar sx={[{ pl: { sm: 2 }, pr: { xs: 1, sm: 1 } }, numSelected > 0 && { bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity) }]}>
       {numSelected > 0 ? (
@@ -211,6 +212,7 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEdit
             variant="outlined"
             color="error"
             startIcon={<DeleteIcon />}
+            onClick={onDeleteSelected}
           >
             Delete
           </PillButton>
@@ -229,8 +231,9 @@ export const AdminExams: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const { data: examsData = [], isLoading, isError, error } = useQuery<ExamData[], Error>({ queryKey: ['exams'], queryFn: fetchExams });
+  const { data: examsData = [], isLoading, isError, error, refetch } = useQuery<ExamData[], Error>({ queryKey: ['exams'], queryFn: fetchExams });
 
   const rows = React.useMemo<RowData[]>(() => examsData.map((exam) => {
     const coreVenue = getPrimaryExamVenue(exam);
@@ -295,6 +298,26 @@ export const AdminExams: React.FC = () => {
   const handleEditSelected = () => {
     if (selected.length === 1) navigate(`/admin/exam/${selected[0]}`);
   };
+  const handleDeleteSelected = React.useCallback(async () => {
+    if (selected.length === 0) return;
+    const ok = window.confirm(`Delete ${selected.length} exam${selected.length > 1 ? 's' : ''}?`);
+    if (!ok) return;
+    try {
+      await Promise.all(
+        selected.map(async (id) => {
+          const res = await apiFetch(`${apiBaseUrl}/exams/${id}/`, { method: "DELETE" });
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || `Failed deleting exam ${id}`);
+          }
+        })
+      );
+      setSelected([]);
+      await Promise.all([refetch(), queryClient.invalidateQueries({ queryKey: ['exams'] })]);
+    } catch (err: any) {
+      alert(err?.message || "Delete failed");
+    }
+  }, [selected, refetch, queryClient]);
 
   const filteredRows = React.useMemo(() => {
     if (!searchQuery) return rows;
@@ -360,7 +383,13 @@ export const AdminExams: React.FC = () => {
         </Stack>
 
         <Panel disableDivider sx={{ p: 0, overflow: 'hidden'}}>
-          <EnhancedTableToolbar numSelected={selected.length} searchQuery={searchQuery} onSearchChange={handleSearchChange} onEditSelected={handleEditSelected} />
+          <EnhancedTableToolbar
+            numSelected={selected.length}
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+            onEditSelected={handleEditSelected}
+            onDeleteSelected={handleDeleteSelected}
+          />
           <Divider />
           <TableContainer>
             <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle" size="medium">
