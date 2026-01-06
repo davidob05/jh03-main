@@ -353,9 +353,32 @@ export const AdminExams: React.FC = () => {
             <Typography variant="body2" color="text.secondary">Manage exam schedules, venues, and timings.</Typography>
           </Box>
           <Stack direction="row" spacing={1}>
-            <Chip label={`Total: ${summary.total}`} color="primary" variant="outlined" />
-            <Chip label={`Upcoming: ${summary.upcoming}`} color="secondary" variant="outlined" />
-            <Chip label={`Venues: ${summary.totalVenues}`} variant="outlined" />
+            <Chip
+              label={`${summary.total} Exams`}
+              size="medium"
+              sx={{
+                backgroundColor: "#e3f2fd",
+                color: "primary.main",
+                fontWeight: 600,
+              }}
+            />
+            <Chip
+              label={`${summary.upcoming} Upcoming`}
+              size="medium"
+              sx={{
+                backgroundColor: "#def3dbff",
+                color: "secondary.main",
+                fontWeight: 600,
+              }}
+            />
+            <Chip
+              label={`${summary.totalVenues} Venues`}
+              size="medium"
+              sx={{
+                backgroundColor: "#f0f0f0ff",
+                fontWeight: 600,
+              }}
+            />
           </Stack>
         </Stack>
 

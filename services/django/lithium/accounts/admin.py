@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
 from .forms import CustomUserCreationForm, CustomUserChangeForm
-from .models import CustomUser
+from .models import CustomUser, UserSession
 
 
 class CustomUserAdmin(UserAdmin):
@@ -32,3 +32,23 @@ class CustomUserAdmin(UserAdmin):
 
 
 admin.site.register(CustomUser, CustomUserAdmin)
+
+
+@admin.register(UserSession)
+class UserSessionAdmin(admin.ModelAdmin):
+    list_display = [
+        "key",
+        "user",
+        "ip_address",
+        "created_at",
+        "last_seen",
+        "revoked_at",
+        "is_active",
+    ]
+    list_filter = ["revoked_at", "created_at"]
+    search_fields = ["key", "user__email", "user__username", "ip_address", "user_agent"]
+    readonly_fields = ["key", "created_at", "last_seen"]
+
+    @admin.display(boolean=True, description="Active")
+    def is_active(self, obj: UserSession) -> bool:
+        return obj.revoked_at is None

@@ -40,10 +40,13 @@ interface VenueData {
   exam_venues: ExamVenueData[];
 }
 
-const formatLabel = (text?: string): string => {
+const formatVenueType = (text?: string): string => {
   if (!text) return "Unknown";
-  const spaced = text.replace(/_/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+
+  return text
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 const formatDateTime = (dateTime?: string): string => {
@@ -173,8 +176,23 @@ export const AdminVenuePage: React.FC = () => {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Chip label={formatLabel(data.venuetype)} color="primary" variant="outlined" />
-          <Chip label={`Exams: ${examCount}`} variant="outlined" />
+          <Chip
+            label={`${examCount} Exams`}
+            size="medium"
+            sx={{
+              backgroundColor: "#f0f0f0ff",
+              fontWeight: 600,
+            }}
+          />
+          <Chip
+            label={formatVenueType(data.venuetype)}
+            size="medium"
+            sx={{
+              backgroundColor: "#e3f2fd",
+              color: "primary.main",
+              fontWeight: 600,
+            }}
+          />
         </Stack>
       </Stack>
 
@@ -216,17 +234,16 @@ export const AdminVenuePage: React.FC = () => {
                   sx={{
                     p: 2,
                     mb: 0,
-                    borderRadius: 2,
                     height: "100%",
                     width: "100%",
                     display: "flex",
                     flexDirection: "column",
                     gap: 1,
                     cursor: "pointer",
-                    transition: "box-shadow 120ms ease",
+                    transition: "0.2s",
                     minHeight: 200,
                     boxSizing: "border-box",
-                    "&:hover": { boxShadow: 3 },
+                    "&:hover": { transform: "translateY(-6px)", boxShadow: 8 },
                   }}
                   onClick={() => handleExamClick(ex)}
                 >
