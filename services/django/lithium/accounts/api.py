@@ -3,22 +3,28 @@ from django.db.models import Q
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework import serializers, status
-from rest_framework.authtoken.models import Token
+from rest_framework.authtoken import models as authtoken_models
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.throttling import ScopedRateThrottle
 
+Token = authtoken_models.Token
+
+
+def _safe_attr(obj, name, default=None):
+    try:
+        return getattr(obj, name)
+    except Exception:
+        return default
+
 
 def _derive_role(user):
-    if user.is_staff or user.is_superuser:
+    if _safe_attr(user, "is_staff", False) or _safe_attr(user, "is_superuser", False):
         return "admin"
-    try:
-        if user.invigilator_profile:
-            return "invigilator"
-    except Exception:
-        pass
+    if _safe_attr(user, "invigilator_profile"):
+        return "invigilator"
     return "invigilator"
 
 
@@ -93,21 +99,30 @@ class CurrentUserView(APIView):
 
     def get(self, request, *_args, **_kwargs):
         user = request.user
-        phone = getattr(user, "phone", None)
-        avatar = getattr(user, "avatar", None)
-        try:
-            if not phone and hasattr(user, "invigilator_profile") and user.invigilator_profile:
-                phone = user.invigilator_profile.alt_phone
-        except Exception:
-            phone = phone
+        phone = _safe_attr(user, "phone")
+        avatar = _safe_attr(user, "avatar")
+        invigilator_profile = _safe_attr(user, "invigilator_profile")
+        if not phone and invigilator_profile:
+            try:
+                phone = invigilator_profile.alt_phone
+            except Exception:
+                phone = phone
+        last_login = None
+        last_login_value = _safe_attr(user, "last_login")
+        if last_login_value:
+            try:
+                last_login = last_login_value.isoformat()
+            except Exception:
+                last_login = None
         return Response(
             {
                 "id": user.id,
                 "email": user.email,
                 "username": user.username,
-                "is_staff": user.is_staff,
-                "is_superuser": user.is_superuser,
+                "is_staff": _safe_attr(user, "is_staff", False),
+                "is_superuser": _safe_attr(user, "is_superuser", False),
                 "role": _derive_role(user),
+                "last_login": last_login,
                 "phone": phone,
                 "avatar": avatar,
             },

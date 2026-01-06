@@ -29,7 +29,7 @@ from .serializers import (
 )
 
 
-def log_notification(type_: str, message: str, when=None):
+def log_notification(type_: str, message: str, when=None, user=None):
     try:
         Notification.objects.create(
             type=type_,
@@ -39,6 +39,17 @@ def log_notification(type_: str, message: str, when=None):
     except Exception:
         # Do not break main flows if notification logging fails
         pass
+
+
+def _get_request_user(view, serializer=None):
+    request = getattr(view, "request", None)
+    if request is None and serializer is not None:
+        try:
+            request = serializer.context.get("request")
+        except Exception:
+            request = None
+    return getattr(request, "user", None) if request is not None else None
+
 
 class ExamViewSet(viewsets.ModelViewSet):
     queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
@@ -72,7 +83,7 @@ class ExamViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        log_notification("examChange", f"Exam '{instance.exam_name}' was updated.")
+        log_notification("examChange", f"Exam '{instance.exam_name}' was updated.", user=_get_request_user(self, serializer))
         return instance
 
 
@@ -113,18 +124,18 @@ class VenueViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        log_notification("venueChange", f"Venue '{instance.venue_name}' was created.")
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was created.", user=_get_request_user(self, serializer))
         return instance
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        log_notification("venueChange", f"Venue '{instance.venue_name}' was updated.")
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was updated.", user=_get_request_user(self, serializer))
         return instance
 
     def perform_destroy(self, instance):
         venue_name = instance.venue_name
         response = super().perform_destroy(instance)
-        log_notification("venueChange", f"Venue '{venue_name}' was deleted.")
+        log_notification("venueChange", f"Venue '{venue_name}' was deleted.", user=_get_request_user(self))
         return response
 
 
@@ -157,14 +168,14 @@ class ExamVenueViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         exam_name = instance.exam.exam_name if instance.exam else "Exam"
         venue_name = instance.venue.venue_name if instance.venue else "Unassigned"
-        log_notification("examChange", f"Exam '{exam_name}' venue updated to {venue_name}.")
+        log_notification("examChange", f"Exam '{exam_name}' venue updated to {venue_name}.", user=_get_request_user(self, serializer))
         return instance
 
     def perform_create(self, serializer):
         instance = serializer.save()
         exam_name = instance.exam.exam_name if instance.exam else "Exam"
         venue_name = instance.venue.venue_name if instance.venue else "Unassigned"
-        log_notification("examChange", f"Exam '{exam_name}' venue set to {venue_name}.")
+        log_notification("examChange", f"Exam '{exam_name}' venue set to {venue_name}.", user=_get_request_user(self, serializer))
         return instance
 
 
@@ -205,7 +216,7 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         instance = serializer.save()
         name = instance.preferred_name or instance.full_name or "Invigilator"
-        log_notification("invigilatorUpdate", f"{name} updated their details.")
+        log_notification("invigilatorUpdate", f"{name} updated their details.", user=_get_request_user(self, serializer))
         return instance
 
 

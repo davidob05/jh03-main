@@ -68,7 +68,6 @@ def _canonical_columns(df):
 
 
 def detect_provision_file(df):
-    print("Detecting provision file...")
     """Provision files contain student + registry info."""
     canonical_cols = _canonical_columns(df)
 
@@ -88,7 +87,6 @@ def detect_provision_file(df):
 
 
 def detect_exam_file(df):
-    print("Detecting exam file...")
     """Exam files contain exam session fields but no student data."""
     canonical_cols = _canonical_columns(df)
     exam_indicators = {
@@ -138,7 +136,6 @@ def _looks_like_date_cell(val):
 
 
 def detect_venue_file(df):
-    print("Detecting venue file...")
     """
     Venue files are column-based:
     Row 1 = day names
