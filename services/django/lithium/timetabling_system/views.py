@@ -1,6 +1,7 @@
+from django.contrib.auth.decorators import login_required
 from django.db import DatabaseError, connection
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
@@ -42,7 +43,8 @@ def healthz_view(_request):
     )
 
 
-@csrf_exempt
+@csrf_protect
+@login_required
 @require_POST
 def upload_timetable_file(request):
     upload = request.FILES.get("file")

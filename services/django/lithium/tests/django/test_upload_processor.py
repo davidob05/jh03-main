@@ -939,6 +939,7 @@ class UploadProcessorTests(TestCase):
                 capacity=200,
                 venuetype=VenueType.MAIN_HALL,
                 is_accessible=True,
+                provision_capabilities=[ExamVenueProvisionType.ACCESSIBLE_HALL],
             ),
             start_time=core_start,
             exam_length=120,

@@ -5,24 +5,6 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/dev/howto/deployment/checklist/
-
-# https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-0peo@#x9jur3!h$ryje!$879xww8y1y66jx!%*#ymhg&jkozs2"
-
-# https://docs.djangoproject.com/en/dev/ref/settings/#debug
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-# https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
-ALLOWED_HOSTS = os.getenv(
-    "DJANGO_ALLOWED_HOSTS",
-    "localhost,0.0.0.0,127.0.0.1,django",
-).split(",")
-
-
 def env_flag(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
@@ -32,6 +14,26 @@ def env_list(name: str, default: str = "") -> list[str]:
     if not raw:
         return []
     return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/dev/howto/deployment/checklist/
+
+# https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-key-change-me")
+
+# https://docs.djangoproject.com/en/dev/ref/settings/#debug
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = env_flag("DJANGO_DEBUG", "true")
+if not DEBUG and SECRET_KEY == "dev-secret-key-change-me":
+    raise ValueError("DJANGO_SECRET_KEY must be set in production.")
+
+# https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
+ALLOWED_HOSTS = os.getenv(
+    "DJANGO_ALLOWED_HOSTS",
+    "localhost,0.0.0.0,127.0.0.1,django",
+).split(",")
 
 
 # Application definition
@@ -98,16 +100,25 @@ TEMPLATES = [
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
+_DB_NAME = os.getenv("DJANGO_DB_NAME", "postgres")
+_DB_USER = os.getenv("DJANGO_DB_USER", "postgres")
+_DB_PASSWORD = os.getenv("DJANGO_DB_PASSWORD", "postgres")
+_DB_HOST = os.getenv("DJANGO_DB_HOST", "127.0.0.1")
+_DB_PORT = os.getenv("DJANGO_DB_PORT", "5432")
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DJANGO_DB_NAME", "postgres"),
-        "USER": os.getenv("DJANGO_DB_USER", "postgres"),
-        "PASSWORD": os.getenv("DJANGO_DB_PASSWORD", "postgres"),
-        "HOST": os.getenv("DJANGO_DB_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DJANGO_DB_PORT", "5432"),
+        "NAME": _DB_NAME,
+        "USER": _DB_USER,
+        "PASSWORD": _DB_PASSWORD,
+        "HOST": _DB_HOST,
+        "PORT": _DB_PORT,
     }
 }
+
+if not DEBUG and _DB_PASSWORD in {"", "postgres"}:
+    raise ValueError("DJANGO_DB_PASSWORD must be set to a strong value in production.")
 
 # Password validation
 # https://docs.djangoproject.com/en/dev/ref/settings/#auth-password-validators
@@ -231,12 +242,13 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
+        "timetabling_system.api.throttles.AdminBypassUserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        # Relaxed defaults to avoid throttling bulk admin actions; override via env if needed.
-        "anon": os.getenv("DRF_THROTTLE_ANON_RATE", "1000/min"),
-        "user": os.getenv("DRF_THROTTLE_USER_RATE", "2000/min"),
+        # Override via env if needed.
+        "anon": os.getenv("DRF_THROTTLE_ANON_RATE", "50/min"),
+        "user": os.getenv("DRF_THROTTLE_USER_RATE", "200/min"),
+        "login": os.getenv("DRF_THROTTLE_LOGIN_RATE", "10/min"),
     },
 }
 

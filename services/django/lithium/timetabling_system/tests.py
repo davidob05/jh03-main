@@ -2,6 +2,7 @@ from io import BytesIO
 from unittest import mock
 
 import pandas as pd
+from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
 from django.test import TestCase
@@ -60,6 +61,17 @@ class HealthTests(TestCase):
 
 
 class UploadTimetableFileTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="admin",
+            email="admin@example.com",
+            password="StrongPass123!",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client.login(username="admin", password="StrongPass123!")
+
     def _build_excel_upload(self, rows):
         buffer = BytesIO()
         pd.DataFrame(rows).to_excel(buffer, index=False)

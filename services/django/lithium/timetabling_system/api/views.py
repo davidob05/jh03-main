@@ -1,4 +1,5 @@
 from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -42,14 +43,50 @@ def log_notification(type_: str, message: str, when=None, user=None):
         # Do not break main flows if notification logging fails
         pass
 
+
+def _get_request_user(view, serializer=None):
+    request = getattr(view, "request", None)
+    if request is None and serializer is not None:
+        try:
+            request = serializer.context.get("request")
+        except Exception:
+            request = None
+    return getattr(request, "user", None) if request is not None else None
+
+
 class ExamViewSet(viewsets.ModelViewSet):
     queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
     serializer_class = ExamSerializer
     permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """
+        Delete multiple Exam records (admin-only).
+        Expects JSON body: {"ids": [1,2,3]}
+        """
+        ids = request.data.get("ids") if isinstance(request.data, dict) else None
+        if not ids or not isinstance(ids, list):
+            return Response(
+                {"detail": "Provide a non-empty list of ids."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ids = [pk for pk in ids if isinstance(pk, int)]
+        if not ids:
+            return Response(
+                {"detail": "No valid exam ids supplied."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = Exam.objects.filter(pk__in=ids)
+        deleted_count, _ = qs.delete()
+        return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        log_notification("examChange", f"Exam '{instance.exam_name}' was updated.", user=self.request.user)
+        log_notification("examChange", f"Exam '{instance.exam_name}' was updated.", user=_get_request_user(self, serializer))
         return instance
 
 
@@ -57,6 +94,31 @@ class VenueViewSet(viewsets.ModelViewSet):
     queryset = Venue.objects.all().prefetch_related("examvenue_set__exam")
     serializer_class = VenueSerializer
     permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """
+        Delete multiple Venue records (admin-only).
+        Expects JSON body: {"ids": ["Hall A", "Lab B"]}
+        """
+        ids = request.data.get("ids") if isinstance(request.data, dict) else None
+        if not ids or not isinstance(ids, list):
+            return Response(
+                {"detail": "Provide a non-empty list of venue names in 'ids'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ids = [pk for pk in ids if isinstance(pk, str) and pk.strip()]
+        if not ids:
+            return Response(
+                {"detail": "No valid venue names supplied."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = Venue.objects.filter(venue_name__in=ids)
+        deleted_count, _ = qs.delete()
+        return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
 
     def get_serializer_class(self):
         if self.action in {"create", "update", "partial_update"}:
@@ -65,18 +127,18 @@ class VenueViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        log_notification("venueChange", f"Venue '{instance.venue_name}' was created.", user=self.request.user)
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was created.", user=_get_request_user(self, serializer))
         return instance
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        log_notification("venueChange", f"Venue '{instance.venue_name}' was updated.", user=self.request.user)
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was updated.", user=_get_request_user(self, serializer))
         return instance
 
     def perform_destroy(self, instance):
         venue_name = instance.venue_name
         response = super().perform_destroy(instance)
-        log_notification("venueChange", f"Venue '{venue_name}' was deleted.", user=self.request.user)
+        log_notification("venueChange", f"Venue '{venue_name}' was deleted.", user=_get_request_user(self))
         return response
 
 
@@ -89,6 +151,7 @@ class ExamVenueViewSet(viewsets.ModelViewSet):
 
     queryset = ExamVenue.objects.select_related("exam", "venue").all()
     permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
@@ -108,14 +171,14 @@ class ExamVenueViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         exam_name = instance.exam.exam_name if instance.exam else "Exam"
         venue_name = instance.venue.venue_name if instance.venue else "Unassigned"
-        log_notification("examChange", f"Exam '{exam_name}' venue updated to {venue_name}.", user=self.request.user)
+        log_notification("examChange", f"Exam '{exam_name}' venue updated to {venue_name}.", user=_get_request_user(self, serializer))
         return instance
 
     def perform_create(self, serializer):
         instance = serializer.save()
         exam_name = instance.exam.exam_name if instance.exam else "Exam"
         venue_name = instance.venue.venue_name if instance.venue else "Unassigned"
-        log_notification("examChange", f"Exam '{exam_name}' venue set to {venue_name}.", user=self.request.user)
+        log_notification("examChange", f"Exam '{exam_name}' venue set to {venue_name}.", user=_get_request_user(self, serializer))
         return instance
 
 
@@ -127,11 +190,36 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
     )
     serializer_class = InvigilatorSerializer
     permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """
+        Delete multiple invigilators (admin-only).
+        Expects JSON body: {"ids": [1,2,3]}
+        """
+        ids = request.data.get("ids") if isinstance(request.data, dict) else None
+        if not ids or not isinstance(ids, list):
+            return Response(
+                {"detail": "Provide a non-empty list of ids."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ids = [pk for pk in ids if isinstance(pk, int)]
+        if not ids:
+            return Response(
+                {"detail": "No valid invigilator ids supplied."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = Invigilator.objects.filter(pk__in=ids)
+        deleted_count, _ = qs.delete()
+        return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
 
     def perform_update(self, serializer):
         instance = serializer.save()
         name = instance.preferred_name or instance.full_name or "Invigilator"
-        log_notification("invigilatorUpdate", f"{name} has updated details.", user=self.request.user)
+        log_notification("invigilatorUpdate", f"{name} has updated details.", user=_get_request_user(self, serializer))
         return instance
 
 
@@ -143,18 +231,19 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = InvigilatorAssignmentSerializer
     permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
 
     def perform_create(self, serializer):
         instance = serializer.save()
         name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
         exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
-        log_notification("shiftPickup", f"{name} picked up a shift for {exam_name}.", user=self.request.user)
+        log_notification("shiftPickup", f"{name} picked up a shift for {exam_name}.", user=_get_request_user(self, serializer))
         return instance
 
     def perform_destroy(self, instance):
         name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
         exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
-        log_notification("cancellation", f"{name} cancelled a shift for {exam_name}.", user=self.request.user)
+        log_notification("cancellation", f"{name} cancelled a shift for {exam_name}.", user=_get_request_user(self))
         return super().perform_destroy(instance)
 
 
@@ -162,6 +251,7 @@ class TimetableUploadView(APIView):
     """Accepts an uploaded Excel file and routes it through the parser helpers."""
     parser_classes = (MultiPartParser, FormParser)
     permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk uploads without throttling
 
 
     def post(self, request, *args, **kwargs):
@@ -210,6 +300,7 @@ class NotificationsView(APIView):
     Return notifications stored in the Notification table.
     """
     permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large pulls without throttling
 
     def get(self, request, *args, **kwargs):
         cutoff = timezone.now() - timedelta(days=7)

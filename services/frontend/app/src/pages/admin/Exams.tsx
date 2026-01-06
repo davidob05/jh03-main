@@ -303,15 +303,15 @@ export const AdminExams: React.FC = () => {
     const ok = window.confirm(`Delete ${selected.length} exam${selected.length > 1 ? 's' : ''}?`);
     if (!ok) return;
     try {
-      await Promise.all(
-        selected.map(async (id) => {
-          const res = await apiFetch(`${apiBaseUrl}/exams/${id}/`, { method: "DELETE" });
-          if (!res.ok) {
-            const text = await res.text();
-            throw new Error(text || `Failed deleting exam ${id}`);
-          }
-        })
-      );
+      const res = await apiFetch(`${apiBaseUrl}/exams/bulk-delete/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selected }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Bulk delete failed");
+      }
       setSelected([]);
       await Promise.all([refetch(), queryClient.invalidateQueries({ queryKey: ['exams'] })]);
     } catch (err: any) {

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Button, TextField, Typography, Paper, CircularProgress, Alert } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
-import { apiBaseUrl, authTokenKey, authUserKey, getStoredRole } from "../utils/api";
+import { apiBaseUrl, getAuthToken, getStoredRole, setAuthSession } from "../utils/api";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -25,7 +25,7 @@ export default function Login() {
   };
 
   React.useEffect(() => {
-    const token = localStorage.getItem(authTokenKey);
+    const token = getAuthToken();
     if (!token) return;
     const role = getStoredRole();
     const target = resolveRedirect(role, fromPath);
@@ -58,10 +58,7 @@ export default function Login() {
         return;
       }
 
-      localStorage.setItem(authTokenKey, token);
-      if (data.user) {
-        localStorage.setItem(authUserKey, JSON.stringify(data.user));
-      }
+      setAuthSession(token, data.user);
       const role = data.user?.role || (data.user?.is_staff || data.user?.is_superuser ? "admin" : "invigilator");
       const target = resolveRedirect(role, fromPath);
       navigate(target, { replace: true });

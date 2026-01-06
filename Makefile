@@ -80,3 +80,20 @@ test:
 	@echo "Running full Django test suite (no rebuild)..."
 	docker compose -f $(DEV_COMPOSE) up -d --no-build django || true
 	docker compose -f $(DEV_COMPOSE) exec django bash -lc '$(TEST_DJANGO_CMD)'
+
+coverage:
+	@echo "Calculating Django test coverage (per-file missing lines)..."
+	docker compose -f $(DEV_COMPOSE) up -d --no-build django || true
+	docker compose -f $(DEV_COMPOSE) exec django bash -lc '\
+		set -euo pipefail; \
+		cd /app; \
+		. /app/.venv/bin/activate; \
+		if ! python -c "import coverage" >/dev/null 2>&1; then \
+			python -m pip install --quiet "coverage>=7.5"; \
+		fi; \
+		python manage.py makemigrations --noinput; \
+		python manage.py migrate --noinput; \
+		coverage erase; \
+		coverage run --rcfile=/app/.coveragerc manage.py test --keepdb; \
+		coverage report -m; \
+	'
