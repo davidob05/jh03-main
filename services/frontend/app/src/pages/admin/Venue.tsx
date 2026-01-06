@@ -22,6 +22,7 @@ import { Edit, Delete } from "@mui/icons-material";
 import { ExamDetailsPopup, ExamDetails as PopupExamDetails, ExamVenueInfo as PopupExamVenueInfo } from "../../components/admin/ExamDetailsPopup";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
 interface ExamVenueData {
   exam_name: string;
@@ -39,10 +40,13 @@ interface VenueData {
   exam_venues: ExamVenueData[];
 }
 
-const formatLabel = (text?: string): string => {
+const formatVenueType = (text?: string): string => {
   if (!text) return "Unknown";
-  const spaced = text.replace(/_/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+
+  return text
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 const formatDateTime = (dateTime?: string): string => {
@@ -155,7 +159,9 @@ export const AdminVenuePage: React.FC = () => {
   if (isError || !data) {
     return (
       <Box sx={{ p: 4 }}>
-        <Alert severity="error">{error?.message || "Failed to load venue"}</Alert>
+        <Panel>
+          <Alert severity="error">{error?.message || "Failed to load venue"}</Alert>
+        </Panel>
       </Box>
     );
   }
@@ -170,13 +176,27 @@ export const AdminVenuePage: React.FC = () => {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Chip label={formatLabel(data.venuetype)} color="primary" variant="outlined" />
-          <Chip label={`Exams: ${examCount}`} variant="outlined" />
+          <Chip
+            label={`${examCount} Exams`}
+            size="medium"
+            sx={{
+              backgroundColor: "#f0f0f0ff",
+              fontWeight: 600,
+            }}
+          />
+          <Chip
+            label={formatVenueType(data.venuetype)}
+            size="medium"
+            sx={{
+              backgroundColor: "#e3f2fd",
+              color: "primary.main",
+              fontWeight: 600,
+            }}
+          />
         </Stack>
       </Stack>
 
-      <Paper sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-        <Typography variant="h6" fontWeight={700} gutterBottom>Details</Typography>
+      <Panel title="Venue details">
         <Stack spacing={1.5}>
           <Typography variant="body2"><strong>Capacity:</strong> {data.capacity}</Typography>
           <Typography variant="body2"><strong>Accessible:</strong> {data.is_accessible ? "Yes" : "No"}</Typography>
@@ -189,11 +209,9 @@ export const AdminVenuePage: React.FC = () => {
             </Stack>
           </Box>
         </Stack>
-      </Paper>
+      </Panel>
 
-      <Paper sx={{ p: 3, borderRadius: 3 }}>
-        <Typography variant="h6" fontWeight={700} gutterBottom>Exams in this venue</Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Exams in this venue">
         {examCount === 0 ? (
           <Typography variant="body2" color="text.secondary">No exams scheduled for this venue.</Typography>
         ) : (
@@ -210,23 +228,23 @@ export const AdminVenuePage: React.FC = () => {
               }}
             >
               {visibleExams.map((ex, idx) => (
-                <Paper
+                <Panel
                   key={`${ex.exam_name}-${idx}`}
+                  disableDivider
                   sx={{
                     p: 2,
-                    borderRadius: 2,
+                    mb: 0,
                     height: "100%",
                     width: "100%",
                     display: "flex",
                     flexDirection: "column",
                     gap: 1,
                     cursor: "pointer",
-                    transition: "box-shadow 120ms ease",
+                    transition: "0.2s",
                     minHeight: 200,
                     boxSizing: "border-box",
-                    "&:hover": { boxShadow: 3 },
+                    "&:hover": { transform: "translateY(-6px)", boxShadow: 8 },
                   }}
-                  variant="outlined"
                   onClick={() => handleExamClick(ex)}
                 >
                   <Typography
@@ -250,7 +268,7 @@ export const AdminVenuePage: React.FC = () => {
                   <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
                     View details
                   </Typography>
-                </Paper>
+                </Panel>
               ))}
             </Box>
 
@@ -272,7 +290,7 @@ export const AdminVenuePage: React.FC = () => {
             </Box>
           </>
         )}
-      </Paper>
+      </Panel>
 
       <Box
         sx={{

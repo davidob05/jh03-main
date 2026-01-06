@@ -27,6 +27,8 @@ export type AuthUser = {
   is_staff?: boolean;
   is_superuser?: boolean;
   role?: string;
+  phone?: string;
+  avatar?: string;
 };
 
 const parseStoredUser = (): AuthUser | null => {

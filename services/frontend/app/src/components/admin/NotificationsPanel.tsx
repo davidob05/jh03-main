@@ -1,6 +1,7 @@
 import React from "react";
-import { Box, Chip, Divider, Stack, Typography, Paper } from "@mui/material";
-import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined, Place } from "@mui/icons-material";
+import { Box, Chip, Divider, Stack, Typography } from "@mui/material";
+import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined, Place, AlternateEmail } from "@mui/icons-material";
+import { Panel } from "../Panel";
 
 export type NotificationType =
   | "availability"
@@ -8,7 +9,8 @@ export type NotificationType =
   | "shiftPickup"
   | "examChange"
   | "invigilatorUpdate"
-  | "venueChange";
+  | "venueChange"
+  | "mailMerge";
 
 export interface NotificationItem {
   id: number;
@@ -57,6 +59,12 @@ const typeStyles: Record<
     bg: "rgba(249,168,37,0.12)",
     icon: <Place fontSize="small" />,
   },
+  mailMerge: {
+    label: "Mail Merge",
+    color: "#00695c",
+    bg: "rgba(0,105,92,0.08)",
+    icon: <AlternateEmail fontSize="small" />,
+  },
 };
 
 const formatDate = (iso: string) => {
@@ -73,32 +81,20 @@ const formatDate = (iso: string) => {
 
 export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }> = ({ notifications }) => {
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 2.5,
-        borderRadius: 3,
-        border: "1px solid",
-        borderColor: "divider",
-        background: "#ffffff",
-      }}
-    >
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="h6" fontWeight={700}>
-          Notifications
-        </Typography>
+    <Panel
+      title="Notifications"
+      actions={
         <Chip
           label={`${notifications.length} updates`}
-          size="small"
+          size="medium"
           sx={{
             backgroundColor: "#e3f2fd",
             color: "#0d47a1",
             fontWeight: 600,
           }}
         />
-      </Stack>
-      <Divider sx={{ mb: 2 }} />
-
+      }
+    >
       <Stack spacing={1.5}>
         {notifications.length === 0 ? (
           <Box
@@ -162,6 +158,6 @@ export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }>
           })
         )}
       </Stack>
-    </Paper>
+    </Panel>
   );
 };

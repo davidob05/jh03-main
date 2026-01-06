@@ -11,6 +11,7 @@ from .models import (
     ProvisionType,
     ExamVenueProvisionType,
     UploadLog,
+    Notification,
     Invigilator,
     InvigilatorQualification,
     InvigilatorRestriction,
@@ -165,3 +166,10 @@ class InvigilatorAssignmentAdmin(admin.ModelAdmin):
 class UploadLogAdmin(admin.ModelAdmin):
     list_display = ("file_name", "uploaded_by", "uploaded_at", "records_created", "records_updated")
     ordering = ("-uploaded_at",)
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("type", "message", "timestamp")
+    list_filter = ("type",)
+    search_fields = ("message",)
