@@ -1,16 +1,8 @@
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Avatar,
-  Divider,
-  Stack,
-  Switch,
-} from "@mui/material";
+import { Avatar, Box, Stack, Switch, Typography } from "@mui/material";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CButton } from "../../utils/globalStyles";
+import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
 export const InvigilatorProfile: React.FC = () => {
   const navigate = useNavigate();
@@ -32,10 +24,10 @@ export const InvigilatorProfile: React.FC = () => {
       .toUpperCase();
 
   return (
-    <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, pb: 6 }}>
 
       {/* Profile overview */}
-      <Card sx={{ p: 3, mb: 3 }}>
+      <Panel>
         <Box sx={{ textAlign: "center" }}>
           <Avatar
             sx={{
@@ -57,122 +49,116 @@ export const InvigilatorProfile: React.FC = () => {
             {profileDetails.email}
           </Typography>
 
-          <CButton
-            variant="contained"
-            color="primary"
-            sx={{ mt: 2 }}
-            onClick={() => navigate("/invigilator/profile/upload-photo")}
-          >
-            Upload / Change Photo
-          </CButton>
+          <Stack direction="row" spacing={1} justifyContent="center" mt={2}>
+            <PillButton
+              variant="contained"
+              color="primary"
+              onClick={() => navigate("/invigilator/profile/upload-photo")}
+            >
+              Upload / Change Photo
+            </PillButton>
+          </Stack>
         </Box>
-      </Card>
+      </Panel>
 
       {/* Personal information */}
-      <Card sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Personal Information
-        </Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Personal Information">
 
         <Stack spacing={3}>
           {/* Display Name */}
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Display Name
-            </Typography>
-
-            <Stack direction="row" justifyContent="space-between" mt={0.5}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            spacing={1}
+          >
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                Display Name
+              </Typography>
               <Typography>{profileDetails.name}</Typography>
-              <CButton
-                variant="contained"
-                color="primary"
-                onClick={() =>
-                  navigate("/invigilator/profile/edit-display-name", {
-                    state: { autofocus: "displayName" },
-                  })
-                }
-              >
-                Change
-              </CButton>
-            </Stack>
-          </Box>
+            </Box>
+            <PillButton
+              variant="contained"
+              onClick={() =>
+                navigate("/invigilator/profile/edit-display-name", {
+                  state: { autofocus: "displayName" },
+                })
+              }
+            >
+              Change
+            </PillButton>
+          </Stack>
 
           {/* Email */}
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Email
-            </Typography>
-
-            <Stack direction="row" justifyContent="space-between" mt={0.5}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            spacing={1}
+          >
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                Email
+              </Typography>
               <Typography>{profileDetails.email}</Typography>
-              <CButton
-                variant="contained"
-                color="primary"
-                onClick={() =>
-                  navigate("/invigilator/profile/edit-email", {
-                    state: { autofocus: "email" },
-                  })
-                }
-              >
-                Change
-              </CButton>
-            </Stack>
-          </Box>
+            </Box>
+            <PillButton
+              variant="contained"
+              onClick={() =>
+                navigate("/invigilator/profile/edit-email", {
+                  state: { autofocus: "email" },
+                })
+              }
+            >
+              Change
+            </PillButton>
+          </Stack>
 
           {/* Phone */}
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Phone Number
-            </Typography>
-
-            <Stack direction="row" justifyContent="space-between" mt={0.5}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            spacing={1}
+          >
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                Phone Number
+              </Typography>
               <Typography>{profileDetails.phone}</Typography>
-              <CButton
-                variant="contained"
-                color="primary"
-                onClick={() =>
-                  navigate("/invigilator/profile/edit-phone-number", {
-                    state: { autofocus: "phone" },
-                  })
-                }
-              >
-                Change
-              </CButton>
-            </Stack>
-          </Box>
+            </Box>
+            <PillButton
+              variant="contained"
+              onClick={() =>
+                navigate("/invigilator/profile/edit-phone-number", {
+                  state: { autofocus: "phone" },
+                })
+              }
+            >
+              Change
+            </PillButton>
+          </Stack>
         </Stack>
-      </Card>
+      </Panel>
 
       {/* Security */}
-      <Card sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Password & Security
-        </Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Password & Security">
 
         <Stack spacing={3}>
-          <CButton
-            variant="contained"
-            color="primary"
-            onClick={() => navigate("/invigilator/profile/change-password")}
-          >
+          <PillButton variant="contained" onClick={() => navigate("/invigilator/profile/change-password")}>
             Change Password
-          </CButton>
+          </PillButton>
 
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Two-Factor Authentication</Typography>
             <Switch disabled /> {/* feature placeholder */}
           </Stack>
         </Stack>
-      </Card>
+      </Panel>
 
       {/* Preferences */}
-      <Card sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Preferences
-        </Typography>
-        <Divider sx={{ mb: 2 }} />
+      <Panel title="Preferences" disableDivider>
 
         <Stack spacing={3}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -191,7 +177,7 @@ export const InvigilatorProfile: React.FC = () => {
             />
           </Stack>
         </Stack>
-      </Card>
+      </Panel>
     </Box>
   );
 };
