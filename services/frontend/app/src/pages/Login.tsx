@@ -51,14 +51,15 @@ export default function Login() {
         return;
       }
 
-      const token = data.token;
-      if (!token) {
+      const sessionToken = data.session || data.token;
+      if (!sessionToken) {
         setErrorMsg("Invalid server response.");
         setLoading(false);
         return;
       }
 
-      setAuthSession(token, data.user);
+      // Use per-login UserSession token so DRF's UserSessionAuthentication accepts requests
+      setAuthSession(sessionToken, data.user);
       const role = data.user?.role || (data.user?.is_staff || data.user?.is_superuser ? "admin" : "invigilator");
       const target = resolveRedirect(role, fromPath);
       navigate(target, { replace: true });
