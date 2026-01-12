@@ -1,7 +1,7 @@
 import { AppBar, Toolbar, Box, Button, Avatar, IconButton, Tooltip, Menu, MenuItem, Divider, Typography } from "@mui/material";
 import React, { useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
-import { apiBaseUrl, apiFetch, authTokenKey, authUserKey, getStoredUser } from "../../utils/api";
+import { apiBaseUrl, apiFetch, clearAuthSession, getStoredUser } from "../../utils/api";
 
 export const AdminLayout: React.FC = () => {
   const location = useLocation();
@@ -22,9 +22,8 @@ export const AdminLayout: React.FC = () => {
     } catch (_err) {
       // Ignore failures; still clear local state.
     } finally {
-      localStorage.removeItem(authTokenKey);
-      localStorage.removeItem(authUserKey);
-      navigate("/login");
+      clearAuthSession();
+      navigate("/login", { replace: true });
     }
   };
 
