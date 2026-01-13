@@ -1,62 +1,44 @@
 import React, { useState } from "react";
-import {
-  Box,
-  Grid,
-  Paper,
-  Typography,
-  Button,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  Chip,
-  Avatar,
-  ListItemIcon,
-  Stack,
-} from "@mui/material";
+import { Avatar, Box, Grid, List, ListItem, ListItemText, Stack, Typography } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
-import NotificationsIcon from "@mui/icons-material/Notifications";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import AccountBoxOutlined from "@mui/icons-material/AccountBoxOutlined";
+import { Panel } from "../../components/Panel";
+import { PillButton } from "../../components/PillButton";
+import { NotificationItem, NotificationsPanel } from "../../components/admin/NotificationsPanel";
 
-interface Notification {
-  id: number;
-  type: 
-    | "availability"
-    | "cancellation"
-    | "verification"
-    | "timetableUpdate";
-  message: string;
-  timestamp: string;
-}
-
-const fakeNotifications: Notification[] = [
-  { id: 1,
+const notifications: NotificationItem[] = [
+  {
+    id: 1,
     type: "availability",
     message: "Your availability for Week 12 has been approved.",
     timestamp: "2025-11-19T09:15:00Z",
   },
-  { id: 2,
-    type: "timetableUpdate",
+  {
+    id: 2,
+    type: "venueChange",
     message: "Admin updated your assigned venue for MATH101.",
     timestamp: "2025-10-19T09:15:00Z",
   },
-  { id: 3,
-    type: "timetableUpdate",
+  {
+    id: 3,
+    type: "examChange",
     message: "You have a new exam assignment for COMP204.",
     timestamp: "2025-09-19T09:15:00Z",
   },
-  { id: 4,
-    type: "verification",
+  {
+    id: 4,
+    type: "invigilatorUpdate",
     message: "Your qualification level has been verified.",
     timestamp: "2025-08-19T09:15:00Z",
   },
 ];
 
 export const InvigilatorDashboard: React.FC = () => {
-  // Placeholder data (replace with future API calls)
+  const [visibleCount, setVisibleCount] = useState(4);
+
   const nextShift = {
     date: "2025-02-14",
     time: "09:00 - 11:00",
@@ -66,244 +48,165 @@ export const InvigilatorDashboard: React.FC = () => {
 
   const announcements = [
     "Reminder: Training seminar on Wednesday at 3 PM.",
-    "Exam season peak begins next week — please update availability.",
+    "Exam season peak begins next week - please update availability.",
   ];
 
-  const [visibleCount, setVisibleCount] = useState(3);
+  const activityStats = [
+    { label: "Shifts this month", value: "12" },
+    { label: "Cancellations", value: "4" },
+    { label: "Total hours assigned", value: "28" },
+  ];
 
   return (
-    <Box sx={{ p: 3 }}>
-
-      {/* Title */}
-      <Typography variant="h4" sx={{ mb: 3 }}>
+    <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
+      <Typography variant="h4" fontWeight={700}>
         Dashboard
       </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Stay on top of upcoming exams and actions.
+      </Typography>
 
-      <Grid container spacing={3}>
-        
-        <Stack direction={{ xs: "column", md: "row"}} justifyContent="space-between" mb={4} spacing={2}>
-          {/* Next Shift */}
-          <Grid item xs={12} md={8}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Your Next Exam
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Avatar sx={{ bgcolor: "primary.main" }}>
-                  <EventAvailableIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="subtitle1">{nextShift.exam}</Typography>
-                  <Typography variant="body2">
-                    {nextShift.date} • {nextShift.time}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Venue: {nextShift.venue}
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Button
+      <Grid container spacing={2.5}>
+        <Grid item xs={12} md={8}>
+          <Panel
+            title="Your Next Exam"
+            actions={
+              <PillButton
                 variant="contained"
-                color="primary"
-                sx={{ mt: 2 }}
                 startIcon={<CalendarMonthIcon />}
                 href="/invigilator/timetable"
               >
-                View Full Timetable
-              </Button>
-            </Paper>
-          </Grid>
-
-          {/* Quick Links */}
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Quick Actions
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<EditCalendarIcon />}
-                  href="/invigilator/timetable"
-                >
-                  View Timetable
-                </Button>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<AccessTimeIcon />}
-                  href="/invigilator/availability"
-                >
-                  Submit Availability
-                </Button>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<AccountBoxOutlined />}
-                  href="/invigilator/profile"
-                >
-                  Edit Profile
-                </Button>
+                View timetable
+              </PillButton>
+            }
+          >
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: "primary.main", width: 52, height: 52 }}>
+                <EventAvailableIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  {nextShift.exam}
+                </Typography>
+                <Typography variant="body2">
+                  {nextShift.date} - {nextShift.time}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Venue: {nextShift.venue}
+                </Typography>
               </Box>
-            </Paper>
-          </Grid>
-        </Stack>
+            </Stack>
+          </Panel>
+        </Grid>
 
-      <Stack direction={{ xs: "row", md: "column"}} justifyContent="space-between" alignItems="center" mb={4} spacing={2}>
-        {/* Announcements */}
+        <Grid item xs={12} md={4}>
+          <Panel title="Quick Actions">
+            <Stack spacing={1}>
+              <PillButton
+                variant="outlined"
+                fullWidth
+                startIcon={<EditCalendarIcon />}
+                href="/invigilator/timetable"
+              >
+                View timetable
+              </PillButton>
+              <PillButton
+                variant="outlined"
+                fullWidth
+                startIcon={<AccessTimeIcon />}
+                href="/invigilator/availability"
+              >
+                Submit restrictions
+              </PillButton>
+              <PillButton
+                variant="outlined"
+                fullWidth
+                startIcon={<AccountBoxOutlined />}
+                href="/invigilator/profile"
+              >
+                Edit profile
+              </PillButton>
+            </Stack>
+          </Panel>
+        </Grid>
+
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Announcements
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-
-            <List>
+          <Panel title="Announcements">
+            <List dense>
               {announcements.map((msg, i) => (
-                <ListItem key={i}>
-                  <ListItemIcon sx={{ minWidth: 20 }}>
-                    •
-                  </ListItemIcon>
-                  <ListItemText primary={msg} />
+                <ListItem key={i} disableGutters>
+                  <ListItemText
+                    primary={msg}
+                    primaryTypographyProps={{ variant: "body2", color: "text.primary" }}
+                  />
                 </ListItem>
               ))}
             </List>
-          </Paper>
+          </Panel>
         </Grid>
 
-        {/* Stats */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Your Activity
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <Box textAlign="center">
-                  <Typography variant="h4">12</Typography>
-                  <Typography>Total Shifts This Month</Typography>
-                </Box>
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <Box textAlign="center">
-                  <Typography variant="h4">4</Typography>
-                  <Typography>Cancellations</Typography>
-                </Box>
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <Box textAlign="center">
-                  <Typography variant="h4">28 hrs</Typography>
-                  <Typography>Total Hours Assigned</Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
-        </Grid>
-      </Stack>
-
-        {/* Notifications */}
-        <Grid item xs="row" md="column">
-          <Paper sx={{ p: 3}}>
-            <Typography variant="h6" gutterBottom>
-              Notifications
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-
-            {fakeNotifications.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                No notifications yet.
-              </Typography>
-            )}
-
-            <List>
-              {fakeNotifications.slice(0, visibleCount).map((n) => {
-                const color =
-                  n.type === "cancellation"
-                    ? "error.main"
-                    : n.type === "availability"
-                    ? "success.main"
-                    : n.type === "timetableUpdate"
-                    ? "info.main"
-                    : n.type === "verification"
-                    ? "success.main"
-                    : "warning.main";
-
-                return (
-                  <ListItem
-                    key={n.id}
+        <Grid item xs={12} md={6}>
+          <Panel title="Your Activity">
+            <Grid container spacing={2}>
+              {activityStats.map((item) => (
+                <Grid item xs={12} sm={4} key={item.label}>
+                  <Box
                     sx={{
-                      // base appearance
-                      position: "relative",
-                      mb: 0.5,
                       p: 2,
-                      borderRadius: 0.5,
-                      backgroundColor: `${color}22`, // transparent tint
-                      overflow: "visible",
+                      borderRadius: 2,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      backgroundColor: "#f9fafb",
+                      textAlign: "center",
                     }}
-                    >
-
-                      {/* left bar */}
-                      <Box
-                      sx={{
-                        position: "absolute",
-                        left: 0,
-                        top: 10,
-                        bottom: 0,
-                        width: "3px",
-                        height: "70%",
-                        backgroundColor: color,
-                        borderRadius: "4px 0 0 4px",
-                      }}
-                    />
-
-                    {/* underline */}
-                    <Box
-                      sx={{
-                        display: "inline-block",
-                        pb: 0.5,
-                        borderBottom: `3px solid`,
-                        borderColor: color,
-                      }}
-                    >
-                      <ListItemText primary={n.message} />
-                    </Box>
-                  </ListItem>
-                );
-              })}
-            </List>
-
-            {fakeNotifications.length > 3 && (
-              <Box sx={{ textAlign: "center", mt: 1 }}>
-                <Button
-                  variant="text"
-                  onClick={() =>
-                    setVisibleCount((prev) =>
-                      prev >= fakeNotifications.length ? 3 : prev + 3
-                    )
-                  }
-                >
-                  {visibleCount >= fakeNotifications.length
-                    ? "Show less"
-                    : `Show ${Math.min(
-                        3,
-                        fakeNotifications.length - visibleCount
-                      )} more notifications`}
-                </Button>
-              </Box>
-            )}
-          </Paper>
+                  >
+                    <Typography variant="h5" fontWeight={700}>
+                      {item.value}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {item.label}
+                    </Typography>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </Panel>
         </Grid>
 
+        <Grid item xs={12}>
+          <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
+          {notifications.length > 0 && (
+            <Box
+              sx={{
+                textAlign: "center",
+                mt: 2,
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 1.5,
+              }}
+            >
+              <PillButton
+                variant="outlined"
+                onClick={() => setVisibleCount(4)}
+                disabled={visibleCount <= 4}
+              >
+                Show less
+              </PillButton>
+              <PillButton
+                variant="contained"
+                onClick={() =>
+                  setVisibleCount((prev) => Math.min(prev + 4, notifications.length))
+                }
+                disabled={visibleCount >= notifications.length}
+              >
+                {`Show ${Math.min(
+                  4,
+                  Math.max(notifications.length - visibleCount, 0)
+                )} more`}
+              </PillButton>
+            </Box>
+          )}
+        </Grid>
       </Grid>
     </Box>
   );
