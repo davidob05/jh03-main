@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Avatar, Box, Grid, IconButton, Stack, Typography } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
@@ -57,35 +57,18 @@ export const InvigilatorDashboard: React.FC = () => {
     venue: "Exam Hall A",
   };
 
-  const announcements: Announcement[] = useMemo(
-    () => [
-      {
-        id: 1,
-        title: "Exam season kicks off next week",
-        body: "Confirm your availability and re-check venues for late changes.",
-        imageUrl:
-          "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1600&q=80",
-        publishedAt: "2025-02-01T09:00:00Z",
-      },
-      {
-        id: 2,
-        title: "New training resources",
-        body: "Updated invigilation handbook and fire safety guide are now live.",
-        imageUrl:
-          "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1600&q=80",
-        publishedAt: "2025-02-05T10:00:00Z",
-      },
-      {
-        id: 3,
-        title: "Extra shifts available",
-        body: "Pickup slots for COMP204 have opened. Grab them if you are free.",
-        imageUrl:
-          "https://images.unsplash.com/photo-1523475472560-d2df97ec485c?auto=format&fit=crop&w=1600&q=80",
-        publishedAt: "2025-02-07T12:00:00Z",
-      },
-    ],
-    []
-  );
+  // Placeholder announcement when no announcements are available
+  const placeholderAnnouncement: Announcement = {
+    id: 0,
+    title: "Exam operations",
+    body: "The exams team will post important updates here. Check back soon.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1623075840956-c95a6b0ea89e?q=80&w=1674&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    publishedAt: new Date().toISOString(),
+  };
+
+  // TODO: Replace with API data when backend is ready
+  const announcements: Announcement[] = [];
 
   const activityStats = [
     { label: "Total shifts", value: "120", tone: "#0b4f8c" },
@@ -98,25 +81,26 @@ export const InvigilatorDashboard: React.FC = () => {
   ];
 
   useEffect(() => {
-    if (announcements.length === 0) return undefined;
-    const timer = window.setInterval(
-      () => setActiveAnnouncementIndex((prev) => (prev + 1) % announcements.length),
-      7000
-    );
+    const total = announcements.length || 1;
+    const timer = window.setInterval(() => {
+      setActiveAnnouncementIndex((prev) => (prev + 1) % total);
+    }, 7000);
     return () => window.clearInterval(timer);
   }, [announcements.length]);
 
   const showPrevAnnouncement = () => {
-    setActiveAnnouncementIndex((prev) =>
-      prev === 0 ? announcements.length - 1 : prev - 1
-    );
+    const total = announcements.length || 1;
+    setActiveAnnouncementIndex((prev) => (prev === 0 ? total - 1 : prev - 1));
   };
 
   const showNextAnnouncement = () => {
-    setActiveAnnouncementIndex((prev) => (prev + 1) % announcements.length);
+    const total = announcements.length || 1;
+    setActiveAnnouncementIndex((prev) => (prev + 1) % total);
   };
 
-  const activeAnnouncement = announcements[activeAnnouncementIndex];
+  const activeAnnouncement =
+    announcements[activeAnnouncementIndex] ?? placeholderAnnouncement;
+  const announcementCount = announcements.length;
 
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
@@ -243,7 +227,20 @@ export const InvigilatorDashboard: React.FC = () => {
             }}
           >
             {activeAnnouncement && (
-              <Stack spacing={1.2} sx={{ pt: 0.5, color: "#fff", maxWidth: "82%" }}>
+              <Stack
+                key={activeAnnouncement.id}
+                spacing={1.2}
+                sx={{
+                  pt: 0.5,
+                  color: "#fff",
+                  maxWidth: "82%",
+                  animation: "fadeIn 0.6s ease-in-out",
+                  "@keyframes fadeIn": {
+                    from: { opacity: 0, transform: "translateY(6px)" },
+                    to: { opacity: 1, transform: "translateY(0)" },
+                  },
+                }}
+              >
                 <Typography variant="overline" sx={{ letterSpacing: 0.6, opacity: 0.9 }}>
                   {new Date(activeAnnouncement.publishedAt).toLocaleDateString("en-GB", {
                     day: "numeric",
@@ -254,6 +251,39 @@ export const InvigilatorDashboard: React.FC = () => {
                 <Typography variant="body1" sx={{ color: "#e8ecf1" }}>
                   {activeAnnouncement.body}
                 </Typography>
+              </Stack>
+            )}
+
+            {announcementCount > 1 && (
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{
+                  position: "absolute",
+                  bottom: 12,
+                  left: 16,
+                  zIndex: 2,
+                }}
+              >
+                {announcements.map((a, idx) => {
+                  const isActive = idx === activeAnnouncementIndex;
+                  return (
+                    <Box
+                      key={a.id}
+                      onClick={() => setActiveAnnouncementIndex(idx)}
+                      sx={{
+                        width: isActive ? 12 : 10,
+                        height: isActive ? 12 : 10,
+                        borderRadius: "50%",
+                        backgroundColor: isActive ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.45)",
+                        border: "1px solid rgba(255,255,255,0.7)",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        boxShadow: isActive ? "0 0 0 3px rgba(255,255,255,0.18)" : "none",
+                      }}
+                    />
+                  );
+                })}
               </Stack>
             )}
           </Panel>
