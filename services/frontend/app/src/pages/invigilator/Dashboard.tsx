@@ -52,9 +52,13 @@ export const InvigilatorDashboard: React.FC = () => {
   ];
 
   const activityStats = [
-    { label: "Shifts this month", value: "12" },
-    { label: "Cancellations", value: "4" },
-    { label: "Total hours assigned", value: "28" },
+    { label: "Total shifts", value: "120", tone: "#0b4f8c" },
+    { label: "Shifts this diet", value: "12", tone: "#1565c0" },
+    { label: "Hours this diet", value: "28", tone: "#546e7a" },
+    { label: "Restrictions this diet", value: "4", tone: "#d84315" },
+    { label: "Extra shifts available", value: "3", tone: "#00796b" },
+    { label: "Requests approved", value: "5", tone: "#2e7d32" },
+    { label: "Requests denied", value: "1", tone: "#c62828" },
   ];
 
   return (
@@ -63,44 +67,50 @@ export const InvigilatorDashboard: React.FC = () => {
         Dashboard
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Stay on top of upcoming exams and actions.
+        Stay on top of upcoming exams, important information, and your actions.
       </Typography>
 
-      <Grid container spacing={2.5}>
-        <Grid item xs={12} md={8}>
-          <Panel
-            title="Your Next Exam"
-            actions={
-              <PillButton
-                variant="contained"
-                startIcon={<CalendarMonthIcon />}
-                href="/invigilator/timetable"
-              >
-                View timetable
-              </PillButton>
-            }
-          >
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar sx={{ bgcolor: "primary.main", width: 52, height: 52 }}>
-                <EventAvailableIcon />
-              </Avatar>
-              <Box>
-                <Typography variant="subtitle1" fontWeight={700}>
-                  {nextShift.exam}
-                </Typography>
-                <Typography variant="body2">
-                  {nextShift.date} - {nextShift.time}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Venue: {nextShift.venue}
-                </Typography>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2.5}
+        alignItems="stretch"
+        sx={{ width: "100%" }}
+      >
+        <Box sx={{ flex: { xs: "1 1 100%", md: "0 0 350px" }, display: "flex" }}>
+          <Panel title="Your Next Exam" sx={{ flex: 1 }}>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar sx={{ bgcolor: "primary.main", width: 52, height: 52 }}>
+                  <EventAvailableIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    {nextShift.exam}
+                  </Typography>
+                  <Typography variant="body2">
+                    {nextShift.date} - {nextShift.time}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Venue: {nextShift.venue}
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Box sx={{ display: "flex", justifyContent: "center" }}>
+                <PillButton
+                  variant="contained"
+                  startIcon={<CalendarMonthIcon />}
+                  href="/invigilator/timetable"
+                >
+                  Show more
+                </PillButton>
               </Box>
             </Stack>
           </Panel>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} md={4}>
-          <Panel title="Quick Actions">
+        <Box sx={{ flex: { xs: "1 1 100%", md: "0 0 250px" }, display: "flex" }}>
+          <Panel title="Quick Actions" sx={{ flex: 1 }}>
             <Stack spacing={1}>
               <PillButton
                 variant="outlined"
@@ -128,10 +138,10 @@ export const InvigilatorDashboard: React.FC = () => {
               </PillButton>
             </Stack>
           </Panel>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} md={6}>
-          <Panel title="Announcements">
+        <Box sx={{ flex: { xs: "1 1 100%", md: "1 1 auto" }, display: "flex" }}>
+          <Panel title="Announcements" sx={{ flex: 1, width: "100%" }}>
             <List dense>
               {announcements.map((msg, i) => (
                 <ListItem key={i} disableGutters>
@@ -143,71 +153,69 @@ export const InvigilatorDashboard: React.FC = () => {
               ))}
             </List>
           </Panel>
-        </Grid>
+        </Box>
+      </Stack>
 
-        <Grid item xs={12} md={6}>
-          <Panel title="Your Activity">
-            <Grid container spacing={2}>
-              {activityStats.map((item) => (
-                <Grid item xs={12} sm={4} key={item.label}>
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      border: "1px solid",
-                      borderColor: "divider",
-                      backgroundColor: "#f9fafb",
-                      textAlign: "center",
-                    }}
-                  >
-                    <Typography variant="h5" fontWeight={700}>
-                      {item.value}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {item.label}
-                    </Typography>
-                  </Box>
-                </Grid>
-              ))}
+      <Panel title="Your Activity" disableDivider sx={{ mt: 1 }}>
+        <Grid container spacing={2.5}>
+          {activityStats.map((item) => (
+            <Grid item xs={12} sm={6} md={4} lg={2} key={item.label}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  backgroundColor: "#f8f8f8",
+                  textAlign: "center",
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ color: item.tone, fontWeight: 700, mb: 0.5 }}>
+                  {item.label}
+                </Typography>
+                <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
+                  {item.value}
+                </Typography>
+              </Box>
             </Grid>
-          </Panel>
+          ))}
         </Grid>
+      </Panel>
 
-        <Grid item xs={12}>
-          <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
-          {notifications.length > 0 && (
-            <Box
-              sx={{
-                textAlign: "center",
-                mt: 2,
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 1.5,
-              }}
+      <Box sx={{ mt: 1.5 }}>
+        <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
+        {notifications.length > 0 && (
+          <Box
+            sx={{
+              textAlign: "center",
+              mt: 2,
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 1.5,
+            }}
+          >
+            <PillButton
+              variant="outlined"
+              onClick={() => setVisibleCount(4)}
+              disabled={visibleCount <= 4}
             >
-              <PillButton
-                variant="outlined"
-                onClick={() => setVisibleCount(4)}
-                disabled={visibleCount <= 4}
-              >
-                Show less
-              </PillButton>
-              <PillButton
-                variant="contained"
-                onClick={() =>
-                  setVisibleCount((prev) => Math.min(prev + 4, notifications.length))
-                }
-                disabled={visibleCount >= notifications.length}
-              >
-                {`Show ${Math.min(
-                  4,
-                  Math.max(notifications.length - visibleCount, 0)
-                )} more`}
-              </PillButton>
-            </Box>
-          )}
-        </Grid>
-      </Grid>
+              Show less
+            </PillButton>
+            <PillButton
+              variant="contained"
+              onClick={() =>
+                setVisibleCount((prev) => Math.min(prev + 4, notifications.length))
+              }
+              disabled={visibleCount >= notifications.length}
+            >
+              {`Show ${Math.min(
+                4,
+                Math.max(notifications.length - visibleCount, 0)
+              )} more`}
+            </PillButton>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 };
