@@ -425,8 +425,19 @@ export const InvigilatorProfile: React.FC = () => {
 
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Two-Factor Authentication</Typography>
-            <Switch disabled />
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Switch disabled /> {/* placeholder */}
+              <Tooltip title="Manage 2FA setup">
+                <PillButton variant="outlined" size="small" onClick={() => navigate("/invigilator/profile/two-factor")} disabled>
+                  Manage
+                </PillButton>
+              </Tooltip>
+            </Stack>
           </Stack>
+
+          <Alert severity="info">
+            Two-factor authentication controls are coming soon. This section is not yet available in the current build.
+          </Alert>
 
           <Stack spacing={1}>
             <Typography variant="subtitle2">Active sessions</Typography>
