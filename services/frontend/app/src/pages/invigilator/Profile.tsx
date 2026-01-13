@@ -6,8 +6,13 @@ import {
   CardContent,
   CircularProgress,
   Chip,
+  Divider,
+  FormControl,
   IconButton,
   InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
   Snackbar,
   Stack,
   Tooltip,
@@ -50,7 +55,9 @@ export const InvigilatorProfile: React.FC = () => {
   });
 
   const [darkMode, setDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(true);
+  const [notifyEmail, setNotifyEmail] = useState<"instant" | "daily" | "weekly" | "off">("instant");
+  const [notifySms, setNotifySms] = useState(false);
+  const [notifyPush, setNotifyPush] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -479,6 +486,9 @@ export const InvigilatorProfile: React.FC = () => {
       {/* Preferences */}
       <Panel title="Preferences" disableDivider>
         <Stack spacing={3}>
+          <Alert severity="info">
+            Notification and appearance preferences are coming soon. These controls are not active yet.
+          </Alert>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Dark Mode</Typography>
             <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} disabled />
@@ -486,7 +496,52 @@ export const InvigilatorProfile: React.FC = () => {
 
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Email Notifications</Typography>
-            <Switch checked={notifications} onChange={() => setNotifications(!notifications)} disabled />
+            <FormControl size="small" sx={{ minWidth: 180 }} disabled>
+              <InputLabel>Email frequency</InputLabel>
+              <Select
+                label="Email frequency"
+                value={notifyEmail}
+                onChange={(e) => setNotifyEmail(e.target.value as any)}
+              >
+                <MenuItem value="instant">Instant</MenuItem>
+                <MenuItem value="daily">Daily summary</MenuItem>
+                <MenuItem value="weekly">Weekly summary</MenuItem>
+                <MenuItem value="off">Off</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography>SMS Notifications</Typography>
+            <Switch
+              checked={notifySms}
+              onChange={() => setNotifySms(!notifySms)}
+              disabled
+            />
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography>Push Notifications</Typography>
+            <Switch
+              checked={notifyPush}
+              onChange={() => setNotifyPush(!notifyPush)}
+              disabled
+            />
+          </Stack>
+
+          <PillButton variant="contained" onClick={() => setSnackbar({ open: true, message: "Test notification sent", severity: "success" })} disabled>
+            Send test notification
+          </PillButton>
+
+          <Divider />
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <PillButton variant="outlined" onClick={() => setSnackbar({ open: true, message: "Data export started", severity: "success" })}>
+              Export my data
+            </PillButton>
+            <PillButton variant="outlined" color="error" onClick={() => setSnackbar({ open: true, message: "Account deletion requested", severity: "success" })}>
+              Delete my account
+            </PillButton>
           </Stack>
         </Stack>
       </Panel>
