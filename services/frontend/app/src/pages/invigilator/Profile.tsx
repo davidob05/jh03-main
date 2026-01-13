@@ -23,13 +23,15 @@ import {
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Logout, PhotoCamera, Visibility, VisibilityOff } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
-import { apiBaseUrl, apiFetch, getAuthToken, setAuthSession } from "../../utils/api";
+import { apiBaseUrl, apiFetch, clearAuthSession, getAuthToken, setAuthSession } from "../../utils/api";
 
 export const InvigilatorProfile: React.FC = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: userData, isLoading, isError, error } = useQuery({
     queryKey: ["me"],
@@ -67,6 +69,7 @@ export const InvigilatorProfile: React.FC = () => {
   const [showPhotoSave, setShowPhotoSave] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("Just now");
   const [lastLogin, setLastLogin] = useState<string | null>(null);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
     open: false,
     message: "",
@@ -194,6 +197,24 @@ export const InvigilatorProfile: React.FC = () => {
       .catch((err: any) => {
         setSnackbar({ open: true, message: err?.message || "Failed to update password.", severity: "error" });
       });
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/auth/me/`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const msg = data?.detail || "Failed to delete account.";
+        throw new Error(msg);
+      }
+      clearAuthSession();
+      setSnackbar({ open: true, message: "Account deleted.", severity: "success" });
+      navigate("/login", { replace: true });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err?.message || "Failed to delete account.", severity: "error" });
+    } finally {
+      setDeleteAccountOpen(false);
+    }
   };
 
   const handleSignOutAll = async () => {
@@ -539,7 +560,7 @@ export const InvigilatorProfile: React.FC = () => {
             <PillButton variant="outlined" onClick={() => setSnackbar({ open: true, message: "Data export started", severity: "success" })}>
               Export my data
             </PillButton>
-            <PillButton variant="outlined" color="error" onClick={() => setSnackbar({ open: true, message: "Account deletion requested", severity: "success" })}>
+            <PillButton variant="outlined" color="error" onClick={() => setDeleteAccountOpen(true)}>
               Delete my account
             </PillButton>
           </Stack>
@@ -604,6 +625,14 @@ export const InvigilatorProfile: React.FC = () => {
             setConfirmRemoveOpen(false);
           }
         }}
+      />
+      <DeleteConfirmationDialog
+        open={deleteAccountOpen}
+        title="Delete account?"
+        description="This will permanently delete your account and sign you out. This cannot be undone."
+        confirmText="Delete"
+        onClose={() => setDeleteAccountOpen(false)}
+        onConfirm={handleDeleteAccount}
       />
     </Box>
   );
