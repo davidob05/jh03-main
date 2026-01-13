@@ -2,18 +2,22 @@ import {
   Alert,
   Avatar,
   Box,
+  Card,
+  CardContent,
   CircularProgress,
+  Chip,
   IconButton,
   InputAdornment,
   Snackbar,
   Stack,
+  Tooltip,
   Switch,
   TextField,
   Typography,
 } from "@mui/material";
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PhotoCamera, Visibility, VisibilityOff } from "@mui/icons-material";
+import { Logout, PhotoCamera, Visibility, VisibilityOff } from "@mui/icons-material";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
@@ -27,6 +31,20 @@ export const InvigilatorProfile: React.FC = () => {
     queryFn: async () => {
       const res = await apiFetch(`${apiBaseUrl}/auth/me/`);
       if (!res.ok) throw new Error("Unable to load profile");
+      return res.json();
+    },
+  });
+  const {
+    data: sessions,
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+    error: sessionsErrorObj,
+    refetch: refetchSessions,
+  } = useQuery({
+    queryKey: ["sessions"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/auth/sessions/`);
+      if (!res.ok) throw new Error("Unable to load sessions");
       return res.json();
     },
   });
@@ -169,6 +187,34 @@ export const InvigilatorProfile: React.FC = () => {
       .catch((err: any) => {
         setSnackbar({ open: true, message: err?.message || "Failed to update password.", severity: "error" });
       });
+  };
+
+  const handleSignOutAll = async () => {
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/auth/sessions/revoke-others/`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || "Failed to sign out of other sessions.");
+      setSnackbar({ open: true, message: "Signed out of other sessions.", severity: "success" });
+      await refetchSessions();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err?.message || "Failed to sign out of other sessions.", severity: "error" });
+    }
+  };
+
+  const handleRevokeSession = async (key: string) => {
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/auth/sessions/revoke/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || "Failed to sign out of session.");
+      setSnackbar({ open: true, message: "Session signed out.", severity: "success" });
+      await refetchSessions();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err?.message || "Failed to sign out of session.", severity: "error" });
+    }
   };
 
   if (isLoading) {
@@ -352,6 +398,80 @@ export const InvigilatorProfile: React.FC = () => {
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Two-Factor Authentication</Typography>
             <Switch disabled />
+          </Stack>
+
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Active sessions</Typography>
+            <Stack spacing={1}>
+              {sessionsLoading && (
+                <Card variant="outlined">
+                  <CardContent sx={{ py: 1.5, textAlign: "center" }}>
+                    <CircularProgress size={20} />
+                  </CardContent>
+                </Card>
+              )}
+              {sessionsError && (
+                <Alert severity="error">{(sessionsErrorObj as any)?.message || "Failed to load sessions."}</Alert>
+              )}
+              {!sessionsLoading && !sessionsError && Array.isArray(sessions) && sessions.length === 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  No active sessions.
+                </Typography>
+              )}
+              {!sessionsLoading &&
+                !sessionsError &&
+                Array.isArray(sessions) &&
+                sessions.map((s: any) => (
+                  <Card key={s.key} variant="outlined">
+                    <CardContent sx={{ py: 1.5 }}>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", sm: "center" }}
+                        spacing={1}
+                      >
+                        <Box>
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                            <Typography fontWeight={600}>Session</Typography>
+                            {s.is_current && <Chip size="small" sx={{ fontWeight: 600 }} color="primary" label="Current" />}
+                            {!s.is_active && <Chip size="small" sx={{ fontWeight: 600 }} color="default" label="Revoked" />}
+                          </Stack>
+                          <Typography variant="body2" color="text.secondary">
+                            Last active: {s.last_seen ? new Date(s.last_seen).toLocaleString() : "N/A"}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Created: {s.created_at ? new Date(s.created_at).toLocaleString() : "N/A"}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            IP: {s.ip_address || "Unknown"}
+                          </Typography>
+                          {s.user_agent && (
+                            <Typography variant="body2" color="text.secondary">
+                              Agent: {s.user_agent}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Tooltip
+                          title={s.is_current ? "You cannot sign out the current session here." : "Sign out this session"}
+                        >
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={s.is_current || !s.is_active}
+                              onClick={() => handleRevokeSession(s.key)}
+                            >
+                              <Logout fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                ))}
+            </Stack>
+            <PillButton variant="outlined" color="error" onClick={handleSignOutAll}>
+              Sign out of other sessions
+            </PillButton>
           </Stack>
         </Stack>
       </Panel>
