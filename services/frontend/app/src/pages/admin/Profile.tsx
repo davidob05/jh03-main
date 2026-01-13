@@ -181,7 +181,7 @@ export const AdminProfile: React.FC = () => {
           const msg = Array.isArray(data?.detail) ? data.detail.join(" ") : data?.detail || "Failed to update password.";
           throw new Error(msg);
         }
-        setSnackbar({ open: true, message: "Password updated successfully.", severity: "success" });
+        setSnackbar({ open: true, message: "Password updated successfully!", severity: "success" });
         setPasswords({ current: "", next: "", confirm: "" });
       })
       .catch((err: any) => {

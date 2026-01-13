@@ -1,13 +1,26 @@
-import { Alert, Avatar, Box, CircularProgress, Stack, Switch, Typography } from "@mui/material";
-import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import {
+  Alert,
+  Avatar,
+  Box,
+  CircularProgress,
+  IconButton,
+  InputAdornment,
+  Snackbar,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from "@mui/material";
+import React, { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { PhotoCamera, Visibility, VisibilityOff } from "@mui/icons-material";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
-import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { apiBaseUrl, apiFetch, getAuthToken, setAuthSession } from "../../utils/api";
 
 export const InvigilatorProfile: React.FC = () => {
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: userData, isLoading, isError, error } = useQuery({
     queryKey: ["me"],
@@ -20,24 +33,143 @@ export const InvigilatorProfile: React.FC = () => {
 
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [avatarData, setAvatarData] = useState<string | null>(null);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const [showPhotoSave, setShowPhotoSave] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState("Just now");
+  const [lastLogin, setLastLogin] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+  const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
+  const [showPasswords, setShowPasswords] = useState(false);
 
   const profileDetails = useMemo(
     () => ({
-      name: userData?.username || userData?.email || "Invigilator",
-      email: userData?.email || "",
-      phone: userData?.phone || "",
-      avatar: userData?.avatar || null,
-      lastLogin: userData?.last_login || null,
+      name: name || userData?.username || userData?.email || "Invigilator",
+      email: email || userData?.email || "",
+      phone: phone || userData?.phone || "",
+      avatar: photoPreview || userData?.avatar || null,
+      lastLogin: lastLogin,
     }),
-    [userData]
+    [email, lastLogin, name, phone, photoPreview, userData]
   );
 
-  const getInitials = (name: string) =>
-    name
+  const getInitials = (value: string) =>
+    value
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase();
+
+  useEffect(() => {
+    if (!userData) return;
+    setName(userData.username || userData.email || "");
+    setEmail(userData.email || userData.username || "");
+    setPhone(userData.phone || "");
+    setPhotoPreview(userData.avatar || null);
+    setAvatarData(userData.avatar || null);
+    setShowPhotoSave(false);
+    setLastLogin(userData.last_login ? new Date(userData.last_login).toLocaleString() : null);
+    setLastUpdated("Just now");
+  }, [userData]);
+
+  const passwordStrength = (pwd: string) => {
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[a-z]/.test(pwd)) score++;
+    if (/\d/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    const label = score >= 4 ? "Strong" : score >= 3 ? "Medium" : score > 0 ? "Weak" : "Not set";
+    return { score: Math.min(score, 4), label };
+  };
+
+  const handlePhotoChange = (file?: File | null) => {
+    if (!file) {
+      setPhotoPreview(null);
+      setAvatarData(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === "string" ? reader.result : null;
+      setPhotoPreview(result);
+      setAvatarData(result);
+      setSnackbar({ open: true, message: "Photo ready to save.", severity: "success" });
+      setShowPhotoSave(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/auth/me/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: name,
+          email,
+          phone,
+          avatar: avatarData ?? "",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSnackbar({ open: true, message: data?.detail || "Failed to update profile.", severity: "error" });
+        return;
+      }
+      const token = getAuthToken();
+      if (token) {
+        setAuthSession(token, data);
+      }
+      queryClient.setQueryData(["me"], data);
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      setSnackbar({ open: true, message: "Profile updated!", severity: "success" });
+      setShowPhotoSave(false);
+      setLastUpdated("Just now");
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err?.message || "Failed to update profile.", severity: "error" });
+    }
+  };
+
+  const handleSavePassword = () => {
+    if (passwords.next !== passwords.confirm) {
+      setSnackbar({ open: true, message: "New passwords do not match", severity: "error" });
+      return;
+    }
+    if (!passwords.current || !passwords.next) {
+      setSnackbar({ open: true, message: "Current and new passwords are required.", severity: "error" });
+      return;
+    }
+    apiFetch(`${apiBaseUrl}/auth/me/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        current_password: passwords.current,
+        new_password: passwords.next,
+        confirm_password: passwords.confirm,
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          const msg = Array.isArray(data?.detail) ? data.detail.join(" ") : data?.detail || "Failed to update password.";
+          throw new Error(msg);
+        }
+        setSnackbar({ open: true, message: "Password updated successfully!", severity: "success" });
+        setPasswords({ current: "", next: "", confirm: "" });
+      })
+      .catch((err: any) => {
+        setSnackbar({ open: true, message: err?.message || "Failed to update password.", severity: "error" });
+      });
+  };
 
   if (isLoading) {
     return (
@@ -58,7 +190,6 @@ export const InvigilatorProfile: React.FC = () => {
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, pb: 6 }}>
-
       {/* Profile overview */}
       <Panel>
         <Box sx={{ textAlign: "center" }}>
@@ -84,134 +215,221 @@ export const InvigilatorProfile: React.FC = () => {
           </Typography>
 
           <Stack direction="row" spacing={1} justifyContent="center" mt={2}>
-            <PillButton
-              variant="contained"
-              color="primary"
-              onClick={() => navigate("/invigilator/profile/upload-photo")}
-            >
-              Upload / Change Photo
+            <PillButton variant="contained" color="primary" startIcon={<PhotoCamera />} component="label">
+              {photoPreview || userData?.avatar ? "Change photo" : "Upload photo"}
+              <input
+                type="file"
+                hidden
+                accept="image/*"
+                onChange={(e) => handlePhotoChange(e.target.files?.[0] || null)}
+              />
             </PillButton>
+            {showPhotoSave && avatarData && (
+              <PillButton variant="outlined" color="primary" onClick={handleSaveProfile}>
+                Save
+              </PillButton>
+            )}
+            {photoPreview && (
+              <PillButton variant="outlined" color="error" onClick={() => setConfirmRemoveOpen(true)}>
+                Remove
+              </PillButton>
+            )}
           </Stack>
+
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Last updated: {lastUpdated} • Last login: {lastLogin || "N/A"}
+          </Typography>
         </Box>
       </Panel>
 
       {/* Personal information */}
       <Panel title="Personal Information">
-
         <Stack spacing={3}>
           {/* Display Name */}
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            spacing={1}
-          >
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                Display Name
-              </Typography>
-              <Typography>{profileDetails.name}</Typography>
-            </Box>
-            <PillButton
-              variant="contained"
-              onClick={() =>
-                navigate("/invigilator/profile/edit-display-name", {
-                  state: { autofocus: "displayName" },
-                })
-              }
-            >
-              Change
-            </PillButton>
-          </Stack>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary">
+              Display Name
+            </Typography>
+
+            <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
+              <TextField fullWidth size="small" value={name} onChange={(e) => setName(e.target.value)} />
+              <PillButton variant="contained" onClick={handleSaveProfile}>Save</PillButton>
+            </Stack>
+          </Box>
 
           {/* Email */}
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            spacing={1}
-          >
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                Email
-              </Typography>
-              <Typography>{profileDetails.email}</Typography>
-            </Box>
-            <PillButton
-              variant="contained"
-              onClick={() =>
-                navigate("/invigilator/profile/edit-email", {
-                  state: { autofocus: "email" },
-                })
-              }
-            >
-              Change
-            </PillButton>
-          </Stack>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary">
+              Email
+            </Typography>
+
+            <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
+              <TextField fullWidth size="small" value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+              <PillButton variant="contained" onClick={handleSaveProfile}>Save</PillButton>
+            </Stack>
+          </Box>
 
           {/* Phone */}
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            spacing={1}
-          >
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                Phone Number
-              </Typography>
-              <Typography>{profileDetails.phone}</Typography>
-            </Box>
-            <PillButton
-              variant="contained"
-              onClick={() =>
-                navigate("/invigilator/profile/edit-phone-number", {
-                  state: { autofocus: "phone" },
-                })
-              }
-            >
-              Change
-            </PillButton>
-          </Stack>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary">
+              Phone Number
+            </Typography>
+
+            <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
+              <TextField fullWidth size="small" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <PillButton variant="contained" onClick={handleSaveProfile}>Save</PillButton>
+            </Stack>
+          </Box>
         </Stack>
       </Panel>
 
       {/* Security */}
       <Panel title="Password & Security">
-
         <Stack spacing={3}>
-          <PillButton variant="contained" onClick={() => navigate("/invigilator/profile/change-password")}>
-            Change Password
-          </PillButton>
+          <Stack spacing={1.5}>
+            {["current", "next", "confirm"].map((key) => (
+              <TextField
+                key={key}
+                type={showPasswords ? "text" : "password"}
+                label={
+                  key === "current"
+                    ? "Current password"
+                    : key === "next"
+                    ? "New password"
+                    : "Confirm new password"
+                }
+                value={(passwords as any)[key]}
+                onChange={(e) => setPasswords((prev) => ({ ...prev, [key]: e.target.value }))}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowPasswords((p) => !p)} edge="end">
+                        {showPasswords ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            ))}
+            {(() => {
+              const strength = passwordStrength(passwords.next);
+              const colors = ["#d32f2f", "#ed6c02", "#f9a825", "#2e7d32", "#1b5e20"];
+              const barColor = colors[Math.min(strength.score, colors.length - 1)];
+              const percent = (strength.score / 4) * 100;
+              return (
+                <Box sx={{ mt: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Strength: {strength.label}
+                  </Typography>
+                  <Box
+                    sx={{
+                      mt: 0.5,
+                      height: 8,
+                      borderRadius: 999,
+                      backgroundColor: "#e0e0e0",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: `${percent}%`,
+                        maxWidth: "100%",
+                        height: "100%",
+                        borderRadius: 999,
+                        background: barColor,
+                        transition: "width 200ms ease",
+                      }}
+                    />
+                  </Box>
+                </Box>
+              );
+            })()}
+            <PillButton variant="contained" onClick={handleSavePassword}>
+              Update Password
+            </PillButton>
+          </Stack>
 
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Two-Factor Authentication</Typography>
-            <Switch disabled /> {/* feature placeholder */}
+            <Switch disabled />
           </Stack>
         </Stack>
       </Panel>
 
       {/* Preferences */}
       <Panel title="Preferences" disableDivider>
-
         <Stack spacing={3}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Dark Mode</Typography>
-            <Switch
-              checked={darkMode}
-              onChange={() => setDarkMode(!darkMode)}
-            />
+            <Switch checked={darkMode} onChange={() => setDarkMode(!darkMode)} disabled />
           </Stack>
 
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Email Notifications</Typography>
-            <Switch
-              checked={notifications}
-              onChange={() => setNotifications(!notifications)}
-            />
+            <Switch checked={notifications} onChange={() => setNotifications(!notifications)} disabled />
           </Stack>
         </Stack>
       </Panel>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          variant="filled"
+          sx={
+            snackbar.severity === "success"
+              ? {
+                  backgroundColor: "#d4edda",
+                  color: "#155724",
+                  border: "1px solid #155724",
+                  borderRadius: "50px",
+                  fontWeight: 500,
+                }
+              : undefined
+          }
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      <DeleteConfirmationDialog
+        open={confirmRemoveOpen}
+        title="Remove profile photo?"
+        description="This will remove your current profile photo."
+        confirmText="Remove"
+        onClose={() => setConfirmRemoveOpen(false)}
+        onConfirm={async () => {
+          try {
+            const res = await apiFetch(`${apiBaseUrl}/auth/me/`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ avatar: "" }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              setSnackbar({ open: true, message: data?.detail || "Failed to remove photo.", severity: "error" });
+              return;
+            }
+            const token = getAuthToken();
+            if (token) {
+              setAuthSession(token, data);
+            }
+            queryClient.setQueryData(["me"], data);
+            setPhotoPreview(null);
+            setAvatarData(null);
+            setSnackbar({ open: true, message: "Profile photo removed.", severity: "success" });
+          } catch (err: any) {
+            setSnackbar({ open: true, message: err?.message || "Failed to remove photo.", severity: "error" });
+          } finally {
+            setConfirmRemoveOpen(false);
+          }
+        }}
+      />
     </Box>
   );
 };
