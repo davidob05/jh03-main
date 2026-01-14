@@ -10,9 +10,8 @@ import {
   Grid,
   Stack,
   Typography,
+  Tooltip,
 } from "@mui/material";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ArrowBack from "@mui/icons-material/ArrowBack";
 import ArrowForward from "@mui/icons-material/ArrowForward";
 import Today from "@mui/icons-material/Today";
@@ -146,41 +145,96 @@ export const InvigilatorTimetable: React.FC = () => {
           sx={{ mb: 2.5 }}
         >
           <Stack direction="row" spacing={1} flexWrap="wrap">
-            <PillButton
-              variant="outlined"
-              size="medium"
-              startIcon={<ArrowBack />}
-              onClick={handlePrevDay}
-            >
-              Previous
-            </PillButton>
-            <PillButton
-              variant="contained"
-              size="medium"
-              color="primary"
-              startIcon={<Today />}
-              onClick={handleToday}
-            >
-              Today
-            </PillButton>
-            <PillButton
-              variant="outlined"
-              size="medium"
-              endIcon={<ArrowForward />}
-              onClick={handleNextDay}
-            >
-              Next
-            </PillButton>
-            <DatePicker
-              value={selectedDate}
-              onChange={(newValue) => setDay(newValue)}
-              slotProps={{
-                textField: {
-                  size: "small",
-                  sx: { minWidth: 210 },
-                },
-              }}
-            />
+            <Tooltip title="Go to the previous day">
+              <Box>
+                <PillButton
+                  variant="outlined"
+                  size="medium"
+                  startIcon={<ArrowBack />}
+                  onClick={handlePrevDay}
+                >
+                  Previous
+                </PillButton>
+              </Box>
+            </Tooltip>
+            <Tooltip title="Jump back to today">
+              <Box>
+                <PillButton
+                  variant="contained"
+                  size="medium"
+                  color="primary"
+                  startIcon={<Today />}
+                  onClick={handleToday}
+                >
+                  Today
+                </PillButton>
+              </Box>
+            </Tooltip>
+            <Tooltip title="Skip forward to the next day">
+              <Box>
+                <PillButton
+                  variant="outlined"
+                  size="medium"
+                  endIcon={<ArrowForward />}
+                  onClick={handleNextDay}
+                >
+                  Next
+                </PillButton>
+              </Box>
+            </Tooltip>
+            <Tooltip title="Pick a specific date">
+              <Box>
+                <DatePicker
+                  value={selectedDate}
+                  onChange={(newValue) => setDay(newValue)}
+                  slotProps={{
+                    textField: {
+                      variant: "outlined",
+                      size: "small",
+                      sx: {
+                        minWidth: 220,
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: "999px",
+                          bgcolor: "#f8fafc",
+                          border: "1px solid #b9c0d0",
+                          fontWeight: 600,
+                          letterSpacing: 0.2,
+                          transition: "all 0.2s ease",
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#b9c0d0",
+                            borderRadius: "999px",
+                          },
+                          "&:hover": {
+                            transform: "translateY(-1px)",
+                            boxShadow: "0px 4px 18px rgba(0,0,0,0.12)",
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "primary.main",
+                          },
+                          "&.Mui-focused": {
+                            boxShadow:
+                              "0 0 0 2px rgba(25,118,210,0.16), 0px 4px 18px rgba(0,0,0,0.12)",
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "primary.main",
+                            borderRadius: "999px",
+                          },
+                        },
+                        "& .MuiInputBase-input": {
+                          py: 1.1,
+                        },
+                        "& .MuiSvgIcon-root": { color: "primary.main" },
+                      },
+                      InputProps: {
+                        sx: {
+                          borderRadius: "999px",
+                        },
+                      },
+                    },
+                  }}
+                />
+              </Box>
+            </Tooltip>
           </Stack>
         </Stack>
 
@@ -407,39 +461,45 @@ export const InvigilatorTimetable: React.FC = () => {
                             </Stack>
                             <Divider sx={{ width: "100%", my: 0.5 }} />
                             <Stack direction="column" spacing={0.8} alignItems="flex-start">
-                              <Chip
-                                size="small"
-                                label="Confirmed"
-                                icon={<CheckIcon fontSize="small" />}
-                                sx={{
-                                  bgcolor: "#e8f5e9",
-                                  color: "#1b5e20",
-                                  fontWeight: 700,
-                                  "& .MuiChip-icon": { color: "#1b5e20" },
-                                }}
-                              />
-                              <Chip
-                                size="small"
-                                label={`${totalDuration} minutes`}
-                                icon={<AccessTimeIcon fontSize="small" />}
-                                sx={{
-                                  bgcolor: "#ede9fe",
-                                  color: "#42307d",
-                                  fontWeight: 700,
-                                  "& .MuiChip-icon": { color: "#42307d" },
-                                }}
-                              />
-                              <Chip
-                                icon={<AvTimerIcon fontSize="small" />}
-                                label={`Arrive by ${arrivalTime}`}
-                                size="small"
-                                sx={{
-                                  bgcolor: "#fff4e5",
-                                  color: "#b45309",
-                                  fontWeight: 700,
-                                  "& .MuiChip-icon": { color: "#b45309" },
-                                }}
-                              />
+                              <Tooltip title="This shift is confirmed">
+                                <Chip
+                                  size="small"
+                                  label="Confirmed"
+                                  icon={<CheckIcon fontSize="small" />}
+                                  sx={{
+                                    bgcolor: "#e8f5e9",
+                                    color: "#1b5e20",
+                                    fontWeight: 700,
+                                    "& .MuiChip-icon": { color: "#1b5e20" },
+                                  }}
+                                />
+                              </Tooltip>
+                              <Tooltip title="Total duration including required early arrival">
+                                <Chip
+                                  size="small"
+                                  label={`${totalDuration} minutes`}
+                                  icon={<AccessTimeIcon fontSize="small" />}
+                                  sx={{
+                                    bgcolor: "#ede9fe",
+                                    color: "#42307d",
+                                    fontWeight: 700,
+                                    "& .MuiChip-icon": { color: "#42307d" },
+                                  }}
+                                />
+                              </Tooltip>
+                              <Tooltip title="Arrive 30 minutes before the exam starts">
+                                <Chip
+                                  icon={<AvTimerIcon fontSize="small" />}
+                                  label={`Arrive by ${arrivalTime}`}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: "#fff4e5",
+                                    color: "#b45309",
+                                    fontWeight: 700,
+                                    "& .MuiChip-icon": { color: "#b45309" },
+                                  }}
+                                />
+                              </Tooltip>
                             </Stack>
                           </Stack>
                         </Box>
