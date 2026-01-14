@@ -14,6 +14,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { EventAvailable } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel } from "../../components/Panel";
@@ -22,15 +23,22 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 type SlotCode = "MORNING" | "AFTERNOON" | "EVENING";
 
+type AvailabilityEntry = {
+  date: string;
+  slot: SlotCode;
+  available: boolean;
+};
+
 type AvailabilityResponse = {
   diet: string;
-  start_date: string;
-  end_date: string;
+  start_date: string | null;
+  end_date: string | null;
   diets: { code: string; start_date: string; end_date: string }[];
   days: {
     date: string;
     slots: { slot: SlotCode; available: boolean }[];
   }[];
+  availabilities?: AvailabilityEntry[];
 };
 
 const slotLabels: Record<SlotCode, string> = {
@@ -46,6 +54,11 @@ export const InvigilatorRestrictions: React.FC = () => {
   const [selectedDiet, setSelectedDiet] = useState<string | null>(null);
   const [days, setDays] = useState<AvailabilityResponse["days"]>([]);
   const [successOpen, setSuccessOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const availabilityQuery = useQuery<AvailabilityResponse>({
     queryKey: ["invigilator-availability", selectedDiet || "default"],
@@ -58,18 +71,64 @@ export const InvigilatorRestrictions: React.FC = () => {
       }
       return res.json();
     },
-    onSuccess: (data) => {
-      if (!selectedDiet) setSelectedDiet(data.diet);
-      setDays(
-        (data.days || []).map((d) => ({
-          ...d,
-          slots: [...d.slots].sort((a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot)),
-        }))
-      );
-    },
     staleTime: 0,
     keepPreviousData: true,
   });
+
+  useEffect(() => {
+    if (!availabilityQuery.data) return;
+    if (!selectedDiet) setSelectedDiet(availabilityQuery.data.diet);
+    setDays(buildDays(availabilityQuery.data));
+  }, [availabilityQuery.data, selectedDiet]);
+
+  const buildDays = (data: AvailabilityResponse) => {
+    const entries = data.availabilities || [];
+    const byDate: Record<string, Record<SlotCode, boolean>> = {};
+    entries.forEach((e) => {
+      if (!byDate[e.date]) byDate[e.date] = {} as Record<SlotCode, boolean>;
+      byDate[e.date][e.slot] = e.available;
+    });
+
+    // Prefer server-provided days if present
+    if (data.days && data.days.length > 0) {
+      return data.days.map((d) => ({
+        ...d,
+        slots: slotOrder.map((slot) => {
+          const fromServer = d.slots.find((s) => s.slot === slot);
+          const fallback = byDate[d.date]?.[slot];
+          return { slot, available: fromServer ? fromServer.available : fallback ?? true };
+        }),
+      }));
+    }
+
+    // Build from date range if supplied
+    if (data.start_date && data.end_date) {
+      const start = dayjs(data.start_date);
+      const end = dayjs(data.end_date);
+      const rows: { date: string; slots: { slot: SlotCode; available: boolean }[] }[] = [];
+      if (start.isValid() && end.isValid()) {
+        let cursor = start.startOf("day");
+        while (cursor.isSame(end, "day") || cursor.isBefore(end, "day")) {
+          const key = cursor.format("YYYY-MM-DD");
+          const slots = slotOrder.map((slot) => ({
+            slot,
+            available: byDate[key]?.[slot] ?? true,
+          }));
+          rows.push({ date: key, slots });
+          cursor = cursor.add(1, "day");
+        }
+        return rows;
+      }
+    }
+
+    // Fallback to whatever entries we have grouped by date
+    return Object.entries(byDate)
+      .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+      .map(([date, slotsMap]) => ({
+        date,
+        slots: slotOrder.map((slot) => ({ slot, available: slotsMap[slot] ?? true })),
+      }));
+  };
 
   const diets = useMemo(() => {
     return (availabilityQuery.data?.diets || []).map((d) => ({
@@ -123,16 +182,12 @@ export const InvigilatorRestrictions: React.FC = () => {
       return res.json();
     },
     onSuccess: (data: AvailabilityResponse & { unavailable_count?: number }) => {
-      if (data.days) {
-        setDays(
-          data.days.map((d) => ({
-            ...d,
-            slots: [...d.slots].sort((a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot)),
-          }))
-        );
-      }
-      setSuccessOpen(true);
+      setDays(buildDays(data));
+      setSnackbar({ open: true, message: "Restrictions updated!", severity: "success" });
       queryClient.invalidateQueries({ queryKey: ["invigilator-availability"] });
+    },
+    onError: (err: any) => {
+      setSnackbar({ open: true, message: err?.message || "Failed to update restrictions", severity: "error" });
     },
   });
 
@@ -144,9 +199,9 @@ export const InvigilatorRestrictions: React.FC = () => {
   const endDate = availabilityQuery.data?.end_date;
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Stack spacing={2} sx={{ maxWidth: 1200, mx: "auto" }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" spacing={1}>
+    <Box sx={{ p: 3 }}>
+      <Stack spacing={2.5}>
+        <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }} spacing={1.5}>
           <Stack spacing={0.5}>
             <Typography variant="h4" fontWeight={700}>
               Restrictions
@@ -155,7 +210,7 @@ export const InvigilatorRestrictions: React.FC = () => {
               Deselect the slots you cannot work for the selected exam diet, then submit your restrictions.
             </Typography>
           </Stack>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="body2" color="text.secondary">
               Exam diet
             </Typography>
@@ -163,7 +218,7 @@ export const InvigilatorRestrictions: React.FC = () => {
               size="small"
               value={selectedDiet || ""}
               onChange={(e) => handleDietChange(e.target.value)}
-              sx={{ minWidth: 180 }}
+              sx={{ minWidth: 200 }}
             >
               {diets.map((d) => (
                 <MenuItem key={d.code} value={d.code}>
@@ -171,40 +226,51 @@ export const InvigilatorRestrictions: React.FC = () => {
                 </MenuItem>
               ))}
             </Select>
+            <PillButton
+              variant="outlined"
+              onClick={() => availabilityQuery.refetch()}
+              disabled={availabilityQuery.isFetching}
+              size="small"
+            >
+              Refresh
+            </PillButton>
+            <PillButton
+              variant="contained"
+              onClick={() => mutation.mutate()}
+              disabled={availabilityQuery.isLoading || mutation.isLoading || days.length === 0}
+              size="small"
+            >
+              Submit restrictions
+            </PillButton>
           </Stack>
         </Stack>
 
+        <Panel
+          disableDivider
+          title={
+            <Stack direction="row" spacing={1} alignItems="center">
+              <EventAvailable fontSize="small" />
+              <Typography variant="subtitle1" fontWeight={700}>
+                Update your restrictions
+              </Typography>
+            </Stack>
+          }
+          sx={{
+            mb: 1,
+            background: "linear-gradient(135deg, #f8fafc, #eef2ff)",
+            borderColor: "#e0e7ff",
+            boxShadow: "0 12px 35px rgba(79, 70, 229, 0.08)",
+          }}
+        >
+          <Typography color="text.secondary">
+            Find the dates and times you are unavailable to invigilate and deselect the corresponding slots.
+            <br />
+            Edit them as needed and submit your restrictions when you are done.
+          </Typography>
+        </Panel>
+
         <Panel sx={{ p: 3 }}>
           <Stack spacing={2}>
-            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems="flex-start" spacing={1}>
-              <Box>
-                <Typography variant="subtitle1" fontWeight={700}>
-                  Availability for {selectedDiet || "diet"}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {startDate && endDate
-                    ? `${dayjs(startDate).format("D MMM YYYY")} - ${dayjs(endDate).format("D MMM YYYY")}`
-                    : "Loading date range..."}
-                </Typography>
-              </Box>
-              <Stack direction="row" spacing={1}>
-                <PillButton
-                  variant="outlined"
-                  onClick={() => availabilityQuery.refetch()}
-                  disabled={availabilityQuery.isFetching}
-                >
-                  Refresh
-                </PillButton>
-                <PillButton
-                  variant="contained"
-                  onClick={() => mutation.mutate()}
-                  disabled={availabilityQuery.isLoading || mutation.isLoading || days.length === 0}
-                >
-                  Submit restrictions
-                </PillButton>
-              </Stack>
-            </Stack>
-
             {availabilityQuery.isLoading && (
               <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                 <CircularProgress />
@@ -226,58 +292,86 @@ export const InvigilatorRestrictions: React.FC = () => {
                 const dateLabel = dayjs(day.date).format("ddd, D MMM");
                 return (
                   <Grid item xs={12} sm={6} md={4} key={day.date}>
-                    <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
-                      <Stack spacing={1}>
+                    <Panel
+                      disableDivider
+                      title={
                         <Typography variant="subtitle2" fontWeight={700}>
                           {dateLabel}
                         </Typography>
-                        <Divider />
+                      }
+                      sx={{
+                        height: "100%",
+                        borderRadius: 3,
+                        p: 2,
+                      }}
+                    >
+                      <Stack spacing={1.25}>
                         <Stack direction="row" spacing={1} flexWrap="wrap">
                           {day.slots.map((slot) => {
                             const available = slot.available;
                             const label = slotLabels[slot.slot];
                             return (
-                              <Tooltip
+                              <PillButton
                                 key={slot.slot}
-                                title={available ? "Available" : "Not available"}
-                                arrow
+                                variant={available ? "contained" : "outlined"}
+                                color="success"
+                                size="medium"
+                                onClick={() => toggleSlot(day.date, slot.slot)}
+                                sx={{
+                                  borderRadius: 10,
+                                  minWidth: 120,
+                                  justifyContent: "center",
+                                  borderWidth: 1.5,
+                                  borderColor: available ? "success.main" : "success.main",
+                                  backgroundColor: available ? "success.main" : "transparent",
+                                  color: available ? "#fff" : "success.dark",
+                                  "&:hover": {
+                                    backgroundColor: available ? "success.dark" : "success.light",
+                                    color: available ? "#fff" : "success.dark",
+                                    borderColor: "success.dark",
+                                  },
+                                }}
                               >
-                                <Chip
-                                  label={label}
-                                  color={available ? "success" : "default"}
-                                  variant={available ? "filled" : "outlined"}
-                                  onClick={() => toggleSlot(day.date, slot.slot)}
-                                  sx={{
-                                    borderRadius: 2,
-                                    minWidth: 120,
-                                    justifyContent: "center",
-                                    opacity: available ? 1 : 0.7,
-                                  }}
-                                />
-                              </Tooltip>
+                                {label}
+                              </PillButton>
                             );
                           })}
                         </Stack>
                       </Stack>
-                    </Paper>
+                    </Panel>
                   </Grid>
                 );
               })}
             </Grid>
-
-            <Alert severity="info">
-              Clicking a slot marks you as unavailable for that time. Submit to save your restrictions and notify administrators.
-            </Alert>
           </Stack>
         </Panel>
       </Stack>
 
       <Snackbar
-        open={successOpen}
-        autoHideDuration={3500}
-        onClose={() => setSuccessOpen(false)}
-        message="Restrictions updated"
-      />
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={
+            snackbar.severity === "success"
+              ? {
+                  backgroundColor: "#d4edda",
+                  color: "#155724",
+                  border: "1px solid #155724",
+                  borderRadius: "50px",
+                  fontWeight: 500,
+                }
+              : undefined
+          }
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
