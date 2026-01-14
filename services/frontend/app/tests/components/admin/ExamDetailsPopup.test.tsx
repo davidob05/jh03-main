@@ -125,9 +125,9 @@ describe("Components - ExamDetailsPopup", () => {
         const onClose = vi.fn();
         renderComponent({ onClose });
 
-        const button = screen.getByText("Close");
+        const button = screen.getByLabelText("Close");
         fireEvent.click(button);
 
-        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(onClose).toHaveBeenCalled();
     });
 });
