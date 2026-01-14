@@ -227,13 +227,31 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
 
 
 class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
-    queryset = InvigilatorAssignment.objects.select_related(
-        "invigilator",
-        "exam_venue__exam",
-        "exam_venue__venue",
-    ).all()
+    """
+    Admins can manage all assignments; invigilators can read their own.
+    """
+
     serializer_class = InvigilatorAssignmentSerializer
-    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [permissions.IsAdminUser()]
+
+    def get_queryset(self):
+        qs = InvigilatorAssignment.objects.select_related(
+            "invigilator",
+            "exam_venue__exam",
+            "exam_venue__venue",
+        )
+        user = getattr(self.request, "user", None)
+        if user and (user.is_staff or user.is_superuser):
+            return qs.all()
+        invigilator = getattr(user, "invigilator_profile", None) if user else None
+        if invigilator is None:
+            return qs.none()
+        return qs.filter(invigilator=invigilator)
     throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
 
     def perform_create(self, serializer):
@@ -530,3 +548,25 @@ class InvigilatorStatsView(APIView):
                 "role": next_assignment.role,
             }
         return Response(data, status=status.HTTP_200_OK)
+
+
+class InvigilatorAssignmentsView(APIView):
+    """
+    Return assignments for the authenticated invigilator.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes: list = []
+
+    def get(self, request, *args, **kwargs):
+        invigilator = getattr(request.user, "invigilator_profile", None)
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        assignments = (
+            InvigilatorAssignment.objects.select_related("exam_venue__exam", "exam_venue__venue")
+            .filter(invigilator=invigilator)
+            .order_by("assigned_start")
+        )
+
+        return Response(InvigilatorAssignmentSerializer(assignments, many=True).data)

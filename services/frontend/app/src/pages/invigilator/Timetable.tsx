@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import dayjs, { Dayjs } from "dayjs";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -12,6 +12,7 @@ import {
   Typography,
   Tooltip,
 } from "@mui/material";
+import { useQuery } from "@tanstack/react-query";
 import ArrowBack from "@mui/icons-material/ArrowBack";
 import ArrowForward from "@mui/icons-material/ArrowForward";
 import Today from "@mui/icons-material/Today";
@@ -22,6 +23,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 interface Exam {
   id: string;
@@ -32,37 +34,24 @@ interface Exam {
   date: string;
 }
 
-const examEvents: Exam[] = [
-  {
-    id: "1",
-    title: "Calculus 101",
-    location: "Hunter Hall East",
-    start: "09:00",
-    end: "11:00",
-    date: dayjs().format("YYYY-MM-DD"),
-  },
-  {
-    id: "2",
-    title: "Physics 201",
-    location: "Boyd Orr Building 202",
-    start: "13:00",
-    end: "15:00",
-    date: dayjs().format("YYYY-MM-DD"),
-  },
-  {
-    id: "3",
-    title: "Chinese 1",
-    location: "St Andrews Building 237A",
-    start: "10:00",
-    end: "12:00",
-    date: dayjs().add(1, "day").format("YYYY-MM-DD"),
-  },
-];
+interface InvigilatorAssignment {
+  id: number;
+  exam_name?: string | null;
+  venue_name?: string | null;
+  assigned_start: string;
+  assigned_end: string;
+  exam_start?: string | null;
+  exam_length?: number | null;
+  role?: string | null;
+  break_time_minutes?: number | null;
+  notes?: string | null;
+}
 
 const HOUR_HEIGHT = 45;
 
-const toMinutes = (time: string) => {
+const timeToMinutes = (time: string) => {
   const [h, m] = time.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return 0;
   return h * 60 + m;
 };
 
@@ -74,15 +63,53 @@ export const InvigilatorTimetable: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(today);
   const [month, setMonth] = useState(dayjs().startOf("month"));
 
+  const {
+    data: assignments = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<InvigilatorAssignment[]>({
+    queryKey: ["invigilator-assignments"],
+    queryFn: async () => {
+      const url = `${apiBaseUrl}/invigilator/assignments/`;
+      const res = await apiFetch(url);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Unable to load assignments");
+      }
+      const data = await res.json();
+      if (Array.isArray(data)) return data as InvigilatorAssignment[];
+      if (Array.isArray(data?.assignments)) return data.assignments as InvigilatorAssignment[];
+      throw new Error("Assignments data missing");
+    },
+  });
+
+  const examEvents: Exam[] = useMemo(
+    () =>
+      (assignments || []).map((a) => {
+        const start = dayjs(a.assigned_start);
+        const end = dayjs(a.assigned_end);
+        return {
+          id: String(a.id),
+          title: a.exam_name || "Exam",
+          location: a.venue_name || "Venue TBC",
+          start: start.isValid() ? start.format("HH:mm") : "",
+          end: end.isValid() ? end.format("HH:mm") : "",
+          date: start.isValid() ? start.format("YYYY-MM-DD") : "",
+        };
+      }),
+    [assignments]
+  );
+
   const selectedDayKey = selectedDate?.format("YYYY-MM-DD");
 
   const examsForSelectedDay = selectedDayKey
     ? examEvents
         .filter((e) => e.date === selectedDayKey)
-        .sort((a, b) => toMinutes(a.start) - toMinutes(b.start))
+        .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start))
     : [];
 
-  const examDates = examEvents.map((e) => e.date);
+  const examDates = useMemo(() => examEvents.map((e) => e.date), [examEvents]);
 
   const goToMonth = (newMonth: Dayjs) => {
     setMonth(newMonth.startOf("month"));
@@ -374,139 +401,153 @@ export const InvigilatorTimetable: React.FC = () => {
                 overflow: "visible",
               }}
             >
-              {examsForSelectedDay.length === 0 ? (
-                <Box
-                  sx={{
-                    textAlign: "center",
-                    py: 6,
-                    color: "text.secondary",
-                    border: "1px dashed #e5e7eb",
-                    borderRadius: 2,
-                  }}
-                >
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
-                    No exams on this day
-                  </Typography>
-                  <Typography>
-                    Select a day with a green dot to view the schedule.
+              {isLoading && (
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <Typography color="text.secondary">Loading assignments...</Typography>
+                </Box>
+              )}
+              {isError && (
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <Typography color="error">
+                    {error?.message || "Failed to load assignments."}
                   </Typography>
                 </Box>
-              ) : (
-                <Grid container spacing={2.5}>
-                  {examsForSelectedDay.map((event) => {
-                    const start = toMinutes(event.start);
-                    const end = toMinutes(event.end);
-                    const duration = end - start;
-                    const arrival = Math.max(0, start - 30);
-                    const arrivalTime = minutesToTime(arrival);
-                    const totalDuration = duration + 30;
+              )}
+              {!isLoading && !isError && (
+                examsForSelectedDay.length === 0 ? (
+                  <Box
+                    sx={{
+                      textAlign: "center",
+                      py: 6,
+                      color: "text.secondary",
+                      border: "1px dashed #e5e7eb",
+                      borderRadius: 2,
+                    }}
+                  >
+                    <Typography variant="h6" fontWeight={700} gutterBottom>
+                      No exams on this day
+                    </Typography>
+                    <Typography>
+                      Select a day with a green dot to view the schedule.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={2.5}>
+                    {examsForSelectedDay.map((event) => {
+                      const start = timeToMinutes(event.start);
+                      const end = timeToMinutes(event.end);
+                      const duration = end - start;
+                      const arrival = Math.max(0, start - 30);
+                      const arrivalTime = minutesToTime(arrival);
+                      const totalDuration = duration + 30;
 
-                    return (
-                      <Grid item xs={12} sm={6} key={event.id}>
-                        <Box
-                          sx={{
-                            display: "grid",
-                            gridTemplateColumns: { xs: "1fr", sm: "150px 1fr" },
-                            gap: 2.5,
-                            p: 2.5,
-                            borderRadius: 3,
-                            border: "1px solid #e5e7eb",
-                            background:
-                              "linear-gradient(135deg, #f8fafc, #e3f2fd)",
-                            boxShadow: "0 8px 25px rgba(0,0,0,0.04)",
-                            minHeight: 260,
-                            height: "100%",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Stack
-                            spacing={1.2}
-                            alignItems="flex-start"
-                            sx={{ minWidth: 130, justifySelf: "center" }}
+                      return (
+                        <Grid item xs={12} sm={6} key={event.id}>
+                          <Box
+                            sx={{
+                              display: "grid",
+                              gridTemplateColumns: { xs: "1fr", sm: "150px 1fr" },
+                              gap: 2.5,
+                              p: 2.5,
+                              borderRadius: 3,
+                              border: "1px solid #e5e7eb",
+                              background:
+                                "linear-gradient(135deg, #f8fafc, #e3f2fd)",
+                              boxShadow: "0 8px 25px rgba(0,0,0,0.04)",
+                              minHeight: 260,
+                              height: "100%",
+                              alignItems: "center",
+                            }}
                           >
-                            <Typography variant="body2" color="text.secondary">
-                              Start
-                            </Typography>
-                            <Typography fontWeight={700} fontSize="1.15rem">
-                              {event.start}
-                            </Typography>
-                            <Divider sx={{ width: "100%", my: 0.5 }} />
-                            <Typography variant="body2" color="text.secondary">
-                              End
-                            </Typography>
-                            <Typography fontWeight={700} fontSize="1.15rem">
-                              {event.end}
-                            </Typography>
-                          </Stack>
-
-                          <Stack spacing={1.2} justifyContent="center">
-                            <Typography variant="h5" fontWeight={800}>
-                              {event.title}
-                            </Typography>
                             <Stack
-                              direction="row"
                               spacing={1.2}
-                              alignItems="center"
+                              alignItems="flex-start"
+                              sx={{ minWidth: 130, justifySelf: "center" }}
                             >
-                              <LocationOnOutlinedIcon
-                                fontSize="small"
-                                color="action"
-                              />
-                              <Typography
-                                variant="body1"
-                                color="text.secondary"
-                              >
-                                {event.location}
+                              <Typography variant="body2" color="text.secondary">
+                                Start
+                              </Typography>
+                              <Typography fontWeight={700} fontSize="1.15rem">
+                                {event.start}
+                              </Typography>
+                              <Divider sx={{ width: "100%", my: 0.5 }} />
+                              <Typography variant="body2" color="text.secondary">
+                                End
+                              </Typography>
+                              <Typography fontWeight={700} fontSize="1.15rem">
+                                {event.end}
                               </Typography>
                             </Stack>
-                            <Divider sx={{ width: "100%", my: 0.5 }} />
-                            <Stack direction="column" spacing={0.8} alignItems="flex-start">
-                              <Tooltip title="This shift is confirmed">
-                                <Chip
-                                  size="small"
-                                  label="Confirmed"
-                                  icon={<CheckIcon fontSize="small" />}
-                                  sx={{
-                                    bgcolor: "#e8f5e9",
-                                    color: "#1b5e20",
-                                    fontWeight: 700,
-                                    "& .MuiChip-icon": { color: "#1b5e20" },
-                                  }}
+
+                            <Stack spacing={1.2} justifyContent="center">
+                              <Typography variant="h5" fontWeight={800}>
+                                {event.title}
+                              </Typography>
+                              <Stack
+                                direction="row"
+                                spacing={1.2}
+                                alignItems="center"
+                              >
+                                <LocationOnOutlinedIcon
+                                  fontSize="small"
+                                  color="action"
                                 />
-                              </Tooltip>
-                              <Tooltip title="Total duration including required early arrival">
-                                <Chip
-                                  size="small"
-                                  label={`${totalDuration} minutes`}
-                                  icon={<AccessTimeIcon fontSize="small" />}
-                                  sx={{
-                                    bgcolor: "#ede9fe",
-                                    color: "#42307d",
-                                    fontWeight: 700,
-                                    "& .MuiChip-icon": { color: "#42307d" },
-                                  }}
-                                />
-                              </Tooltip>
-                              <Tooltip title="Arrive 30 minutes before the exam starts">
-                                <Chip
-                                  icon={<AvTimerIcon fontSize="small" />}
-                                  label={`Arrive by ${arrivalTime}`}
-                                  size="small"
-                                  sx={{
-                                    bgcolor: "#fff4e5",
-                                    color: "#b45309",
-                                    fontWeight: 700,
-                                    "& .MuiChip-icon": { color: "#b45309" },
-                                  }}
-                                />
-                              </Tooltip>
+                                <Typography
+                                  variant="body1"
+                                  color="text.secondary"
+                                >
+                                  {event.location}
+                                </Typography>
+                              </Stack>
+                              <Divider sx={{ width: "100%", my: 0.5 }} />
+                              <Stack direction="column" spacing={0.8} alignItems="flex-start">
+                                <Tooltip title="This shift is confirmed">
+                                  <Chip
+                                    size="small"
+                                    label="Confirmed"
+                                    icon={<CheckIcon fontSize="small" />}
+                                    sx={{
+                                      bgcolor: "#e8f5e9",
+                                      color: "#1b5e20",
+                                      fontWeight: 700,
+                                      "& .MuiChip-icon": { color: "#1b5e20" },
+                                    }}
+                                  />
+                                </Tooltip>
+                                <Tooltip title="Total duration including required early arrival">
+                                  <Chip
+                                    size="small"
+                                    label={`${totalDuration} minutes`}
+                                    icon={<AccessTimeIcon fontSize="small" />}
+                                    sx={{
+                                      bgcolor: "#ede9fe",
+                                      color: "#42307d",
+                                      fontWeight: 700,
+                                      "& .MuiChip-icon": { color: "#42307d" },
+                                    }}
+                                  />
+                                </Tooltip>
+                                <Tooltip title="Arrive 30 minutes before the exam starts">
+                                  <Chip
+                                    icon={<AvTimerIcon fontSize="small" />}
+                                    label={`Arrive by ${arrivalTime}`}
+                                    size="small"
+                                    sx={{
+                                      bgcolor: "#fff4e5",
+                                      color: "#b45309",
+                                      fontWeight: 700,
+                                      "& .MuiChip-icon": { color: "#b45309" },
+                                    }}
+                                  />
+                                </Tooltip>
+                              </Stack>
                             </Stack>
-                          </Stack>
-                        </Box>
-                      </Grid>
-                    );
-                  })}
-                </Grid>
+                          </Box>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                )
               )}
             </Panel>
           </Box>
