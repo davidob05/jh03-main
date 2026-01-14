@@ -11,7 +11,7 @@ export const InvigilatorLayout: React.FC = () => {
   const menuItems = [
     { text: "Home", path: "/invigilator" },
     { text: "Timetable", path: "/invigilator/timetable" },
-    { text: "Availability", path: "/invigilator/availability" },
+    { text: "Restrictions", path: "/invigilator/restrictions" },
     { text: "Shifts", path: "/invigilator/shifts" }
   ];
 

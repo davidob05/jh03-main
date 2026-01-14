@@ -252,7 +252,7 @@ export const InvigilatorDashboard: React.FC = () => {
                 variant="outlined"
                 fullWidth
                 startIcon={<AccessTimeIcon />}
-                href="/invigilator/availability"
+                href="/invigilator/restrictions"
               >
                 Submit restrictions
               </PillButton>
@@ -470,4 +470,3 @@ export const InvigilatorDashboard: React.FC = () => {
     </Box>
   );
 };
-
