@@ -109,7 +109,7 @@ class Exam(models.Model):
     exam_type = models.CharField(max_length=30)
     no_students = models.IntegerField()
     exam_school = models.CharField(max_length=30)
-    school_contact = models.CharField(max_length=100)
+    school_contact = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
         return f"{self.exam_name} ({self.course_code})"
@@ -405,6 +405,7 @@ class InvigilatorAssignment(models.Model):
     assigned_start = models.DateTimeField()
     assigned_end = models.DateTimeField()
     break_time_minutes = models.IntegerField(default=0)
+    confirmed = models.BooleanField(default=False)
     cancel = models.BooleanField(default=False)
     cancel_cause = models.TextField(blank=True)
 

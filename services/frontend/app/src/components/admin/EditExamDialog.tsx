@@ -39,7 +39,7 @@ type ExamData = {
   exam_type: string;
   no_students: number;
   exam_school: string;
-  school_contact: string;
+  school_contact: string | null;
   exam_venues: ExamVenue[];
 };
 
@@ -234,7 +234,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
           exam_type: examType,
           no_students: students === "" ? 0 : Number(students),
           exam_school: school,
-          school_contact: contact,
+          school_contact: contact ? contact : null,
         }),
       });
       if (!examRes.ok) {
@@ -315,7 +315,8 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
     onError: (err: any) => alert(err?.message || "Failed to update exam"),
   });
 
-  const canSave = name && code && examType && school && contact;
+  // Allow save without school contact; keep other essentials populated
+  const canSave = Boolean(name && code && examType && school);
 
   return (
     <Dialog open={open} onClose={mutation.isPending ? undefined : onClose} fullWidth maxWidth="md">
@@ -357,7 +358,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField label="Exam school" value={school} onChange={(e) => setSchool(e.target.value)} fullWidth required />
-              <TextField label="School contact" value={contact} onChange={(e) => setContact(e.target.value)} fullWidth required />
+              <TextField label="School contact" value={contact} onChange={(e) => setContact(e.target.value)} fullWidth />
             </Stack>
 
             <Stack spacing={1}>
