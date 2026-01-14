@@ -1,4 +1,6 @@
 // Polyfills for Node versions where resizable/growable buffers are not implemented yet.
+import "@testing-library/jest-dom/vitest";
+
 if (typeof ArrayBuffer !== "undefined") {
   const descriptor = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, "resizable");
   if (!descriptor) {
@@ -19,4 +21,4 @@ if (typeof SharedArrayBuffer !== "undefined") {
   }
 }
 
-import "@testing-library/jest-dom/vitest";
+

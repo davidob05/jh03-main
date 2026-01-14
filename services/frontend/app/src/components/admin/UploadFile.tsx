@@ -135,6 +135,7 @@ export const UploadFile: React.FC = () => {
             Choose File
             <input
               id="file-upload"
+              data-testid="file-upload"
               type="file"
               hidden
               accept={acceptMap[uploadType] || ".csv,.xlsx,.xls"}
