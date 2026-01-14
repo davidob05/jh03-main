@@ -25,43 +25,72 @@ type Announcement = {
   expires_at?: string | null;
 };
 
+type InvigilatorStats = {
+  total_shifts: number;
+  upcoming_shifts: number;
+  cancelled_shifts: number;
+  hours_assigned: number;
+  hours_upcoming: number;
+  restrictions: number;
+  availability_entries: number;
+  next_assignment?: {
+    exam_name?: string | null;
+    venue_name?: string | null;
+    start?: string | null;
+    end?: string | null;
+    role?: string | null;
+  } | null;
+};
+
+type InvigilatorStatKey =
+  | "total_shifts"
+  | "upcoming_shifts"
+  | "cancelled_shifts"
+  | "hours_assigned"
+  | "hours_upcoming"
+  | "restrictions"
+  | "availability_entries";
+
 const notifications: NotificationItem[] = [
-  {
-    id: 1,
-    type: "availability",
-    message: "Your availability for Week 12 has been approved.",
-    timestamp: "2025-11-19T09:15:00Z",
-  },
-  {
-    id: 2,
-    type: "venueChange",
-    message: "Admin updated your assigned venue for MATH101.",
-    timestamp: "2025-10-19T09:15:00Z",
-  },
-  {
-    id: 3,
-    type: "examChange",
-    message: "You have a new exam assignment for COMP204.",
-    timestamp: "2025-09-19T09:15:00Z",
-  },
-  {
-    id: 4,
-    type: "invigilatorUpdate",
-    message: "Your qualification level has been verified.",
-    timestamp: "2025-08-19T09:15:00Z",
-  },
 ];
 
 export const InvigilatorDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
   const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+  } = useQuery<InvigilatorStats>({
+    queryKey: ["invigilator-stats"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilator/stats/`);
+      if (!res.ok) throw new Error("Unable to load stats");
+      return res.json();
+    },
+    retry: false,
+  });
 
-  const nextShift = {
-    date: "2025-02-14",
-    time: "09:00 - 11:00",
-    exam: "MATH101 Final Examination",
-    venue: "Exam Hall A",
-  };
+  const nextShift = useMemo(() => {
+    const ns = stats?.next_assignment;
+    if (!ns) return null;
+    const start = ns.start ? new Date(ns.start) : null;
+    const end = ns.end ? new Date(ns.end) : null;
+    const formattedDate = start
+      ? start.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : "TBC";
+    const formattedTime =
+      start && end
+        ? `${start.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} - ${end.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+        : "Time TBC";
+    return {
+      date: formattedDate,
+      time: formattedTime,
+      exam: ns.exam_name || "Upcoming exam",
+      venue: ns.venue_name || "Venue TBC",
+      role: ns.role || "Invigilator",
+    };
+  }, [stats]);
 
   // Placeholder announcement when no announcements are available
   const placeholderAnnouncement: Announcement = {
@@ -104,14 +133,28 @@ export const InvigilatorDashboard: React.FC = () => {
     });
   }, [announcementsError, announcementsFromApi]);
 
-  const activityStats = [
-    { label: "Total shifts", value: "120", tone: "#0b4f8c" },
-    { label: "Shifts this diet", value: "12", tone: "#1565c0" },
-    { label: "Hours this diet", value: "28", tone: "#546e7a" },
-    { label: "Restrictions this diet", value: "4", tone: "#d84315" },
-    { label: "Extra shifts available", value: "3", tone: "#00796b" },
-    { label: "Requests approved", value: "5", tone: "#2e7d32" },
-    { label: "Requests denied", value: "1", tone: "#c62828" },
+  const {
+    data: notificationsFromApi = [],
+    isError: notificationsError,
+  } = useQuery<NotificationItem[]>({
+    queryKey: ["invigilator-notifications"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilator/notifications/`);
+      if (res.status === 404) return [];
+      if (!res.ok) throw new Error("Unable to load notifications");
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const activityStats: { label: string; key: InvigilatorStatKey; tone: string }[] = [
+    { label: "Total shifts", key: "total_shifts", tone: "#0b4f8c" },
+    { label: "Upcoming shifts", key: "upcoming_shifts", tone: "#1565c0" },
+    { label: "Cancelled shifts", key: "cancelled_shifts", tone: "#d84315" },
+    { label: "Hours assigned", key: "hours_assigned", tone: "#546e7a" },
+    { label: "Hours upcoming", key: "hours_upcoming", tone: "#00796b" },
+    { label: "Restrictions", key: "restrictions", tone: "#2e7d32" },
+    { label: "Availability entries", key: "availability_entries", tone: "#4a148c" },
   ];
 
   useEffect(() => {
@@ -170,13 +213,13 @@ export const InvigilatorDashboard: React.FC = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="subtitle1" fontWeight={700}>
-                    {nextShift.exam}
+                    {nextShift?.exam || "No upcoming exam"}
                   </Typography>
                   <Typography variant="body2">
-                    {nextShift.date} - {nextShift.time}
+                    {nextShift ? `${nextShift.date} - ${nextShift.time}` : "Awaiting schedule"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Venue: {nextShift.venue}
+                    Venue: {nextShift?.venue || "TBC"}
                   </Typography>
                 </Box>
               </Stack>
@@ -374,7 +417,11 @@ export const InvigilatorDashboard: React.FC = () => {
                   {item.label}
                 </Typography>
                 <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
-                  {item.value}
+                  {statsError
+                    ? "—"
+                    : statsLoading || !stats
+                    ? "..."
+                    : (stats?.[item.key] ?? 0).toString()}
                 </Typography>
               </Box>
             </Grid>
@@ -383,8 +430,10 @@ export const InvigilatorDashboard: React.FC = () => {
       </Panel>
 
       <Box sx={{ mt: 1.5 }}>
-        <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
-        {notifications.length > 0 && (
+        <NotificationsPanel
+          notifications={(notificationsError ? [] : notificationsFromApi).slice(0, visibleCount)}
+        />
+        {(notificationsError ? [] : notificationsFromApi).length > 0 && (
           <Box
             sx={{
               textAlign: "center",
@@ -404,13 +453,15 @@ export const InvigilatorDashboard: React.FC = () => {
             <PillButton
               variant="contained"
               onClick={() =>
-                setVisibleCount((prev) => Math.min(prev + 4, notifications.length))
+                setVisibleCount((prev) =>
+                  Math.min(prev + 4, (notificationsError ? [] : notificationsFromApi).length)
+                )
               }
-              disabled={visibleCount >= notifications.length}
+              disabled={visibleCount >= (notificationsError ? 0 : notificationsFromApi.length)}
             >
               {`Show ${Math.min(
                 4,
-                Math.max(notifications.length - visibleCount, 0)
+                Math.max((notificationsError ? 0 : notificationsFromApi.length) - visibleCount, 0)
               )} more`}
             </PillButton>
           </Box>
@@ -419,3 +470,4 @@ export const InvigilatorDashboard: React.FC = () => {
     </Box>
   );
 };
+

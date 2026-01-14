@@ -16,6 +16,8 @@ from .views import (
     ExamViewSet,
     InvigilatorAssignmentViewSet,
     InvigilatorViewSet,
+    InvigilatorStatsView,
+    InvigilatorNotificationsView,
     NotificationsView,
     TimetableUploadView,
     VenueViewSet,
@@ -37,6 +39,8 @@ urlpatterns = [
     path("auth/logout/", SessionLogoutView.as_view(), name="api-auth-logout"),
     path("exams-upload", TimetableUploadView.as_view(), name="api-exam-upload"),
     path("notifications/", NotificationsView.as_view(), name="api-notifications"),
+    path("invigilator/stats/", InvigilatorStatsView.as_view(), name="api-invigilator-stats"),
+    path("invigilator/notifications/", InvigilatorNotificationsView.as_view(), name="api-invigilator-notifications"),
 ]
 
 urlpatterns += router.urls
