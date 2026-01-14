@@ -315,7 +315,6 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
     onError: (err: any) => alert(err?.message || "Failed to update exam"),
   });
 
-  const venueOptions = useMemo(() => (venues || []).map((v) => v.venue_name), [venues]);
   // Allow save without school contact; keep other essentials populated
   const canSave = Boolean(name && code && examType && school);
 
