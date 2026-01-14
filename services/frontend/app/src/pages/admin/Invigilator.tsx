@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Box,
   Typography,
@@ -6,74 +6,37 @@ import {
   Stack,
   Chip,
   Grid,
+  Button,
   Tooltip,
   Divider,
   ToggleButton,
   ToggleButtonGroup,
-  Collapse,
+  CircularProgress,
+  Alert,
+  Fab,
+  Snackbar,
 } from "@mui/material";
-import { CheckCircle, Cancel, GridView, CalendarViewMonth, ExpandMore, ExpandLess } from "@mui/icons-material";
-import dayjs from "dayjs";
+import { GridView, CalendarViewMonth, Edit, Delete as DeleteIcon } from "@mui/icons-material";
+import dayjs, { Dayjs } from "dayjs";
+import { useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { ContractedHoursReport } from "../../components/admin/ContractedHoursReport";
+import { CollapsibleSection } from "../../components/CollapsibleSection";
+import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { StaticDatePicker } from "@mui/x-date-pickers/StaticDatePicker";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDialog";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
-const fakeContractedHoursReport = {
-  contracted_hours: 100,
-  total_hours: 75,
-  remaining_hours: 100 - 75,
-};
-
-const fakeInvigilator = {
-  id: 1,
-  preferred_name: "Alex",
-  full_name: "Alexandra Chen",
-  mobile: "07700 900123",
-  alt_phone: "07700 900456",
-  university_email: "a.chen@university.edu",
-  personal_email: "allie.c@gmail.com",
-};
-
-const fakeRestrictions = [
-  {
-    diet: ["DEC2025", "APRMAY2026", "JULAUG2026", "DEC2026"],
-    has_accessibility_req: true,
-    separate_room_only: false,
-    purple_cluster: true,
-    computer_cluster: false,
-    vet_school: false,
-    sec: true,
-    osce_golden_jubilee: true,
-    osce_wolfson: false,
-    osce_queen_elizabeth: false,
-    resigned: false,
-    approved_exemption: false,
-    notes: "Prefers morning exams only, needs wheelchair access.",
-  },
-];
-
-const fakeQualifications = [
-  { qualification: "SENIOR_INVIGILATOR" },
-  { qualification: "AKT_TRAINED" },
-];
-
-const fakeAvailability = [
-  { date: "2025-12-01", slot: "Morning", available: true },
-  { date: "2025-12-01", slot: "Afternoon", available: false },
-  { date: "2025-12-01", slot: "Evening", available: true },
-  { date: "2025-12-02", slot: "Morning", available: true },
-  { date: "2025-12-02", slot: "Afternoon", available: true },
-  { date: "2025-12-02", slot: "Evening", available: false },
-  { date: "2025-12-03", slot: "Morning", available: false },
-  { date: "2025-12-03", slot: "Afternoon", available: true },
-  { date: "2025-12-03", slot: "Evening", available: false },
-  { date: "2025-12-08", slot: "Morning", available: true },
-  { date: "2025-12-08", slot: "Afternoon", available: true },
-  { date: "2025-12-08", slot: "Evening", available: true },
-];
-
-const allPossibleDiets = [
-  "DEC2025", "APRMAY2026", "JULAUG2026", "DEC2026",
-  "APRMAY2027", "JULAUG2027", "DEC2027", "APRMAY2028",
-  "JULAUG2028", "DEC2028", "APRMAY2029", "JULAUG2029",
+const baseDietOptions = [
+  { code: "DEC_2025", label: "December 2025" },
+  { code: "APR_MAY_2026", label: "April/May 2026" },
+  { code: "AUG_2026", label: "August 2026" },
 ];
 
 const allQualifications: Record<string, string> = {
@@ -82,87 +45,189 @@ const allQualifications: Record<string, string> = {
   CHECK_IN: "Check-In",
 };
 
+interface InvigilatorAvailability {
+  date: string;
+  slot: string;
+  available: boolean;
+}
+
+interface InvigilatorRestriction {
+  diet: string;
+  restrictions: string[];
+  notes?: string;
+}
+
+interface InvigilatorQualification {
+  qualification: string;
+}
+
+interface InvigilatorData {
+  id: number;
+  preferred_name: string | null;
+  full_name: string;
+  mobile: string | null;
+  mobile_text_only: string | null;
+  janet_txt: string | null;
+  alt_phone: string | null;
+  university_email: string | null;
+  personal_email: string | null;
+  notes: string | null;
+  resigned: boolean;
+  contracted_hours?: number | null;
+  qualifications: InvigilatorQualification[];
+  restrictions: InvigilatorRestriction[];
+  availabilities: InvigilatorAvailability[];
+  assignments?: InvigilatorAssignment[];
+}
+
+interface InvigilatorAssignment {
+  assigned_start: string;
+  assigned_end: string;
+  break_time_minutes: number;
+}
+
+const slotLabelMap: Record<string, string> = {
+  MORNING: "Morning",
+  AFTERNOON: "Afternoon",
+  EVENING: "Evening",
+};
+
 export const AdminInvigilatorProfile: React.FC = () => {
-  const [availabilityView] = useState<"list" | "calendar">("list");
+  const [availabilityView, setAvailabilityView] = useState<"list" | "calendar">("list");
+  const [availabilityLimit, setAvailabilityLimit] = useState(4);
+  const [selectedAvailabilityDate, setSelectedAvailabilityDate] = useState<Dayjs | null>(dayjs());
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [successOpen, setSuccessOpen] = useState(false);
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-  const CollapsibleSection: React.FC<{
-    title: string;
-    children: React.ReactNode;
-    defaultExpanded?: boolean;
-    }> = ({ title, children, defaultExpanded = false }) => {
-    const [expanded, setExpanded] = useState(defaultExpanded);
+  const { data, isLoading, isError, error, refetch } = useQuery<InvigilatorData, Error>({
+    queryKey: ["invigilator", id],
+    queryFn: async () => {
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`);
+      if (!response.ok) throw new Error("Unable to load invigilator");
+      return response.json();
+    },
+    enabled: Boolean(id),
+  });
 
-    return (
-        <Box>
-        <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{
-            cursor: "pointer",
-            py: 1.5,
-            px: 0.5,
-            borderRadius: 1,
-            "&:hover": { bgcolor: "action.hover" },
-            }}
-            onClick={() => setExpanded(!expanded)}
-        >
-            <Typography variant="subtitle2" fontWeight={600}>
-            {title}
-            </Typography>
-            {expanded ? <ExpandLess /> : <ExpandMore />}
-        </Stack>
+  const restrictionsUnion = useMemo(() => {
+    const set = new Set<string>();
+    data?.restrictions?.forEach((r) => r.restrictions?.forEach((code) => set.add(code)));
+    return set;
+  }, [data]);
 
-        <Collapse in={expanded} timeout="auto" unmountOnExit>
-            <Box sx={{ mt: 1, pl: 1 }}>
-            {children}
-            </Box>
-        </Collapse>
-        </Box>
-    );
-  };
+  const diets = useMemo(() => data?.restrictions?.map((r) => r.diet) || [], [data]);
 
-  const renderBoolRow = (
-    label: string,
-    value: boolean,
-    tooltip: { yes: string; no: string }
-  ) => (
-    <Tooltip title={value ? tooltip.yes : tooltip.no}>
-      <Stack direction="row" alignItems="center" spacing={1}>
-        {value ? (
-          <CheckCircle sx={{ color: "success.main" }} />
-        ) : (
-          <Cancel sx={{ color: "error.main" }} />
-        )}
-        <Typography variant="body2">{label}</Typography>
-      </Stack>
-    </Tooltip>
-  );
+  const dietOptions = useMemo(() => {
+    const extras = diets
+      .filter((code) => !baseDietOptions.some((d) => d.code === code))
+      .map((code) => ({ code, label: code.replace(/_/g, " ") }));
+    return [...baseDietOptions, ...extras];
+  }, [diets]);
 
-  const groupedAvailability = fakeAvailability.reduce<Record<string, typeof fakeAvailability>>((acc, slot) => {
+  const groupedAvailability = (data?.availabilities || []).reduce<Record<string, InvigilatorAvailability[]>>((acc, slot) => {
     if (!acc[slot.date]) acc[slot.date] = [];
     acc[slot.date].push(slot);
     return acc;
   }, {});
 
+  const availabilityByDate = useMemo(() => groupedAvailability, [groupedAvailability]);
+
+  const sortedAvailabilityEntries = useMemo(
+    () =>
+      Object.entries(groupedAvailability).sort(
+        ([a], [b]) => new Date(a).getTime() - new Date(b).getTime()
+      ),
+    [groupedAvailability]
+  );
+
+  const totalAssignedHours = useMemo(() => {
+    const assignments = data?.assignments || [];
+    return assignments.reduce((sum, assignment) => {
+      const start = new Date(assignment.assigned_start).getTime();
+      const end = new Date(assignment.assigned_end).getTime();
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return sum;
+      const durationMinutes = (end - start) / 60000 - (assignment.break_time_minutes || 0);
+      return sum + Math.max(durationMinutes, 0) / 60;
+    }, 0);
+  }, [data]);
+
+  const contractedHoursReport = useMemo(() => {
+    const contracted = data?.contracted_hours ?? null;
+    if (contracted == null && totalAssignedHours === 0) return null;
+    return {
+      contracted_hours: contracted ?? 0,
+      total_hours: totalAssignedHours,
+      remaining_hours: contracted != null ? contracted - totalAssignedHours : undefined,
+    };
+  }, [data?.contracted_hours, totalAssignedHours]);
+
+  const handleDelete = async () => {
+    if (!id) return;
+    try {
+      setDeleting(true);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`, { method: "DELETE" });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to delete invigilator");
+      }
+      setSuccessMessage("Invigilator deleted successfully!");
+      setSuccessOpen(true);
+      setTimeout(() => navigate("/admin/invigilators"), 400);
+    } catch (err: any) {
+      alert(err?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
+      setDeleteOpen(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Box sx={{ p: 4, display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <Box sx={{ p: 4 }}>
+        <Alert severity="error">{error?.message || "Failed to load invigilator"}</Alert>
+      </Box>
+    );
+  }
+
   return (
+    <>
     <Box sx={{ p: { xs: 2, md: 4 }, minHeight: "100vh" }}>
       {/* Header */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={4}>
-        <Box>
-          <Typography variant="h4" fontWeight={700}>
-            {fakeInvigilator.preferred_name || fakeInvigilator.full_name}
-          </Typography>
-          <Typography variant="h6" color="text.secondary">
-            {fakeInvigilator.full_name} • {fakeInvigilator.university_email}
-          </Typography>
-        </Box>
+        <Tooltip title="Invigilator identity">
+          <Box>
+            <Typography variant="h4" fontWeight={700}>
+              {data.preferred_name || data.full_name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {data.full_name} • {data.university_email || "No university email"}
+            </Typography>
+          </Box>
+        </Tooltip>
 
-        <ToggleButtonGroup value={availabilityView} exclusive color="primary">
+        <ToggleButtonGroup
+          value={availabilityView}
+          exclusive
+          color="primary"
+          onChange={(_, v) => v && setAvailabilityView(v)}
+        >
           <ToggleButton value="list">
             <GridView />
           </ToggleButton>
-          <ToggleButton value="calendar" disabled>
+          <ToggleButton value="calendar">
             <CalendarViewMonth />
           </ToggleButton>
         </ToggleButtonGroup>
@@ -172,209 +237,585 @@ export const AdminInvigilatorProfile: React.FC = () => {
       <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
         {/* Left Column - Contact, Qualifications, Diet, Restrictions */}
         <Box sx={{ flex: "0 0 450px" }}>
-            <Paper sx={{ p: 4, height: "fit-content" }}>
-                <Stack spacing={5}>
-                    {/* Contact Details */}
+          <Panel sx={{ p: 4, height: "fit-content", mb: 3 }}>
+            <Stack spacing={5}>
+              {/* Contact Details */}
+              <Box>
+                <Typography variant="h6" fontWeight={700} mb={3}>
+                  Contact Details
+                </Typography>
+                <Stack spacing={2}>
+                  <Tooltip title="Primary mobile number for urgent contact">
                     <Box>
-                        <Typography variant="h6" fontWeight={700} mb={3}>
-                        Contact Details
+                      <Typography variant="body2" color="text.secondary">Mobile</Typography>
+                      {data.mobile ? (
+                        <Typography
+                          variant="body1"
+                          component="a"
+                          href={`tel:${data.mobile}`}
+                          sx={{ textDecoration: "none", color: "primary.main" }}
+                        >
+                          {data.mobile}
                         </Typography>
-                        <Stack spacing={2}>
-                            <Box>
-                                <Typography variant="body2" color="text.secondary">Mobile</Typography>
-                                <Typography variant="body1">{fakeInvigilator.mobile}</Typography>
-                            </Box>
-                            {fakeInvigilator.alt_phone && (
-                                <Box>
-                                <Typography variant="body2" color="text.secondary">Alt Phone</Typography>
-                                <Typography variant="body1">{fakeInvigilator.alt_phone}</Typography>
-                                </Box>
-                            )}
-                            <Box>
-                                <Typography variant="body2" color="text.secondary">University Email</Typography>
-                                <Typography variant="body1">{fakeInvigilator.university_email}</Typography>
-                            </Box>
-                            {fakeInvigilator.personal_email && (
-                                <Box>
-                                <Typography variant="body2" color="text.secondary">Personal Email</Typography>
-                                <Typography variant="body1">{fakeInvigilator.personal_email}</Typography>
-                                </Box>
-                            )}
-                        </Stack>
+                      ) : (
+                        <Typography variant="body1">—</Typography>
+                      )}
                     </Box>
-
-                    <Divider />
-
-                    {/* Qualifications */}
-                    <Box>
-                        <Typography variant="h6" fontWeight={700} mb={3}>
-                        Qualifications
+                  </Tooltip>
+                  {data.mobile_text_only && (
+                    <Tooltip title="Text-only mobile number">
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Mobile (Text Only)</Typography>
+                        <Typography
+                          variant="body1"
+                          component="a"
+                          href={`sms:${data.mobile_text_only}`}
+                          sx={{ textDecoration: "none", color: "primary.main" }}
+                        >
+                          {data.mobile_text_only}
                         </Typography>
-                        <Stack direction="row" spacing={1.5} flexWrap="wrap" gap={1}>
-                        {Object.entries(allQualifications).map(([key, label]) => {
-                            const hasQual = fakeQualifications.some((q) => q.qualification === key);
-                            return (
-                            <Tooltip key={key} title={hasQual ? `${label}: Qualified` : `${label}: Not qualified`}>
-                                <Chip
-                                label={label}
-                                color={hasQual ? "primary" : "default"}
-                                variant={hasQual ? "filled" : "outlined"}
-                                size="medium"
-                                />
-                            </Tooltip>
-                            );
-                        })}
-                        </Stack>
-                    </Box>
-
-                    <Divider />
-
-                    {/* Restrictions & Requirements */}
+                      </Box>
+                    </Tooltip>
+                  )}
+                  {data.janet_txt && (
+                    <Tooltip title="Janet txt contact">
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Janet txt</Typography>
+                        <Typography
+                          variant="body1"
+                          component="a"
+                          href={`sms:${data.janet_txt}`}
+                          sx={{ textDecoration: "none", color: "primary.main" }}
+                        >
+                          {data.janet_txt}
+                        </Typography>
+                      </Box>
+                    </Tooltip>
+                  )}
+                  {data.alt_phone && (
+                    <Tooltip title="Alternative phone number">
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Alternative Phone</Typography>
+                        <Typography
+                          variant="body1"
+                          component="a"
+                          href={`tel:${data.alt_phone}`}
+                          sx={{ textDecoration: "none", color: "primary.main" }}
+                        >
+                          {data.alt_phone}
+                        </Typography>
+                      </Box>
+                    </Tooltip>
+                  )}
+                  <Tooltip title="Preferred university email">
                     <Box>
-                    <Typography variant="h6" fontWeight={700} mb={3}>
-                        Restrictions & Requirements
-                    </Typography>
-
-                    <Stack spacing={4}>
-                        {/* Exam Diets */}
-                        <CollapsibleSection title="Exam Diets" defaultExpanded={false}>
-                            <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} sx={{ rowGap: 1.5 }}>
-                                {allPossibleDiets.map((d) => {
-                                const hasDiet = fakeRestrictions[0]?.diet.includes(d);
-                                return (
-                                    <Tooltip key={d} title={hasDiet ? `Contracted for ${d}` : `Not contracted for ${d}`}>
-                                    <Chip
-                                        label={d}
-                                        size="small"
-                                        color={hasDiet ? "primary" : "default"}
-                                        variant={hasDiet ? "filled" : "outlined"}
-                                    />
-                                    </Tooltip>
-                                );
-                                })}
-                            </Stack>
-                        </CollapsibleSection>
-
-                        {/* General Requirements */}
-                        <CollapsibleSection title="General Requirements" defaultExpanded={false}>
-                            <Stack spacing={1.8}>
-                            {renderBoolRow("Accessibility Requirements", fakeRestrictions[0]?.has_accessibility_req || false, {
-                                yes: "Has accessibility needs",
-                                no: "No accessibility requirements",
-                            })}
-                            {renderBoolRow("Separate Room Only", fakeRestrictions[0]?.separate_room_only || false, {
-                                yes: "Must be in separate room",
-                                no: "Can be in regular exam room",
-                            })}
-                            {renderBoolRow("Purple Cluster", fakeRestrictions[0]?.purple_cluster || false, {
-                                yes: "Can work in a Purple Cluster",
-                                no: "Cannot work in a Purple Cluster",
-                            })}
-                            {renderBoolRow("Computer Cluster", fakeRestrictions[0]?.computer_cluster || false, {
-                                yes: "Can work in a Computer Cluster",
-                                no: "Cannot work in a Computer Cluster",
-                            })}
-                            </Stack>
-                        </CollapsibleSection>
-
-                        {/* Locations & OSCE Sites */}
-                        <CollapsibleSection title="Locations & OSCE Sites" defaultExpanded={false}>
-                            <Stack spacing={1.8}>
-                            {renderBoolRow("Vet School", fakeRestrictions[0]?.vet_school || false, {
-                                yes: "Can work at the Vet School",
-                                no: "Cannot work at the Vet School",
-                            })}
-                            {renderBoolRow("SEC", fakeRestrictions[0]?.sec || false, {
-                                yes: "Can work at the SEC",
-                                no: "Cannot work at the SEC",
-                            })}
-                            {renderBoolRow("Golden Jubilee", fakeRestrictions[0]?.osce_golden_jubilee || false, {
-                                yes: "Can work at the Golden Jubilee",
-                                no: "Cannot work at the Golden Jubilee",
-                            })}
-                            {renderBoolRow("Wolfson", fakeRestrictions[0]?.osce_wolfson || false, {
-                                yes: "Can work at the Wolfson",
-                                no: "Cannot work at the Wolfson",
-                            })}
-                            {renderBoolRow("Queen Elizabeth", fakeRestrictions[0]?.osce_queen_elizabeth || false, {
-                                yes: "Can work at the Queen Elizabeth",
-                                no: "Cannot work at the Queen Elizabeth",
-                            })}
-                            </Stack>
-                        </CollapsibleSection>
-
-                        {/* Status */}
-                        <CollapsibleSection title="Status" defaultExpanded={false}>
-                            <Stack spacing={1.8}>
-                            {renderBoolRow("Resigned", fakeRestrictions[0]?.resigned || false, {
-                                yes: "Has resigned",
-                                no: "Active invigilator",
-                            })}
-                            {renderBoolRow("Approved Exemption", fakeRestrictions[0]?.approved_exemption || false, {
-                                yes: "Exemption approved",
-                                no: "No exemption",
-                            })}
-                            </Stack>
-                        </CollapsibleSection>
-                        </Stack>
-
-                        {/* Notes */}
-                        {fakeRestrictions[0]?.notes && (
-                        <Box mt={4}>
-                            <Typography variant="body2">
-                            <strong>Notes:</strong> {fakeRestrictions[0].notes}
-                            </Typography>
-                        </Box>
-                        )}
+                      <Typography variant="body2" color="text.secondary">University Email</Typography>
+                      {data.university_email ? (
+                        <Typography
+                          variant="body1"
+                          component="a"
+                          href={`mailto:${data.university_email}`}
+                          sx={{ textDecoration: "none", color: "primary.main" }}
+                        >
+                          {data.university_email}
+                        </Typography>
+                      ) : (
+                        <Typography variant="body1">—</Typography>
+                      )}
                     </Box>
+                  </Tooltip>
+                  {data.personal_email && (
+                    <Tooltip title="Personal email on file">
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Personal Email</Typography>
+                        <Typography
+                          variant="body1"
+                          component="a"
+                          href={`mailto:${data.personal_email}`}
+                          sx={{ textDecoration: "none", color: "primary.main" }}
+                        >
+                          {data.personal_email}
+                        </Typography>
+                      </Box>
+                    </Tooltip>
+                  )}
                 </Stack>
-            </Paper>
+              </Box>
+
+              <Divider />
+
+              {/* Qualifications */}
+              <Box>
+                <Typography variant="h6" fontWeight={700} mb={3}>
+                  Qualifications
+                </Typography>
+                <Stack direction="row" spacing={1.5} flexWrap="wrap" gap={1}>
+                  {Object.entries(allQualifications).map(([key, label]) => {
+                    const hasQual = data.qualifications?.some((q) => q.qualification === key);
+                    return (
+                      <Tooltip key={key} title={hasQual ? `${label}: Qualified` : `${label}: Not qualified`}>
+                        <Chip
+                          label={label}
+                          color={hasQual ? "primary" : "default"}
+                          variant={hasQual ? "filled" : "outlined"}
+                          size="medium"
+                        />
+                      </Tooltip>
+                    );
+                  })}
+                </Stack>
+              </Box>
+
+              <Divider />
+
+              {/* Restrictions & Requirements */}
+              <Box>
+                <Typography variant="h6" fontWeight={700} mb={3}>
+                  Restrictions & Requirements
+                </Typography>
+
+                <Stack spacing={4}>
+                  {/* Exam Diets */}
+                  <CollapsibleSection title="Exam Diets" defaultExpanded={false}>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} sx={{ rowGap: 1.5 }}>
+                      {dietOptions.map((d) => {
+                        const hasDiet = diets.includes(d.code);
+                        return (
+                          <Tooltip key={d.code} title={hasDiet ? `Contracted for ${d.label}` : `Not contracted for ${d.label}`}>
+                            <Chip
+                              label={d.label}
+                              size="small"
+                              color={hasDiet ? "primary" : "default"}
+                              variant={hasDiet ? "filled" : "outlined"}
+                            />
+                          </Tooltip>
+                        );
+                      })}
+                    </Stack>
+                  </CollapsibleSection>
+
+                  {/* General Requirements */}
+                  <CollapsibleSection title="General Requirements" defaultExpanded={false}>
+                    <Stack spacing={1.8}>
+                      <Tooltip
+                        title={
+                          restrictionsUnion.has("accessibility_required")
+                            ? "Has accessibility needs"
+                            : "No accessibility requirements"
+                        }
+                      >
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Accessibility Requirements"
+                            value={restrictionsUnion.has("accessibility_required")}
+                            onChange={() => {}}
+                            yesLabel="Has accessibility needs"
+                            noLabel="No accessibility requirements"
+                          />
+                        </Box>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          restrictionsUnion.has("separate_room_only")
+                            ? "Must be in separate room"
+                            : "Can be in regular exam room"
+                        }
+                      >
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Separate Room Only"
+                            value={restrictionsUnion.has("separate_room_only")}
+                            onChange={() => {}}
+                            yesLabel="Must be in separate room"
+                            noLabel="Can be in regular exam room"
+                          />
+                        </Box>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          restrictionsUnion.has("purple_cluster")
+                            ? "Can work in a Purple Cluster"
+                            : "Cannot work in a Purple Cluster"
+                        }
+                      >
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Purple Cluster"
+                            value={restrictionsUnion.has("purple_cluster")}
+                            onChange={() => {}}
+                            yesLabel="Can work in a Purple Cluster"
+                            noLabel="Cannot work in a Purple Cluster"
+                          />
+                        </Box>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          restrictionsUnion.has("computer_cluster")
+                            ? "Can work in a Computer Cluster"
+                            : "Cannot work in a Computer Cluster"
+                        }
+                      >
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Computer Cluster"
+                            value={restrictionsUnion.has("computer_cluster")}
+                            onChange={() => {}}
+                            yesLabel="Can work in a Computer Cluster"
+                            noLabel="Cannot work in a Computer Cluster"
+                          />
+                        </Box>
+                      </Tooltip>
+                    </Stack>
+                  </CollapsibleSection>
+
+                  {/* Locations & OSCE Sites */}
+                  <CollapsibleSection title="Locations & OSCE Sites" defaultExpanded={false}>
+                    <Stack spacing={1.8}>
+                      <Tooltip
+                        title={
+                          restrictionsUnion.has("vet_school")
+                            ? "Can work at the Vet School"
+                            : "Cannot work at the Vet School"
+                        }
+                      >
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Vet School"
+                            value={restrictionsUnion.has("vet_school")}
+                            onChange={() => {}}
+                            yesLabel="Can work at the Vet School"
+                            noLabel="Cannot work at the Vet School"
+                          />
+                        </Box>
+                      </Tooltip>
+                      <Tooltip title={restrictionsUnion.has("sec") ? "Can work at the SEC" : "Cannot work at the SEC"}>
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="SEC"
+                            value={restrictionsUnion.has("sec")}
+                            onChange={() => {}}
+                            yesLabel="Can work at the SEC"
+                            noLabel="Cannot work at the SEC"
+                          />
+                        </Box>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          restrictionsUnion.has("osce_golden_jubilee")
+                            ? "Can work at the Golden Jubilee"
+                            : "Cannot work at the Golden Jubilee"
+                        }
+                      >
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Golden Jubilee"
+                            value={restrictionsUnion.has("osce_golden_jubilee")}
+                            onChange={() => {}}
+                            yesLabel="Can work at the Golden Jubilee"
+                            noLabel="Cannot work at the Golden Jubilee"
+                          />
+                        </Box>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          restrictionsUnion.has("osce_wolfson")
+                            ? "Can work at the Wolfson"
+                            : "Cannot work at the Wolfson"
+                        }
+                      >
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Wolfson"
+                            value={restrictionsUnion.has("osce_wolfson")}
+                            onChange={() => {}}
+                            yesLabel="Can work at the Wolfson"
+                            noLabel="Cannot work at the Wolfson"
+                          />
+                        </Box>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          restrictionsUnion.has("osce_queen_elizabeth")
+                            ? "Can work at the Queen Elizabeth"
+                            : "Cannot work at the Queen Elizabeth"
+                        }
+                      >
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Queen Elizabeth"
+                            value={restrictionsUnion.has("osce_queen_elizabeth")}
+                            onChange={() => {}}
+                            yesLabel="Can work at the Queen Elizabeth"
+                            noLabel="Cannot work at the Queen Elizabeth"
+                          />
+                        </Box>
+                      </Tooltip>
+                    </Stack>
+                  </CollapsibleSection>
+
+                  {/* Status */}
+                  <CollapsibleSection title="Status" defaultExpanded={false}>
+                    <Stack spacing={1.8}>
+                      <Tooltip title={data.resigned ? "Has resigned" : "Active invigilator"}>
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Resigned"
+                            value={data.resigned || false}
+                            onChange={() => {}}
+                            yesLabel="Has resigned"
+                            noLabel="Active invigilator"
+                          />
+                        </Box>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          restrictionsUnion.has("approved_exemption") ? "Exemption approved" : "No exemption"
+                        }
+                      >
+                        <Box>
+                          <BooleanCheckboxRow
+                            label="Approved Exemption"
+                            value={restrictionsUnion.has("approved_exemption")}
+                            onChange={() => {}}
+                            yesLabel="Exemption approved"
+                            noLabel="No exemption"
+                          />
+                        </Box>
+                      </Tooltip>
+                    </Stack>
+                  </CollapsibleSection>
+                </Stack>
+
+                {/* Notes */}
+                {(data.restrictions?.[0]?.notes || data.notes) && (
+                  <Box mt={4}>
+                    <Typography variant="body2">
+                      <strong>Notes:</strong> {data.restrictions?.[0]?.notes || data.notes}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Stack>
+          </Panel>
         </Box>
 
         {/* Right Column - Availability, Contract */}
         <Box sx={{ flex: 1, minWidth: 300 }}>
-            {/* Availability */}
-            <Paper sx={{ p: 4 }}>
-                <Typography variant="h6" fontWeight={700} mb={3}>
+          {/* Availability */}
+          {availabilityView === "list" ? (
+            <Panel sx={{ p: 4 }}>
+              <Typography variant="h6" fontWeight={700} mb={3}>
                 Availability
-                </Typography>
+              </Typography>
 
-                <Grid container spacing={3}>
-                {Object.entries(groupedAvailability).map(([date, slots]) => (
-                    <Grid item xs={12} key={date}>
-                    <Paper sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2 }}>
-                        <Typography variant="subtitle1" fontWeight={600} mb={2}>
+              <Grid container spacing={3}>
+                {sortedAvailabilityEntries.slice(0, availabilityLimit).map(([date, slots]) => (
+                  <Grid item xs={12} key={date}>
+                    <Panel sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2, mb: 0 }}>
+                      <Typography variant="subtitle1" fontWeight={600} mb={2}>
                         {dayjs(date).format("dddd, D MMMM YYYY")}
-                        </Typography>
-                        <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                      </Typography>
+                      <Stack direction="row" spacing={1.5} flexWrap="wrap">
                         {slots.map((s, i) => (
-                            <Tooltip key={i} title={s.available ? "Available" : "Unavailable"}>
+                          <Tooltip key={i} title={s.available ? "Available for this slot" : "Unavailable for this slot"}>
                             <Chip
-                                label={s.slot}
-                                color={s.available ? "success" : "default"}
-                                variant={s.available ? "filled" : "outlined"}
-                                size="medium"
+                              label={slotLabelMap[s.slot] || s.slot}
+                              color={s.available ? "success" : "default"}
+                              variant={s.available ? "filled" : "outlined"}
+                              size="medium"
                             />
-                            </Tooltip>
+                          </Tooltip>
                         ))}
-                        </Stack>
-                    </Paper>
-                    </Grid>
+                      </Stack>
+                    </Panel>
+                  </Grid>
                 ))}
-                </Grid>
-            </Paper>
-
-            {/* Contracted Hours */}
-            <Box sx={{ mt: 4, mr: 6 }}>
-                <ContractedHoursReport
-                    report={fakeContractedHoursReport}
-                    loading={false}
-                    error={null}
-                    invigName={fakeInvigilator.preferred_name}
+              </Grid>
+              {(sortedAvailabilityEntries.length > availabilityLimit || availabilityLimit > 4) && (
+                <Box sx={{ mt: 2, display: "flex", gap: 1.5, justifyContent: "flex-end" }}>
+                  <PillButton
+                    variant="outlined"
+                    onClick={() => setAvailabilityLimit(4)}
+                    disabled={availabilityLimit <= 4}
+                  >
+                    Show less
+                  </PillButton>
+                  <PillButton
+                    variant="contained"
+                    onClick={() => setAvailabilityLimit((prev) => Math.min(prev + 4, sortedAvailabilityEntries.length))}
+                    disabled={availabilityLimit >= sortedAvailabilityEntries.length}
+                  >
+                    {`Show ${Math.min(4, sortedAvailabilityEntries.length - availabilityLimit)} more`}
+                  </PillButton>
+                </Box>
+              )}
+            </Panel>
+          ) : (
+            <Panel sx={{ p: 4 }}>
+              <Typography variant="h6" fontWeight={700} mb={3}>
+                Availability Calendar
+              </Typography>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <StaticDatePicker
+                  displayStaticWrapperAs="desktop"
+                  value={selectedAvailabilityDate}
+                  onChange={(newValue) => setSelectedAvailabilityDate(newValue)}
+                  slots={{
+                    toolbar: () => null,
+                  }}
+                  slotProps={{
+                    actionBar: { actions: [] },
+                    day: (ownerState) => {
+                      const dateStr = (ownerState.day as Dayjs).format("YYYY-MM-DD");
+                      const hasAvailability = availabilityByDate[dateStr]?.some((a) => a.available);
+                      return {
+                        sx: hasAvailability
+                          ? {
+                              "&::after": {
+                                content: '""',
+                                position: "absolute",
+                                bottom: 6,
+                                right: 6,
+                                width: 8,
+                                height: 8,
+                                bgcolor: "success.main",
+                                borderRadius: "50%",
+                                border: "2px solid white",
+                              },
+                            }
+                          : {},
+                      };
+                    },
+                  }}
+                  views={["day"]}
+                  showDaysOutsideCurrentMonth
+                  sx={{
+                    "& .MuiPickersDay-root": {
+                      width: 38,
+                      height: 38,
+                      fontSize: "0.9rem",
+                      margin: "3px",
+                      borderRadius: "50%",
+                      lineHeight: "38px",
+                    },
+                    "& .MuiDayCalendar-weekContainer": {
+                      justifyContent: "center",
+                    },
+                    "& .MuiDayCalendar-monthContainer": {
+                      overflow: "visible",
+                    },
+                    "& .MuiDayCalendar-slideTransition": {
+                      minHeight: "320px",
+                    },
+                  }}
                 />
-            </Box>
+              </LocalizationProvider>
+
+              {selectedAvailabilityDate && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" fontWeight={600} mb={1}>
+                    {selectedAvailabilityDate.format("dddd, D MMMM YYYY")}
+                  </Typography>
+                  <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                    {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).map((slot, i) => (
+                      <Chip
+                        key={i}
+                        label={slotLabelMap[slot.slot] || slot.slot}
+                        color={slot.available ? "success" : "default"}
+                        variant={slot.available ? "filled" : "outlined"}
+                        size="medium"
+                      />
+                    ))}
+                    {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).length === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        No availability recorded for this date.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              )}
+            </Panel>
+          )}
+
+          {/* Contracted Hours */}
+          <Box sx={{ mt: 4, mr: 6 }}>
+            <ContractedHoursReport
+              report={contractedHoursReport}
+              loading={false}
+              error={null}
+              invigName={data.preferred_name || data.full_name}
+            />
+          </Box>
         </Box>
       </Box>
     </Box>
+
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 32,
+          right: 32,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
+          zIndex: 1000,
+        }}
+      >
+        <Tooltip title="Edit invigilator">
+          <Fab color="primary" aria-label="edit invigilator" onClick={() => setEditDialogOpen(true)}>
+            <Edit />
+          </Fab>
+        </Tooltip>
+        <Tooltip title="Delete invigilator">
+          <Fab color="error" aria-label="delete invigilator" onClick={() => setDeleteOpen(true)}>
+            <DeleteIcon />
+          </Fab>
+        </Tooltip>
+      </Box>
+
+      <EditInvigilatorDialog
+        open={editDialogOpen}
+        invigilatorId={data.id}
+        onClose={() => setEditDialogOpen(false)}
+        onSuccess={(name) => {
+          setSuccessMessage(`${name} updated successfully!`);
+          setSuccessOpen(true);
+          refetch();
+          setEditDialogOpen(false);
+        }}
+      />
+      <DeleteConfirmationDialog
+        open={deleteOpen}
+        title="Delete invigilator account?"
+        description="This will permanently delete this invigilator."
+        confirmText="Delete"
+        loading={deleting}
+        onClose={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+        onConfirm={handleDelete}
+      />
+      <Snackbar
+        open={successOpen}
+        autoHideDuration={3000}
+        onClose={() => setSuccessOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSuccessOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };

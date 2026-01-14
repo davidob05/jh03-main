@@ -1,248 +1,172 @@
-import React, { useState } from "react";
-import {
-  Box,
-  Grid,
-  Card,
-  Typography,
-  Paper,
-  Button,
-} from "@mui/material";
+import React, { useMemo, useState } from "react";
+import { Box, Grid, Typography, Paper } from "@mui/material";
+import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { NotificationsPanel, NotificationItem } from "../../components/admin/NotificationsPanel";
+import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
-interface Notification {
-  id: number;
-  type:
-    | "availability"
-    | "cancellation"
-    | "shiftPickup"
-    | "examChange"
-    | "invigilatorUpdate";
-  message: string;
-  timestamp: string;
+interface ExamVenueData {
+  examvenue_id: number;
+  venue_name: string | null;
+  start_time: string | null;
+  exam_length: number | null;
+  core: boolean;
+  provision_capabilities: string[];
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: 1,
-    type: "availability",
-    message: "Invigilator Alex Chen submitted availability for 2025-11-20",
-    timestamp: "2025-11-19T09:15:00Z",
-  },
-  {
-    id: 2,
-    type: "cancellation",
-    message: "Invigilator Rajesh Kumar cancelled availability for 2025-11-18",
-    timestamp: "2025-11-18T14:30:00Z",
-  },
-  {
-    id: 3,
-    type: "examChange",
-    message: "Exam 'Calculus 101' on 2025-11-20 had the time changed",
-    timestamp: "2025-11-17T10:00:00Z",
-  },
-  {
-    id: 4,
-    type: "invigilatorUpdate",
-    message: "Invigilator Maria Garcia updated qualifications",
-    timestamp: "2025-11-16T08:45:00Z",
-  },
-  {
-    id: 5,
-    type: "shiftPickup",
-    message: "Invigilator Ben Okoro picked up a shift on 2025-11-19",
-    timestamp: "2025-11-15T16:20:00Z",
-  },
-  {
-    id: 6,
-    type: "availability",
-    message: "Invigilator Li Wei submitted availability for 2025-11-22",
-    timestamp: "2025-11-14T11:10:00Z",
-  },
-  {
-    id: 7,
-    type: "cancellation",
-    message: "Invigilator Sarah Johnson cancelled availability for 2025-11-21",
-    timestamp: "2025-11-13T13:55:00Z",
-  },
-  {
-    id: 8,
-    type: "examChange",
-    message: "Exam 'Physics 201' on 2025-11-23 had the venue changed",
-    timestamp: "2025-11-12T09:05:00Z",
-  },
-  {
-    id: 9,
-    type: "invigilatorUpdate",
-    message: "Invigilator Ahmed Hassan updated contact information",
-    timestamp: "2025-11-11T15:40:00Z",
-  },
-  {
-    id: 10,
-    type: "shiftPickup",
-    message: "Invigilator Emma Wilson picked up a shift on 2025-11-24",
-    timestamp: "2025-11-10T12:25:00Z",
-  },
-  {
-    id: 11,
-    type: "availability",
-    message: "Invigilator Carlos Martinez submitted availability for 2025-11-25",
-    timestamp: "2025-11-09T10:50:00Z",
-  },
-];
+interface ExamData {
+  exam_id: number;
+  exam_name: string;
+  course_code: string;
+  exam_venues: ExamVenueData[];
+}
+
+interface InvigilatorData {
+  id: number;
+}
+
+interface VenueData {
+  venue_name: string;
+}
 
 export const AdminDashboard: React.FC = () => {
-  const [visibleCount, setVisibleCount] = useState(4); // show 4 by default
+  const [visibleCount, setVisibleCount] = useState(4);
+
+  const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
+    queryKey: ["dashboard-exams"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/exams/`);
+      if (!res.ok) throw new Error("Unable to load exams");
+      return res.json();
+    },
+  });
+
+  const { data: notificationsFromApi, isError: notificationsError } = useQuery<NotificationItem[]>({
+    queryKey: ["dashboard-notifications"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/notifications/`);
+      if (!res.ok) throw new Error("Unable to load notifications");
+      return res.json();
+    },
+  });
+
+  const { data: invigilators = [], isLoading: loadingInvigilators } = useQuery<InvigilatorData[]>({
+    queryKey: ["dashboard-invigilators"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilators/`);
+      if (!res.ok) throw new Error("Unable to load invigilators");
+      return res.json();
+    },
+  });
+
+  const { data: venues = [], isLoading: loadingVenues } = useQuery<VenueData[]>({
+    queryKey: ["dashboard-venues"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/venues/`);
+      if (!res.ok) throw new Error("Unable to load venues");
+      return res.json();
+    },
+  });
+
+  const stats = useMemo(() => {
+    const totalExams = exams.length;
+    const totalInvigilators = invigilators.length;
+    const totalVenues = venues.length;
+
+    const upcomingExamIds = new Set<number>();
+    const unallocatedExamVenueIds = new Set<number>();
+    const now = new Date();
+
+    exams.forEach((exam) => {
+      exam.exam_venues?.forEach((ev) => {
+        if (ev.start_time) {
+          const start = new Date(ev.start_time);
+          if (start > now) upcomingExamIds.add(exam.exam_id);
+        }
+        if (ev.venue_name === null || ev.venue_name === undefined) {
+          unallocatedExamVenueIds.add(ev.examvenue_id);
+        }
+      });
+    });
+
+    return {
+      totalExams,
+      totalInvigilators,
+      totalVenues,
+      upcomingExams: upcomingExamIds.size,
+      examsForAllocation: unallocatedExamVenueIds.size,
+      slotsToAllocate: null,
+      contractsFulfilled: null,
+    };
+  }, [exams, invigilators, venues]);
+
+  const notifications = (notificationsError ? [] : notificationsFromApi) || [];
 
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
-      <Typography variant="h4" gutterBottom>
-        Dashboard
-      </Typography>
+      <Typography variant="h4" fontWeight={700}>Dashboard</Typography>
+      <Typography variant="body2" color="text.secondary">Browse and manage the exam scheduling system.</Typography>
 
       {/* UploadTimetable Component */}
       <UploadFile />
 
       {/* Statistics */}
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Statistics
-      </Typography>
-      <Grid container spacing={7} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Total Exams
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              371
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Total Invigilators
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              112
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Active Venues
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              201
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Upcoming Exams
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              146
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Exams for Allocation
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              124
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Slots to Allocate
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              773
-            </Typography>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, textAlign: "center", width: "100%" }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Contracts Fulfilled
-            </Typography>
-            <Typography variant="h5" fontWeight={600}>
-              28
-            </Typography>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Notifications */}
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Recent Activity
-      </Typography>
-      <Paper sx={{ p: 3, mb: 6, height: "100%", overflowY: "auto" }}>
-        {mockNotifications.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            No recent activity yet.
-          </Typography>
-        ) : (
-          <>
-            {mockNotifications.slice(0, visibleCount).map((n) => (
-              <Box
-                key={n.id}
+      <Panel title="Statistics" disableDivider>
+        <Grid container spacing={2.5}>
+          {[
+            { label: "Total Exams", value: loadingExams ? "…" : stats.totalExams, tone: "#0c57a4" },
+            { label: "Exams for Allocation", value: loadingExams ? "…" : stats.examsForAllocation, tone: "#0d47a1" },
+            { label: "Upcoming Exams", value: loadingExams ? "…" : stats.upcomingExams, tone: "#e65100" },
+            { label: "Active Venues", value: loadingVenues ? "…" : stats.totalVenues, tone: "#1b5e20" },
+            { label: "Total Invigilators", value: loadingInvigilators ? "…" : stats.totalInvigilators, tone: "#4a148c" },
+            { label: "Slots to Allocate", value: stats.slotsToAllocate ?? "…", tone: "#455a64" },
+            { label: "Contracts Fulfilled", value: stats.contractsFulfilled ?? "…", tone: "#2e7d32" },
+          ].map((item, idx) => (
+            <Grid item xs={12} sm={6} md={3} key={idx}>
+              <Paper
+                elevation={0}
                 sx={{
-                  mb: 2,
-                  p: 1,
-                  borderRadius: 1,
-                  backgroundColor:
-                    n.type === "cancellation"
-                      ? "error.light"
-                      : n.type === "availability"
-                      ? "success.light"
-                      : n.type === "shiftPickup"
-                      ? "info.light"
-                      : "warning.light",
+                  p: 2,
+                  borderRadius: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  backgroundColor: "#fff",
                 }}
               >
-                <Typography variant="body2">{n.message}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {new Date(n.timestamp).toLocaleString()}
+                <Typography variant="subtitle2" sx={{ color: item.tone, fontWeight: 700, mb: 0.5 }}>
+                  {item.label}
                 </Typography>
-              </Box>
-            ))}
+                <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
+                  {item.value}
+                </Typography>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+      </Panel>
 
-            {/* Show More / Show Less Button */}
-            {mockNotifications.length > 4 && (
-              <Box sx={{ textAlign: "center", mt: 1 }}>
-                <Button
-                  variant="text"
-                  onClick={() =>
-                    setVisibleCount((prev) =>
-                      prev >= mockNotifications.length ? 4 : prev + 4
-                    )
-                  }
-                >
-                  {visibleCount >= mockNotifications.length
-                    ? "Show less"
-                    : `Show ${Math.min(
-                        4,
-                        mockNotifications.length - visibleCount
-                      )} more notifications`}
-                </Button>
-              </Box>
-            )}
-          </>
-        )}
-      </Paper>
+      {/* Notifications */}
+      <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
+      {notifications.length > 0 && (
+        <Box sx={{ textAlign: "center", mt: 3, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
+          <PillButton
+            variant="outlined"
+            onClick={() => setVisibleCount(4)}
+            disabled={visibleCount <= 4}
+          >
+            Show less
+          </PillButton>
+          <PillButton
+            variant="contained"
+            onClick={() => setVisibleCount((prev) => Math.min(prev + 4, notifications.length))}
+            disabled={visibleCount >= notifications.length}
+          >
+            {`Show ${Math.min(4, Math.max(notifications.length - visibleCount, 0))} more`}
+          </PillButton>
+        </Box>
+      )}
     </Box>
   );
 };

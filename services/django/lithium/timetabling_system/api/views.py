@@ -1,16 +1,35 @@
-from rest_framework import status, viewsets
+from rest_framework import permissions, status, viewsets
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.utils import timezone
+from datetime import timedelta
+from django.conf import settings
+from django.core.mail import EmailMessage
 from timetabling_system.models import (
     Exam,
     ExamVenue,
     Invigilator,
     InvigilatorAssignment,
+    InvigilatorAvailability,
+    InvigilatorRestriction,
     Venue,
+    StudentExam,
+    Provisions,
+    Notification,
 )
 from timetabling_system.services import ingest_upload_result
+from timetabling_system.services.venue_matching import venue_supports_caps
+from timetabling_system.services.upload_processor import (
+    _allowed_venue_types,
+    _needs_accessible_venue,
+    _needs_computer,
+    _needs_separate_room,
+    _required_capabilities,
+)
 from timetabling_system.utils.excel_parser import parse_excel_file
 from timetabling_system.utils.venue_ingest import upsert_venues
 from .serializers import (
@@ -20,17 +39,120 @@ from .serializers import (
     InvigilatorAssignmentSerializer,
     InvigilatorSerializer,
     VenueSerializer,
+    VenueWriteSerializer,
+    NotificationSerializer,
 )
 
 
-class ExamViewSet(viewsets.ReadOnlyModelViewSet):
+def log_notification(type_: str, message: str, when=None, user=None):
+    try:
+        Notification.objects.create(
+            type=type_,
+            message=message,
+            timestamp=when or timezone.now(),
+            triggered_by=user,
+        )
+    except Exception:
+        # Do not break main flows if notification logging fails
+        pass
+
+
+def _get_request_user(view, serializer=None):
+    request = getattr(view, "request", None)
+    if request is None and serializer is not None:
+        try:
+            request = serializer.context.get("request")
+        except Exception:
+            request = None
+    return getattr(request, "user", None) if request is not None else None
+
+
+class ExamViewSet(viewsets.ModelViewSet):
     queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
     serializer_class = ExamSerializer
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """
+        Delete multiple Exam records (admin-only).
+        Expects JSON body: {"ids": [1,2,3]}
+        """
+        ids = request.data.get("ids") if isinstance(request.data, dict) else None
+        if not ids or not isinstance(ids, list):
+            return Response(
+                {"detail": "Provide a non-empty list of ids."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ids = [pk for pk in ids if isinstance(pk, int)]
+        if not ids:
+            return Response(
+                {"detail": "No valid exam ids supplied."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = Exam.objects.filter(pk__in=ids)
+        deleted_count, _ = qs.delete()
+        return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_notification("examChange", f"Exam '{instance.exam_name}' was updated.", user=_get_request_user(self, serializer))
+        return instance
 
 
-class VenueViewSet(viewsets.ReadOnlyModelViewSet):
+class VenueViewSet(viewsets.ModelViewSet):
     queryset = Venue.objects.all().prefetch_related("examvenue_set__exam")
     serializer_class = VenueSerializer
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """
+        Delete multiple Venue records (admin-only).
+        Expects JSON body: {"ids": ["Hall A", "Lab B"]}
+        """
+        ids = request.data.get("ids") if isinstance(request.data, dict) else None
+        if not ids or not isinstance(ids, list):
+            return Response(
+                {"detail": "Provide a non-empty list of venue names in 'ids'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ids = [pk for pk in ids if isinstance(pk, str) and pk.strip()]
+        if not ids:
+            return Response(
+                {"detail": "No valid venue names supplied."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = Venue.objects.filter(venue_name__in=ids)
+        deleted_count, _ = qs.delete()
+        return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
+
+    def get_serializer_class(self):
+        if self.action in {"create", "update", "partial_update"}:
+            return VenueWriteSerializer
+        return VenueSerializer
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was created.", user=_get_request_user(self, serializer))
+        return instance
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_notification("venueChange", f"Venue '{instance.venue_name}' was updated.", user=_get_request_user(self, serializer))
+        return instance
+
+    def perform_destroy(self, instance):
+        venue_name = instance.venue_name
+        response = super().perform_destroy(instance)
+        log_notification("venueChange", f"Venue '{venue_name}' was deleted.", user=_get_request_user(self))
+        return response
 
 
 class ExamVenueViewSet(viewsets.ModelViewSet):
@@ -41,6 +163,8 @@ class ExamVenueViewSet(viewsets.ModelViewSet):
     """
 
     queryset = ExamVenue.objects.select_related("exam", "venue").all()
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
@@ -50,15 +174,66 @@ class ExamVenueViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         if instance.core:
             raise ValidationError("Core exam venues cannot be deleted.")
+        log_notification(
+            "examChange",
+            f"Exam venue removed for '{instance.exam.exam_name if instance.exam else 'Exam'}'.",
+        )
         return super().perform_destroy(instance)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        exam_name = instance.exam.exam_name if instance.exam else "Exam"
+        venue_name = instance.venue.venue_name if instance.venue else "Unassigned"
+        log_notification("examChange", f"Exam '{exam_name}' venue updated to {venue_name}.", user=_get_request_user(self, serializer))
+        return instance
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        exam_name = instance.exam.exam_name if instance.exam else "Exam"
+        venue_name = instance.venue.venue_name if instance.venue else "Unassigned"
+        log_notification("examChange", f"Exam '{exam_name}' venue set to {venue_name}.", user=_get_request_user(self, serializer))
+        return instance
 
 
 class InvigilatorViewSet(viewsets.ModelViewSet):
-    queryset = Invigilator.objects.all().prefetch_related(
+    queryset = Invigilator.objects.select_related("user").prefetch_related(
         "assignments__exam_venue__exam",
         "assignments__exam_venue__venue",
+        "availabilities",
     )
     serializer_class = InvigilatorSerializer
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """
+        Delete multiple invigilators (admin-only).
+        Expects JSON body: {"ids": [1,2,3]}
+        """
+        ids = request.data.get("ids") if isinstance(request.data, dict) else None
+        if not ids or not isinstance(ids, list):
+            return Response(
+                {"detail": "Provide a non-empty list of ids."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ids = [pk for pk in ids if isinstance(pk, int)]
+        if not ids:
+            return Response(
+                {"detail": "No valid invigilator ids supplied."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = Invigilator.objects.filter(pk__in=ids)
+        deleted_count, _ = qs.delete()
+        return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        name = instance.preferred_name or instance.full_name or "Invigilator"
+        log_notification("invigilatorUpdate", f"{name} has updated details.", user=_get_request_user(self, serializer))
+        return instance
 
 
 class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
@@ -68,11 +243,28 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         "exam_venue__venue",
     ).all()
     serializer_class = InvigilatorAssignmentSerializer
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
+        exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
+        log_notification("shiftPickup", f"{name} picked up a shift for {exam_name}.", user=_get_request_user(self, serializer))
+        return instance
+
+    def perform_destroy(self, instance):
+        name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
+        exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
+        log_notification("cancellation", f"{name} cancelled a shift for {exam_name}.", user=_get_request_user(self))
+        return super().perform_destroy(instance)
 
 
 class TimetableUploadView(APIView):
     """Accepts an uploaded Excel file and routes it through the parser helpers."""
     parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large bulk uploads without throttling
 
 
     def post(self, request, *args, **kwargs):
@@ -114,3 +306,317 @@ class TimetableUploadView(APIView):
             status.HTTP_200_OK if result.get("status") == "ok" else status.HTTP_400_BAD_REQUEST
         )
         return Response(result, status=http_status)
+
+
+class NotificationsView(APIView):
+    """
+    Return notifications stored in the Notification table.
+    """
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only; allow large pulls without throttling
+
+    def get(self, request, *args, **kwargs):
+        cutoff = timezone.now() - timedelta(days=7)
+        qs = Notification.objects.filter(timestamp__gte=cutoff).order_by("-timestamp")[:50]
+        return Response(NotificationSerializer(qs, many=True).data)
+
+    def post(self, request, *args, **kwargs):
+        payload = request.data or {}
+        invigilator_ids = payload.get("invigilator_ids") or []
+        methods = payload.get("methods") or []
+        subject = (payload.get("subject") or "").strip()
+        message = (payload.get("message") or "").strip()
+        log_only = bool(payload.get("log_only"))
+
+        if not isinstance(invigilator_ids, (list, tuple)):
+            return Response({"detail": "invigilator_ids must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            invigilator_ids = [int(i) for i in invigilator_ids]
+        except (TypeError, ValueError):
+            return Response({"detail": "invigilator_ids must contain numeric IDs."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not invigilator_ids:
+            return Response({"detail": "At least one invigilator ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not message and not log_only:
+            return Response({"detail": "Message is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not isinstance(methods, (list, tuple)):
+            methods = []
+        allowed_methods = {"email", "sms"}
+        invalid_methods = [m for m in methods if m not in allowed_methods]
+        if invalid_methods:
+            return Response(
+                {"detail": f"Invalid methods: {', '.join(invalid_methods)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not methods:
+            return Response({"detail": "Choose at least one delivery method (email or sms)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        recipients = list(Invigilator.objects.filter(id__in=invigilator_ids))
+        if not recipients:
+            return Response({"detail": "No matching invigilators found."}, status=status.HTTP_404_NOT_FOUND)
+
+        subject_to_use = subject or "Message from administrator"
+
+        if log_only:
+            count = len(recipients)
+            Notification.objects.create(
+                type=Notification.NotificationType.MAIL_MERGE,
+                message=f"Sent '{subject_to_use}' mail merge to {count} invigilator{'s' if count != 1 else ''}",
+                timestamp=timezone.now(),
+                triggered_by=request.user,
+            )
+            return Response(
+                {
+                    "status": "ok",
+                    "logged": True,
+                    "invigilator_ids": [i.id for i in recipients],
+                    "count": count,
+                    "subject": subject_to_use,
+                }
+            )
+
+        if settings.EMAIL_BACKEND in {
+            "django.core.mail.backends.console.EmailBackend",
+            "django.core.mail.backends.dummy.EmailBackend",
+        }:
+            return Response(
+                {
+                    "detail": "Email backend is set to console/dummy. Configure SMTP via EMAIL_* env vars to send messages.",
+                    "backend": settings.EMAIL_BACKEND,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        from django.core.mail import send_mail
+
+        sender_email = settings.DEFAULT_FROM_EMAIL
+        reply_to_email = getattr(request.user, "email", "") or None
+
+        email_recipients = []
+        sms_recipients = []
+        skipped_sms = []
+
+        for invigilator in recipients:
+            name = invigilator.preferred_name or invigilator.full_name or f"Invigilator #{invigilator.id}"
+            if "email" in methods:
+                email_recipients.extend(
+                    [
+                        e
+                        for e in [
+                            getattr(invigilator, "university_email", None),
+                            getattr(invigilator, "personal_email", None),
+                        ]
+                        if e
+                    ]
+                )
+            if "sms" in methods:
+                sms_candidate = getattr(invigilator, "janet_txt", None) or getattr(invigilator, "mobile_text_only", None)
+                if sms_candidate and "@" in sms_candidate:
+                    sms_recipients.append(sms_candidate)
+                else:
+                    skipped_sms.append(name)
+
+        send_results = {"email": 0, "sms": 0}
+        errors = []
+
+        if "email" in methods and email_recipients:
+            try:
+                email_msg = EmailMessage(
+                    subject=subject_to_use,
+                    body=message,
+                    from_email=sender_email,
+                    to=email_recipients,
+                    reply_to=[reply_to_email] if reply_to_email else None,
+                )
+                email_msg.send(fail_silently=False)
+                send_results["email"] = len(email_recipients)
+            except Exception as exc:
+                errors.append(f"Email send failed: {exc}")
+
+        if "sms" in methods and sms_recipients:
+            try:
+                sms_msg = EmailMessage(
+                    subject=subject_to_use,
+                    body=message,
+                    from_email=sender_email,
+                    to=sms_recipients,
+                    reply_to=[reply_to_email] if reply_to_email else None,
+                )
+                sms_msg.send(fail_silently=False)
+                send_results["sms"] = len(sms_recipients)
+            except Exception as exc:
+                errors.append(f"SMS send failed: {exc}")
+
+        if "email" in methods and not email_recipients:
+            errors.append("No email addresses found for selected invigilators.")
+        if "sms" in methods and not sms_recipients:
+            errors.append(
+                "No SMS-capable addresses (e.g. janet_txt/mobile_text_only with @) found for selected invigilators."
+            )
+        if skipped_sms and "sms" in methods:
+            errors.append(f"Skipped SMS for: {', '.join(skipped_sms)} (missing SMS address).")
+
+        if errors and send_results["email"] == 0 and send_results["sms"] == 0:
+            return Response({"detail": errors[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                "status": "ok",
+                "sent_email": send_results["email"],
+                "sent_sms": send_results["sms"],
+                "invigilator_ids": [i.id for i in recipients],
+                "methods": list(methods),
+                "subject": subject_to_use,
+                "message": message,
+                "warnings": errors,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class StudentProvisionListView(APIView):
+    """
+    Return provision records for students, optionally filtered to those
+    whose allocated venue does not yet meet their needs.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only
+
+    def get(self, request, *args, **kwargs):
+        unallocated_only = str(request.query_params.get("unallocated") or "").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        provisions = Provisions.objects.select_related("student", "exam").all()
+        student_exam_map = {
+            (se.student_id, se.exam_id): se
+            for se in StudentExam.objects.select_related("exam_venue__venue", "student", "exam")
+        }
+
+        rows = []
+        for provision in provisions:
+            student_exam = student_exam_map.get((provision.student_id, provision.exam_id))
+            exam_venue = getattr(student_exam, "exam_venue", None)
+            venue = getattr(exam_venue, "venue", None)
+
+            required_caps = _required_capabilities(provision.provisions)
+            needs_accessible = _needs_accessible_venue(provision.provisions)
+            needs_separate_room = _needs_separate_room(provision.provisions)
+            needs_computer = _needs_computer(provision.provisions)
+            allowed_types = _allowed_venue_types(needs_computer, needs_separate_room)
+
+            matches_needs = False
+            allocation_issue = None
+
+            if not exam_venue:
+                allocation_issue = "No exam venue assigned"
+            elif not venue:
+                allocation_issue = "No physical venue allocated"
+            else:
+                if allowed_types is not None and venue.venuetype not in allowed_types:
+                    allocation_issue = "Venue type does not satisfy requirements"
+                elif needs_accessible and not venue.is_accessible:
+                    allocation_issue = "Venue is not marked accessible"
+                elif required_caps and not venue_supports_caps(venue, required_caps):
+                    allocation_issue = "Venue is missing required provisions"
+                else:
+                    matches_needs = True
+
+            if unallocated_only and matches_needs:
+                continue
+
+            rows.append(
+                {
+                    "student_id": provision.student.student_id,
+                    "student_name": provision.student.student_name,
+                    "exam_id": provision.exam.exam_id,
+                    "exam_name": provision.exam.exam_name,
+                    "course_code": provision.exam.course_code,
+                    "provisions": provision.provisions,
+                    "notes": provision.notes,
+                    "exam_venue_id": exam_venue.pk if exam_venue else None,
+                    "exam_venue_caps": getattr(exam_venue, "provision_capabilities", []) or [],
+                    "venue_name": venue.venue_name if venue else None,
+                    "venue_type": venue.venuetype if venue else None,
+                    "venue_accessible": venue.is_accessible if venue else None,
+                    "required_capabilities": required_caps,
+                    "allowed_venue_types": sorted(list(allowed_types)) if allowed_types else [],
+                    "matches_needs": matches_needs,
+                    "allocation_issue": allocation_issue,
+                    "student_exam_id": student_exam.pk if student_exam else None,
+                }
+            )
+
+        rows.sort(key=lambda r: (r.get("student_name") or "", r.get("course_code") or ""))
+        return Response(rows)
+
+
+class InvigilatorNotificationsView(APIView):
+    """
+    Return recent notifications (last 20) for authenticated invigilators.
+    Currently returns global notifications as the model is not scoped per-invigilator.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes: list = []  # Lightweight
+
+    def get(self, request, *args, **kwargs):
+        qs = Notification.objects.order_by("-timestamp")[:20]
+        return Response(NotificationSerializer(qs, many=True).data)
+
+
+class InvigilatorStatsView(APIView):
+    """
+    Returns stats for the currently authenticated invigilator.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes: list = []  # Lightweight endpoint
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        invigilator = getattr(user, "invigilator_profile", None)
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        now = timezone.now()
+        assignments = InvigilatorAssignment.objects.filter(invigilator=invigilator)
+        upcoming_qs = assignments.filter(assigned_start__gte=now, cancel=False)
+        cancelled_qs = assignments.filter(cancel=True)
+        next_assignment = upcoming_qs.order_by("assigned_start").first()
+
+        def _duration_hours(qs):
+            total = 0.0
+            for a in qs:
+                try:
+                    total += float(a.total_hours())
+                except Exception:
+                    continue
+            return round(total, 2)
+
+        data = {
+            "total_shifts": assignments.count(),
+            "upcoming_shifts": upcoming_qs.count(),
+            "cancelled_shifts": cancelled_qs.count(),
+            "hours_assigned": _duration_hours(assignments),
+            "hours_upcoming": _duration_hours(upcoming_qs),
+            "restrictions": InvigilatorRestriction.objects.filter(invigilator=invigilator).count(),
+            "availability_entries": InvigilatorAvailability.objects.filter(invigilator=invigilator).count(),
+            "next_assignment": None,
+        }
+        if next_assignment:
+            data["next_assignment"] = {
+                "exam_name": getattr(next_assignment.exam_venue.exam, "exam_name", None) if next_assignment.exam_venue else None,
+                "venue_name": getattr(next_assignment.exam_venue.venue, "venue_name", None) if next_assignment.exam_venue else None,
+                "start": next_assignment.assigned_start,
+                "end": next_assignment.assigned_end,
+                "role": next_assignment.role,
+            }
+        return Response(data, status=status.HTTP_200_OK)

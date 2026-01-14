@@ -6,7 +6,7 @@ FRONTEND_DIR := services/frontend/app
 SMOKE_FRONTEND_CMD := npm test -- --passWithNoTests --testNamePattern="smoke|health"
 SMOKE_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py test timetabling_system.utils
 TEST_FRONTEND_CMD := npm test -- --passWithNoTests
-TEST_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py test
+TEST_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py makemigrations --noinput && python manage.py migrate --noinput && python manage.py test
 
 
 .PHONY: up down logs build reset-django-db makemigrations migrate superuser django frontend test
@@ -31,6 +31,24 @@ reset-django-db:
 	rm -rf services/django/lithium/.postgres-data
 	@echo "Restarting Django service with a fresh database..."
 	docker compose -f $(DEV_COMPOSE) up -d django || echo "Failed to restart django service"
+
+create-admin:
+	@echo "Ensuring Django service is running..."
+	docker compose -f $(DEV_COMPOSE) up -d --no-build django || true
+	@echo "Waiting for the Django virtualenv to be ready..."
+	docker compose -f $(DEV_COMPOSE) exec django bash -lc 'while [ ! -x /app/.venv/bin/python ]; do sleep 2; done'
+	@echo "Creating/updating admin user \"$(USER)\" with token..."
+	docker compose -f $(DEV_COMPOSE) exec django bash -lc '\
+		. /app/.venv/bin/activate && \
+		python manage.py shell -c "\
+from django.contrib.auth import get_user_model; \
+from rest_framework.authtoken.models import Token; \
+User = get_user_model(); \
+u, created = User.objects.get_or_create(username=\"$(USER)\", defaults={\"email\": \"$(EMAIL)\", \"is_staff\": True, \"is_superuser\": True}); \
+u.email = \"$(EMAIL)\"; u.set_password(\"$(PASSWORD)\"); u.is_staff = True; u.is_superuser = True; u.is_active = True; u.save(); \
+Token.objects.filter(user=u).delete(); t = Token.objects.create(user=u); \
+print(f\"Admin {u.username} ready. Token: {t.key}\")" \
+	'
 
 makemigrations:
 	$(DJANGO_MANAGE) makemigrations timetabling_system
@@ -62,3 +80,20 @@ test:
 	@echo "Running full Django test suite (no rebuild)..."
 	docker compose -f $(DEV_COMPOSE) up -d --no-build django || true
 	docker compose -f $(DEV_COMPOSE) exec django bash -lc '$(TEST_DJANGO_CMD)'
+
+coverage:
+	@echo "Calculating Django test coverage (per-file missing lines)..."
+	docker compose -f $(DEV_COMPOSE) up -d --no-build django || true
+	docker compose -f $(DEV_COMPOSE) exec django bash -lc '\
+		set -euo pipefail; \
+		cd /app; \
+		. /app/.venv/bin/activate; \
+		if ! python -c "import coverage" >/dev/null 2>&1; then \
+			python -m pip install --quiet "coverage>=7.5"; \
+		fi; \
+		python manage.py makemigrations --noinput; \
+		python manage.py migrate --noinput; \
+		coverage erase; \
+		coverage run --rcfile=/app/.coveragerc manage.py test --keepdb; \
+		coverage report -m; \
+	'

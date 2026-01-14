@@ -7,6 +7,7 @@ import {
   Alert,
   Box,
 } from "@mui/material";
+import Panel from "../Panel";
 
 export interface ContractedHoursData {
   contracted_hours: number;
@@ -33,15 +34,7 @@ export const ContractedHoursReport: React.FC<ContractedHoursReportProps> = ({
 }) => {
   
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 3,
-        borderRadius: 2,
-        width: "100%",
-        boxShadow: 1,
-      }}
-    >
+    <Panel disableDivider>
       {/* Header */}
       <Stack direction="row" alignItems="center" spacing={1} mb={2}>
         <Typography variant="h6" fontWeight={600}>
@@ -112,6 +105,6 @@ export const ContractedHoursReport: React.FC<ContractedHoursReportProps> = ({
           )}
         </Stack>
       )}
-    </Paper>
+    </Panel>
   );
 };

@@ -1,12 +1,18 @@
 from rest_framework import serializers
+from datetime import timedelta
 from timetabling_system.models import (
     Exam,
+    Venue,
     ExamVenue,
     Invigilator,
+    InvigilatorQualification,
+    InvigilatorRestriction,
+    InvigilatorAvailability,
     InvigilatorAssignment,
-    Venue,
+    Notification,
+    SlotChoices
 )
-
+from timetabling_system.constants import DIET_DATE_RANGES
 
 class ExamVenueSerializer(serializers.ModelSerializer):
     venue_name = serializers.SerializerMethodField()
@@ -130,6 +136,41 @@ class VenueSerializer(serializers.ModelSerializer):
         return [ev.exam.exam_name for ev in exam_venues]
 
 
+class VenueWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Venue
+        fields = (
+            "venue_name",
+            "capacity",
+            "venuetype",
+            "is_accessible",
+            "provision_capabilities",
+            "qualifications",
+            "availability",
+        )
+
+    def to_representation(self, instance):
+        return VenueSerializer(instance).data
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    triggered_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = ("id", "type", "message", "timestamp", "triggered_by")
+
+    def get_triggered_by(self, obj):
+        user = getattr(obj, "triggered_by", None)
+        if not user:
+            return None
+        return {
+            "id": user.id,
+            "email": getattr(user, "email", None),
+            "username": getattr(user, "username", None),
+        }
+
+
 class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
     invigilator_name = serializers.SerializerMethodField()
     exam_name = serializers.CharField(source="exam_venue.exam.exam_name", read_only=True)
@@ -163,8 +204,29 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
         return venue.venue_name if venue else None
 
 
+class InvigilatorQualificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvigilatorQualification
+        fields = ("qualification",)
+
+
+class InvigilatorRestrictionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvigilatorRestriction
+        fields = ("diet", "restrictions", "notes")
+
+
+class InvigilatorAvailabilitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvigilatorAvailability
+        fields = ("date", "slot", "available")
+
+
 class InvigilatorSerializer(serializers.ModelSerializer):
     assignments = InvigilatorAssignmentSerializer(many=True, read_only=True)
+    qualifications = InvigilatorQualificationSerializer(many=True, required=False)
+    restrictions = InvigilatorRestrictionSerializer(many=True, required=False)
+    availabilities = InvigilatorAvailabilitySerializer(many=True, read_only=True)
 
     class Meta:
         model = Invigilator
@@ -174,10 +236,86 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "full_name",
             "mobile",
             "mobile_text_only",
+            "janet_txt",
             "alt_phone",
             "university_email",
             "personal_email",
             "notes",
-            "is_active",
+            "resigned",
+            "contracted_hours",
+            "qualifications",
+            "restrictions",
             "assignments",
+            "availabilities",
         )
+
+    def create(self, validated_data):
+        qualifications_data = validated_data.pop("qualifications", [])
+        restrictions_data = validated_data.pop("restrictions", [])
+        invigilator = Invigilator.objects.create(**validated_data)
+
+        for q in qualifications_data:
+            InvigilatorQualification.objects.create(
+                invigilator=invigilator,
+                **q
+            )
+
+        diets = []
+        for r in restrictions_data:
+            InvigilatorRestriction.objects.create(
+                invigilator=invigilator,
+                **r
+            )
+            diets.append(r["diet"])
+
+        self._generate_availability(invigilator, diets)
+
+        return invigilator
+    def _generate_availability(self, invigilator, diets):
+        availability_objects = []
+
+        for diet in diets:
+            if diet not in DIET_DATE_RANGES:
+                continue
+
+            start_date, end_date = DIET_DATE_RANGES[diet]
+            current_date = start_date
+
+            while current_date <= end_date:
+                for slot in SlotChoices.values:
+                    availability_objects.append(
+                        InvigilatorAvailability(
+                            invigilator=invigilator,
+                            date=current_date,
+                            slot=slot,
+                            available=True,
+                        )
+                    )
+                current_date += timedelta(days=1)
+
+        InvigilatorAvailability.objects.bulk_create(
+            availability_objects,
+            ignore_conflicts=True,
+        )
+
+    def update(self, instance, validated_data):
+        qualifications_data = validated_data.pop("qualifications", None)
+        restrictions_data = validated_data.pop("restrictions", None)
+
+        instance = super().update(instance, validated_data)
+
+        if qualifications_data is not None:
+            InvigilatorQualification.objects.filter(invigilator=instance).delete()
+            for q in qualifications_data:
+                InvigilatorQualification.objects.create(invigilator=instance, **q)
+
+        if restrictions_data is not None:
+            InvigilatorRestriction.objects.filter(invigilator=instance).delete()
+            InvigilatorAvailability.objects.filter(invigilator=instance).delete()
+            diets = []
+            for r in restrictions_data:
+                InvigilatorRestriction.objects.create(invigilator=instance, **r)
+                diets.append(r["diet"])
+            self._generate_availability(instance, diets)
+
+        return instance

@@ -5,16 +5,29 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def env_flag(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: str = "") -> list[str]:
+    raw = os.getenv(name, default)
+    if not raw:
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/dev/howto/deployment/checklist/
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-0peo@#x9jur3!h$ryje!$879xww8y1y66jx!%*#ymhg&jkozs2"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-key-change-me")
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_flag("DJANGO_DEBUG", "true")
+if not DEBUG and SECRET_KEY == "dev-secret-key-change-me":
+    raise ValueError("DJANGO_SECRET_KEY must be set in production.")
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = os.getenv(
@@ -36,6 +49,7 @@ INSTALLED_APPS = [
     "django.contrib.sites",
     # Third-party
     "rest_framework",
+    "rest_framework.authtoken",
     "allauth",
     "allauth.account",
     "crispy_forms",
@@ -86,16 +100,25 @@ TEMPLATES = [
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
+_DB_NAME = os.getenv("DJANGO_DB_NAME", "postgres")
+_DB_USER = os.getenv("DJANGO_DB_USER", "postgres")
+_DB_PASSWORD = os.getenv("DJANGO_DB_PASSWORD", "postgres")
+_DB_HOST = os.getenv("DJANGO_DB_HOST", "127.0.0.1")
+_DB_PORT = os.getenv("DJANGO_DB_PORT", "5432")
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DJANGO_DB_NAME", "postgres"),
-        "USER": os.getenv("DJANGO_DB_USER", "postgres"),
-        "PASSWORD": os.getenv("DJANGO_DB_PASSWORD", "postgres"),
-        "HOST": os.getenv("DJANGO_DB_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DJANGO_DB_PORT", "5432"),
+        "NAME": _DB_NAME,
+        "USER": _DB_USER,
+        "PASSWORD": _DB_PASSWORD,
+        "HOST": _DB_HOST,
+        "PORT": _DB_PORT,
     }
 }
+
+if not DEBUG and _DB_PASSWORD in {"", "postgres"}:
+    raise ValueError("DJANGO_DB_PASSWORD must be set to a strong value in production.")
 
 # Password validation
 # https://docs.djangoproject.com/en/dev/ref/settings/#auth-password-validators
@@ -105,12 +128,16 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 12},
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+    {
+        "NAME": "accounts.validators.ComplexityPasswordValidator",
     },
 ]
 
@@ -164,10 +191,16 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#email-backend
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "25"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "false").lower() == "true"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#default-from-email
-DEFAULT_FROM_EMAIL = "root@localhost"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "root@localhost")
 
 # django-debug-toolbar
 # https://django-debug-toolbar.readthedocs.io/en/latest/installation.html
@@ -199,10 +232,34 @@ ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_EMAIL_REQUIRED = True
 
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "accounts.authentication.UserSessionAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "timetabling_system.api.throttles.AdminBypassUserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        # Override via env if needed.
+        "anon": os.getenv("DRF_THROTTLE_ANON_RATE", "50/min"),
+        "user": os.getenv("DRF_THROTTLE_USER_RATE", "200/min"),
+        "login": os.getenv("DRF_THROTTLE_LOGIN_RATE", "10/min"),
+    },
+}
+
 # Allow bulk admin actions (e.g., deleting many ExamVenue rows) without hitting the
 # default per-request field cap.
 DATA_UPLOAD_MAX_NUMBER_FIELDS = int(os.getenv("DJANGO_DATA_UPLOAD_MAX_NUMBER_FIELDS", "50000"))
 ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_ADAPTER = "accounts.adapters.AccountAdapter"
+
+# Toggle to block resigned invigilators from logging in.
+BLOCK_RESIGNED_INVIGILATORS = False
 
 # CORS setup for local frontend
 CORS_ALLOWED_ORIGINS = [
@@ -213,9 +270,27 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#csrf-trusted-origins
-CSRF_TRUSTED_ORIGINS = [
+_cors_env = env_list("DJANGO_CORS_ALLOWED_ORIGINS")
+_csrf_env = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+
+CORS_ALLOWED_ORIGINS = _cors_env or [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+CSRF_TRUSTED_ORIGINS = _csrf_env or [
     "http://localhost:8000",  # Default Django dev server
     "http://127.0.0.1:8000",  # Alternative local address
     "http://localhost:3000",  # React dev server
     "http://127.0.0.1:3000",  # Alternative React dev server
 ]
+
+# CSRF & cookie hardening (toggle secure cookies via env to keep local dev workable)
+DJANGO_SECURE_COOKIES = env_flag("DJANGO_SECURE_COOKIES", "false")
+CSRF_COOKIE_SECURE = DJANGO_SECURE_COOKIES
+SESSION_COOKIE_SECURE = DJANGO_SECURE_COOKIES
+CSRF_COOKIE_HTTPONLY = env_flag("DJANGO_CSRF_HTTPONLY", "true")
+SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.getenv("DJANGO_CSRF_COOKIE_SAMESITE", "Lax")
+SECURE_SSL_REDIRECT = env_flag("DJANGO_SECURE_SSL_REDIRECT", "false")
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

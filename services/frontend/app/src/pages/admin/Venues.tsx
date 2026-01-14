@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
 import {
   Box,
@@ -20,13 +20,21 @@ import {
   Tooltip,
   InputBase,
   CircularProgress,
+  Chip,
+  Divider,
+  Stack,
+  Snackbar,
+  Alert,
+  Fab,
+  Link as MUILink,
 } from '@mui/material';
-import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, AddLocationAlt as AddLocationAltIcon } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
-import { Link as MUILink } from '@mui/material';
 import { Link } from 'react-router-dom';
-
-import { apiBaseUrl } from '../../utils/api';
+import { apiBaseUrl, apiFetch } from '../../utils/api';
+import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
+import { PillButton } from '../../components/PillButton';
+import { Panel } from '../../components/Panel';
 
 interface ExamVenueData {
   exam_name: string;
@@ -81,7 +89,7 @@ const headCells: readonly HeadCell[] = [
 ];
 
 const fetchVenues = async (): Promise<VenueData[]> => {
-  const response = await fetch(apiBaseUrl + "/venues/");
+  const response = await apiFetch(apiBaseUrl + "/venues/");
   if (!response.ok) throw new Error('Unable to load venues');
   return response.json();
 };
@@ -201,9 +209,12 @@ interface EnhancedTableToolbarProps {
   numSelected: number;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onAddVenue: () => void;
+  onDeleteSelected: () => void;
+  deleteLoading: boolean;
 }
 
-const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange }: EnhancedTableToolbarProps) => {
+const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddVenue, onDeleteSelected, deleteLoading }: EnhancedTableToolbarProps) => {
   return (
     <Toolbar
       sx={[
@@ -220,8 +231,6 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange }: Enha
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 100%' }}>
-          <Typography variant="h6">Venues</Typography>
-
           <Box
             sx={{
               display: 'flex',
@@ -246,17 +255,23 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange }: Enha
       {numSelected > 0 && (
         <Box sx={{ display: 'flex', gap: 1 }}>
           {numSelected === 1 && (
-            <Tooltip title="Edit">
-              <IconButton>
-                <EditIcon />
-              </IconButton>
-            </Tooltip>
+            <PillButton
+              variant="contained"
+              color="primary"
+              startIcon={<EditIcon />}
+            >
+              Edit
+            </PillButton>
           )}
-          <Tooltip title="Delete">
-            <IconButton>
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
+          <PillButton
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            disabled={deleteLoading}
+            onClick={onDeleteSelected}
+          >
+            {deleteLoading ? "Deleting..." : "Delete"}
+          </PillButton>
         </Box>
       )}
     </Toolbar>
@@ -264,6 +279,7 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange }: Enha
 };
 
 export const AdminVenues: React.FC = () => {
+  const queryClient = useQueryClient();
   const [order, setOrder] = React.useState<Order>('asc');
   const [orderBy, setOrderBy] = React.useState<keyof RowData>('name');
   const [selected, setSelected] = React.useState<readonly string[]>([]);
@@ -271,6 +287,10 @@ export const AdminVenues: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<string, boolean>>({});
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [successOpen, setSuccessOpen] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState('');
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const {
     data: venuesData = [],
@@ -301,6 +321,30 @@ export const AdminVenues: React.FC = () => {
       })),
     [venuesData],
   );
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiFetch(`${apiBaseUrl}/venues/bulk-delete/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Bulk delete failed");
+      }
+      return true;
+    },
+    onSuccess: async (_data, ids) => {
+      setSelected([]);
+      setSuccessMessage(`Deleted ${ids.length} venue${ids.length === 1 ? "" : "s"}.`);
+      setSuccessOpen(true);
+      await queryClient.invalidateQueries({ queryKey: ['venues'] });
+    },
+    onError: (err: any) => {
+      setErrorMessage(err?.message || "Failed to delete venues.");
+    },
+  });
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
@@ -363,6 +407,13 @@ export const AdminVenues: React.FC = () => {
     [order, orderBy, page, rowsPerPage, filteredRows],
   );
 
+  const summary = React.useMemo(() => {
+    const total = venuesData.length;
+    const accessible = venuesData.filter((v) => v.is_accessible).length;
+    const examCount = venuesData.reduce((acc, v) => acc + (v.exam_venues?.length || 0), 0);
+    return { total, accessible, examCount };
+  }, [venuesData]);
+
   if (isLoading)
     return (
       <Box sx={{ p: 6, textAlign: 'center' }}>
@@ -374,22 +425,61 @@ export const AdminVenues: React.FC = () => {
   if (isError)
     return (
       <Box sx={{ width: '100%', maxWidth: 1050, mx: 'auto', p: 3 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Panel>
           <Typography color="error" variant="h6">
             {error?.message || 'Failed to load venues'}
           </Typography>
-        </Paper>
+        </Panel>
       </Box>
     );
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 1050, mx: 'auto', p: 3 }}>
-      <Paper sx={{ width: '100%', mb: 2 }}>
+    <Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto', p: { xs: 2, md: 4 } }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" rowGap={1.5}>
+        <Box>
+          <Typography variant="h4" fontWeight={700}>Venues</Typography>
+          <Typography variant="body2" color="text.secondary">Browse and manage all exam venues.</Typography>
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Chip
+            label={`${summary.total} Venues`}
+            size="medium"
+            sx={{
+              backgroundColor: "#e3f2fd",
+              color: "primary.main",
+              fontWeight: 600,
+            }}
+          />
+          <Chip
+            label={`${summary.accessible} Accessible`}
+            size="medium"
+            sx={{
+              backgroundColor: "#def3dbff",
+              color: "secondary.main",
+              fontWeight: 600,
+            }}
+          />
+          <Chip
+            label={`${summary.examCount} Exam slots`}
+            size="medium"
+            sx={{
+              backgroundColor: "#f0f0f0ff",
+              fontWeight: 600,
+            }}
+          />
+        </Stack>
+      </Stack>
+
+      <Panel disableDivider sx={{ width: '100%', mb: 2, p: 0, overflow: 'hidden' }}>
         <EnhancedTableToolbar
           numSelected={selected.length}
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
+          onAddVenue={() => setAddOpen(true)}
+          onDeleteSelected={() => bulkDeleteMutation.mutate([...selected])}
+          deleteLoading={bulkDeleteMutation.isPending}
         />
+        <Divider />
 
         <TableContainer>
           <Table sx={{ minWidth: 750 }} size="medium">
@@ -421,9 +511,14 @@ export const AdminVenues: React.FC = () => {
                       </TableCell>
 
                       <TableCell id={labelId} component="th" scope="row" padding="none">
-                        <Link to={`/venues/${row.id}`}>
-                          <MUILink sx={{ cursor: 'pointer' }}>{row.name}</MUILink>
-                        </Link>
+                        <MUILink
+                          component={Link}
+                          to={`/admin/venues/${encodeURIComponent(row.id)}`}
+                          sx={{ cursor: 'pointer', fontWeight: 600 }}
+                          underline="hover"
+                        >
+                          {row.name}
+                        </MUILink>
                       </TableCell>
 
                       <TableCell align="right">{row.capacity}</TableCell>
@@ -501,6 +596,7 @@ export const AdminVenues: React.FC = () => {
           </Table>
         </TableContainer>
 
+        <Divider />
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
@@ -513,7 +609,61 @@ export const AdminVenues: React.FC = () => {
             setPage(0);
           }}
         />
-      </Paper>
+      </Panel>
+      <AddVenueDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSuccess={(name) => {
+          setSuccessMessage(`${name} added successfully!`);
+          setSuccessOpen(true);
+          queryClient.invalidateQueries({ queryKey: ['venues'] });
+          setAddOpen(false);
+        }}
+      />
+      <Snackbar
+        open={successOpen}
+        autoHideDuration={3000}
+        onClose={() => setSuccessOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSuccessOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: '#d4edda',
+            color: '#155724',
+            border: '1px solid #155724',
+            borderRadius: '50px',
+            fontWeight: 500,
+          }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={Boolean(errorMessage)}
+        autoHideDuration={4000}
+        onClose={() => setErrorMessage(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={() => setErrorMessage(null)} variant="filled">
+          {errorMessage}
+        </Alert>
+      </Snackbar>
+      <Fab
+        color="primary"
+        onClick={() => setAddOpen(true)}
+        sx={{
+          position: 'fixed',
+          bottom: 32,
+          right: 32,
+          boxShadow: 4,
+        }}
+        aria-label="Add venue"
+      >
+        <AddLocationAltIcon />
+      </Fab>
     </Box>
   );
 };

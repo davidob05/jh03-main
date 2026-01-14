@@ -1,7 +1,6 @@
 from django import forms
 from django.contrib import admin
 
-
 from .models import (
     Exam,
     Venue,
@@ -9,11 +8,19 @@ from .models import (
     ExamVenue,
     StudentExam,
     Provisions,
-    UploadLog,
     ProvisionType,
     ExamVenueProvisionType,
+    UploadLog,
+    Notification,
+    Announcement,
+    Invigilator,
+    InvigilatorQualification,
+    InvigilatorRestriction,
+    InvigilatorAvailability,
+    InvigilatorAssignment,
+    InvigilatorRestrictionType,
+    InvigilatorQualificationChoices,
 )
-
 
 class VenueAdminForm(forms.ModelForm):
     provision_capabilities = forms.MultipleChoiceField(
@@ -95,7 +102,83 @@ class ProvisionsAdmin(admin.ModelAdmin):
     list_filter = ("exam",)
 
 
+@admin.register(Invigilator)
+class InvigilatorAdmin(admin.ModelAdmin):
+    list_display = (
+        "preferred_name",
+        "full_name",
+        "university_email",
+        "contracted_hours",
+        "resigned",
+    )
+    list_filter = ("resigned",)
+    search_fields = (
+        "preferred_name",
+        "full_name",
+        "university_email",
+        "personal_email",
+    )
+
+
+@admin.register(InvigilatorQualification)
+class InvigilatorQualificationAdmin(admin.ModelAdmin):
+    list_display = ("invigilator", "qualification")
+    list_filter = ("qualification",)
+    search_fields = ("invigilator__preferred_name", "invigilator__full_name")
+
+
+@admin.register(InvigilatorRestriction)
+class InvigilatorRestrictionAdmin(admin.ModelAdmin):
+    list_display = ("invigilator", "diet")
+    list_filter = ("diet",)
+    search_fields = (
+        "invigilator__preferred_name",
+        "invigilator__full_name",
+        "notes",
+    )
+
+
+@admin.register(InvigilatorAvailability)
+class InvigilatorAvailabilityAdmin(admin.ModelAdmin):
+    list_display = ("invigilator", "date", "slot", "available")
+    list_filter = ("date", "slot", "available")
+    search_fields = ("invigilator__preferred_name", "invigilator__full_name")
+
+
+@admin.register(InvigilatorAssignment)
+class InvigilatorAssignmentAdmin(admin.ModelAdmin):
+    list_display = (
+        "invigilator",
+        "exam_venue",
+        "role",
+        "assigned_start",
+        "assigned_end",
+        "cancel",
+    )
+    list_filter = ("role", "cancel")
+    search_fields = (
+        "invigilator__preferred_name",
+        "invigilator__full_name",
+        "exam_venue__exam__exam_name",
+    )
+
+
 @admin.register(UploadLog)
 class UploadLogAdmin(admin.ModelAdmin):
     list_display = ("file_name", "uploaded_by", "uploaded_at", "records_created", "records_updated")
     ordering = ("-uploaded_at",)
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("type", "message", "timestamp")
+    list_filter = ("type",)
+    search_fields = ("message",)
+
+
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = ("title", "audience", "is_active", "priority", "published_at", "expires_at")
+    list_filter = ("audience", "is_active")
+    search_fields = ("title", "body")
+    ordering = ("-priority", "-published_at")

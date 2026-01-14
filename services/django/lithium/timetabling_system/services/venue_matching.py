@@ -86,6 +86,10 @@ def attach_placeholders_to_venue(venue: Venue) -> None:
     placeholders = ExamVenue.objects.select_related("exam").filter(venue__isnull=True)
     for ev in placeholders:
         required_caps = ev.provision_capabilities or []
+        # Skip placeholders that have no specific provision requirements to avoid
+        # mass-assigning every unallocated exam to the most recently edited venue.
+        if not required_caps:
+            continue
         if not venue_supports_caps(venue, required_caps):
             continue
         if ExamVenueProvisionType.ACCESSIBLE_HALL in required_caps and not venue.is_accessible:

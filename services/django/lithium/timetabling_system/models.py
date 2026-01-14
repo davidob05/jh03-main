@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from django.utils import timezone
 
 
 # ---------- ENUM TYPES ----------
@@ -28,6 +29,7 @@ class ProvisionType(models.TextChoices):
     USE_SCRIBE = 'use_scribe', 'Use of a scribe'
     READER = 'reader', 'Reader'
     SCRIBE = 'scribe', 'Scribe'
+    VERBAL_INSTR_WRITTEN = 'verbal_instr_written', 'Verbal instructions in written format'
 
 
 class ExamVenueProvisionType(models.TextChoices):
@@ -43,9 +45,62 @@ class VenueType(models.TextChoices):
     COMPUTER_CLUSTER = 'computer_cluster', 'Computer Cluster'
     SEPARATE_ROOM = 'separate_room', 'Separate Room'
     SCHOOL_TO_SORT = 'school_to_sort', 'School To Sort'
+    KELVIN_HALL = 'kelvin_hall', 'Kelvin Hall'
+    DETACHED_DUTY = 'detached_duty', 'Detached Duty'
+    VET_SCHOOL = 'vet_school', 'Vet School'
+    SCOTTISH_EVENT_CAMPUS = 'scottish_event_campus', 'Scottish Event Campus'
+    OSCE_EXAM = 'osce_exam', 'OSCE Exam'
+    PRE_SESSIONAL_ENGLISH = 'pre_sessional_english', 'Pre-Sessional English'
+    ADMIN = 'admin', 'Admin'
+
+
+class ExamTypeChoices(models.TextChoices):
+    ON_CAMPUS = 'on_campus', 'On Campus Exam'
+    ON_CAMPUS_ONLINE = 'on_campus_online', 'On Campus Online Exam'
+
+
+class DietChoices(models.TextChoices):
+    DEC_2025 = 'DEC_2025', 'December 2025'
+    APR_MAY_2026 = 'APR_MAY_2026', 'April/May 2026'
+    AUG_2026 = 'AUG_2026', 'August 2026'
+    # Add more as needed
+
+
+class SlotChoices(models.TextChoices):
+    MORNING = 'MORNING', 'Morning (AM)'
+    AFTERNOON = 'AFTERNOON', 'Afternoon (Noon)'
+    EVENING = 'EVENING', 'Evening (PM)'
+
+
+class InvigilatorQualificationChoices(models.TextChoices):
+    SENIOR_INVIGILATOR = 'SENIOR_INVIGILATOR', 'Senior Invigilator (SI)'
+    AKT_TRAINED = 'AKT_TRAINED', 'AKT Trained'
+    CHECK_IN = 'CHECK_IN', 'Check-In'
+    # Add more qualifications as needed
+
+
+class InvigilatorRestrictionType(models.TextChoices):
+    ACCESSIBILITY_REQUIRED = "accessibility_required", "Accessibility required"
+    SEPARATE_ROOM_ONLY = "separate_room_only", "Separate room only"
+    PURPLE_CLUSTER = "purple_cluster", "Purple cluster"
+    COMPUTER_CLUSTER = "computer_cluster", "Computer cluster"
+    VET_SCHOOL = "vet_school", "Vet School"
+    SEC = "sec", "Scottish Event Campus"
+    OSCE_GOLDEN_JUBILEE = "osce_golden_jubilee", "OSCE - Golden Jubilee"
+    OSCE_WOLFSON = "osce_wolfson", "OSCE - Wolfson"
+    OSCE_QUEEN_ELIZABETH = "osce_queen_elizabeth", "OSCE - Queen Elizabeth"
+    APPROVED_EXEMPTION = "approved_exemption", "Approved exemption"
+
+
+class AccessibilityFeatures(models.TextChoices):
+    WHEELCHAIR_ACCESSIBLE = 'WHEELCHAIR_ACCESSIBLE', 'Wheelchair accessible'
+    HEARING_LOOP = 'HEARING_LOOP', 'Hearing loop'
+    ELEVATOR_ACCESS = 'ELEVATOR_ACCESS', 'Elevator access'
+    # Add more features as needed
 
 
 # ---------- MAIN TABLES ----------
+
 
 class Exam(models.Model):
     exam_id = models.AutoField(primary_key=True)
@@ -75,6 +130,8 @@ class Venue(models.Model):
         default=list,
         blank=True,
     )
+    accessibility_features = models.CharField(max_length=50, choices=AccessibilityFeatures.choices, blank=True)
+    additional_info = models.TextField(blank=True)  # e.g., "Ground floor access"
 
     def __str__(self):
         return self.venue_name
@@ -114,6 +171,7 @@ class StudentExam(models.Model):
         null=True,
         blank=True,
     )
+
     class Meta:
         unique_together = ('student', 'exam')
 
@@ -123,7 +181,6 @@ class StudentExam(models.Model):
 
 class Provisions(models.Model):
     provision_id = models.AutoField(primary_key=True)
-
     exam = models.ForeignKey(
         Exam,
         to_field="exam_id",
@@ -134,20 +191,84 @@ class Provisions(models.Model):
         to_field="student_id",
         on_delete=models.CASCADE
     )
-
     provisions = ArrayField(
         models.CharField(max_length=50, choices=ProvisionType.choices),
         default=list,
         blank=True
     )
-
+    extra_time_custom = models.CharField(max_length=100, blank=True)  # For non-standard extra time
     notes = models.CharField(max_length=200, blank=True, null=True)
 
+    class Meta:
+        verbose_name = "Provisions"
+        verbose_name_plural = "Provisions"
+
+
+# ---------- NOTIFICATIONS ----------
+
+
+class Notification(models.Model):
+    class NotificationType(models.TextChoices):
+        AVAILABILITY = "availability", "Availability"
+        CANCELLATION = "cancellation", "Cancellation"
+        SHIFT_PICKUP = "shiftPickup", "Shift pickup"
+        EXAM_CHANGE = "examChange", "Exam change"
+        VENUE_CHANGE = "venueChange", "Venue change"
+        INVIGILATOR_UPDATE = "invigilatorUpdate", "Invigilator update"
+        MAIL_MERGE = "mailMerge", "Mail merge"
+        ADMIN_MESSAGE = "adminMessage", "Admin message"
+
+    id = models.AutoField(primary_key=True)
+    type = models.CharField(max_length=30, choices=NotificationType.choices)
+    message = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    triggered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="triggered_notifications",
+    )
+
+    class Meta:
+        ordering = ["-timestamp"]
+
     def __str__(self):
-        return f"Provisions for {self.student} in {self.exam}"
+        return f"{self.get_type_display()}: {self.message[:40]}"
 
 
-class UploadLog(models.Model):  # this lets us view upload history
+class Announcement(models.Model):
+    class Audience(models.TextChoices):
+        INVIGILATOR = "invigilator", "Invigilator"
+        ALL = "all", "All users"
+
+    id = models.AutoField(primary_key=True)
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    image = models.TextField(blank=True, null=True)
+    audience = models.CharField(max_length=20, choices=Audience.choices, default=Audience.INVIGILATOR)
+    published_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    priority = models.IntegerField(default=0, help_text="Higher numbers are shown first.")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_announcements",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-priority", "-published_at"]
+
+    def __str__(self):
+        return self.title
+
+
+class UploadLog(models.Model):  # This gives a view of upload history
     file_name = models.CharField(max_length=255)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -159,18 +280,24 @@ class UploadLog(models.Model):  # this lets us view upload history
     records_created = models.IntegerField(default=0)
     records_updated = models.IntegerField(default=0)
 
-
-
     def __str__(self):
         return f"{self.file_name} by {self.uploaded_by} on {self.uploaded_at:%Y-%m-%d %H:%M}"
 
 
 class Invigilator(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invigilator_profile",
+    )
     preferred_name = models.CharField(max_length=255)
     full_name = models.CharField(max_length=255)
 
     mobile = models.CharField(max_length=30, blank=True, null=True)
     mobile_text_only = models.CharField(max_length=30, blank=True, null=True)
+    janet_txt = models.CharField(max_length=30, blank=True, null=True)
     alt_phone = models.CharField(max_length=30, blank=True, null=True)
 
     university_email = models.EmailField(blank=True, null=True)
@@ -178,10 +305,78 @@ class Invigilator(models.Model):
 
     notes = models.TextField(blank=True, null=True)
 
-    is_active = models.BooleanField(default=True)
+    contracted_hours = models.FloatField(default=0)
+    resigned = models.BooleanField(default=False)
 
     def __str__(self):
         return self.preferred_name or self.full_name
+
+
+class InvigilatorQualification(models.Model):
+    invigilator = models.ForeignKey(
+        Invigilator,
+        on_delete=models.CASCADE,
+        related_name="qualifications"
+    )
+    qualification = models.CharField(
+        max_length=50,
+        choices=InvigilatorQualificationChoices.choices
+    )
+
+    class Meta:
+        unique_together = ("invigilator", "qualification")
+
+    def __str__(self):
+        return f"{self.invigilator} - {self.get_qualification_display()}"
+
+
+class InvigilatorRestriction(models.Model):
+    invigilator = models.ForeignKey(
+        Invigilator,
+        on_delete=models.CASCADE,
+        related_name="restrictions"
+    )
+    diet = models.CharField(
+        max_length=20,
+        choices=DietChoices.choices
+    )
+    restrictions = ArrayField(
+        models.CharField(
+            max_length=50,
+            choices=InvigilatorRestrictionType.choices
+        ),
+        default=list,
+        blank=True
+    )
+
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ("invigilator", "diet")
+
+    def __str__(self):
+        return f"{self.invigilator} - {self.diet}"
+
+
+class InvigilatorAvailability(models.Model):
+    invigilator = models.ForeignKey(
+        Invigilator,
+        on_delete=models.CASCADE,
+        related_name="availabilities"
+    )
+    date = models.DateField()
+    slot = models.CharField(
+        max_length=20,
+        choices=SlotChoices.choices
+    )
+    available = models.BooleanField(default=True)  # True if available, False if cannot work
+
+    class Meta:
+        unique_together = ("invigilator", "date", "slot")
+        indexes = [models.Index(fields=["date", "slot"])]
+
+    def __str__(self):
+        return f"{self.invigilator} availability on {self.date} ({self.slot}): {'Available' if self.available else 'Unavailable'}"
 
 
 class InvigilatorAssignment(models.Model):
@@ -209,6 +404,9 @@ class InvigilatorAssignment(models.Model):
 
     assigned_start = models.DateTimeField()
     assigned_end = models.DateTimeField()
+    break_time_minutes = models.IntegerField(default=0)
+    cancel = models.BooleanField(default=False)
+    cancel_cause = models.TextField(blank=True)
 
     notes = models.TextField(blank=True, null=True)
 
@@ -218,4 +416,12 @@ class InvigilatorAssignment(models.Model):
     def __str__(self):
         return f"{self.invigilator} → {self.exam_venue}"
 
-
+    def total_hours(self):
+        """
+        Return total hours assigned, subtracting break_time_minutes.
+        """
+        if not self.assigned_start or not self.assigned_end:
+            return 0
+        delta = self.assigned_end - self.assigned_start
+        hours = delta.total_seconds() / 3600
+        return max(hours - (self.break_time_minutes or 0) / 60, 0)

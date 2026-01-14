@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from "react-router-dom";
+import { Link as RouterLink } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Typography,
@@ -17,7 +19,6 @@ import {
   Avatar,
   ListItemAvatar,
   Stack,
-  Button,
   FormControl,
   InputLabel,
   Select,
@@ -28,10 +29,11 @@ import {
   Tooltip,
   InputBase,
   Checkbox,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Fab,
+  Snackbar,
+  Alert,
+  IconButton,
+  Link as MUILink,
 } from '@mui/material';
 import {
   ViewList,
@@ -41,12 +43,14 @@ import {
   Download,
   Notifications,
   PersonAddAlt1,
-  PersonRemove,
   Search,
   ArrowUpward,
   ArrowDownward,
   ArrowBack,
   ArrowForward,
+  Clear,
+  Done,
+  Delete,
 } from '@mui/icons-material';
 import {
   StaticDatePicker,
@@ -54,27 +58,72 @@ import {
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs, { Dayjs } from 'dayjs';
-import { Link as RouterLink } from 'react-router-dom';
-import { Link as MUILink } from '@mui/material';
 import { InvigilatorAvailabilityModal } from "../../components/admin/InvigilatorAvailabilityModal";
+import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialog';
+import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
+import { NotifyDialog } from '../../components/admin/NotifyDialog';
+import { apiBaseUrl, apiFetch } from '../../utils/api';
+import { PillButton } from "../../components/PillButton";
+import { Panel } from "../../components/Panel";
 
 interface Invigilator {
   id: number;
-  preferred_name?: string | null;
-  full_name?: string | null;
-  email?: string | null;
-  availableDates?: string[]; // e.g. ['2025-06-15', '2025-06-20']
-  availableSlots?: string[]; // e.g. ['2025-06-15T09:00', '2025-06-20T14:00']
+  preferred_name: string | null;
+  full_name: string | null;
+  mobile: string | null;
+  mobile_text_only: string | null;
+  janet_txt: string | null;
+  alt_phone: string | null;
+  university_email: string | null;
+  personal_email: string | null;
+  notes: string | null;
+  resigned: boolean;
+  availableDates?: string[]; // Optional legacy shape
+  availableSlots?: string[]; // Optional legacy shape
+  availabilities?: { date: string; slot: string; available: boolean }[]; // Newer shape from backend
+  assignments?: InvigilatorAssignment[];
 }
+
+interface InvigilatorAssignment {
+  id: number;
+  invigilator: number;
+  invigilator_name?: string | null;
+  exam_venue: number;
+  exam_name?: string | null;
+  venue_name?: string | null;
+  exam_start?: string | null;
+  exam_length?: number | null;
+  role?: string | null;
+  assigned_start: string;
+  assigned_end: string;
+  notes?: string | null;
+  break_time_minutes?: number | null;
+}
+
+const fetchInvigilators = async (): Promise<Invigilator[]> => {
+  const response = await apiFetch(`${apiBaseUrl}/invigilators/`);
+  if (!response.ok) throw new Error('Unable to load invigilators');
+  return response.json();
+};
 
 type ViewMode = 'list' | 'grid' | 'calendar';
 type SortField = 'firstName' | 'lastName';
 type SortOrder = 'asc' | 'desc';
+type NotifyMethod = 'email' | 'sms' | 'call';
 
 export const AdminInvigilators: React.FC = () => {
+  const { data: invigilatorsData = [], isLoading, isError, error } = useQuery<Invigilator[], Error>({ queryKey: ['invigilators'], queryFn: fetchInvigilators });
   const [invigilators, setInvigilators] = useState<Invigilator[]>([]);
   const [filtered, setFiltered] = useState<Invigilator[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // Add Invigilator Dialog state
+  const [addOpen, setAddOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // Delete Invigilator Dialog state
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = (searchParams.get("view") as ViewMode) || "grid";
@@ -107,6 +156,14 @@ export const AdminInvigilators: React.FC = () => {
 
   // Bulk action state
   const [bulkAction, setBulkAction] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+
+  // Sync fetched data to state
+  useEffect(() => {
+    setInvigilators(invigilatorsData);
+    setFiltered(invigilatorsData);
+  }, [invigilatorsData]);
 
   // Handle view mode change
   const handleViewChange = (event: React.MouseEvent<HTMLElement>, value: ViewMode) => {
@@ -129,42 +186,6 @@ export const AdminInvigilators: React.FC = () => {
     return { main: i.preferred_name || i.full_name || `Invigilator #${i.id}`, sub: '' };
   };
 
-  // Fake data for demonstration purposes
-  useEffect(() => {
-    const fake: Invigilator[] = [
-      { id: 1, preferred_name: 'Alex', full_name: 'Alexandra Chen', email: 'a.chen@university.edu', availableDates: ['2025-11-15', '2025-11-20'], availableSlots: ['2025-11-15T09:00','2025-11-15T14;00' , '2025-11-20T14:00'] },
-      { id: 2, preferred_name: 'Ben', full_name: 'Benjamin Okoro', email: 'b.okoro@university.edu', availableDates: ['2025-11-16'],  availableSlots: ['2025-11-16T10:00'] },
-      { id: 3, preferred_name: 'Maria', full_name: 'Maria Garcia', email: 'm.garcia@university.edu', availableDates: ['2025-11-15', '2025-11-18', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-18T13:00', '2025-11-20T14:00'] },
-      { id: 4, preferred_name: 'Sam', full_name: 'Samantha Patel', email: 's.patel@university.edu',  availableDates: ['2025-11-19'], availableSlots: ['2025-11-19T11:00'] },
-      { id: 5, preferred_name: 'Toby', full_name: 'Tobias Müller', email: 't.muller@university.edu', availableDates: ['2025-11-15', '2025-11-17'], availableSlots: ['2025-11-15T09:00', '2025-11-17T12:00'] },
-      { id: 6, preferred_name: 'Lily', full_name: 'Lily Thompson', email: 'l.thompson@university.edu', availableDates: ['2025-11-20'], availableSlots: ['2025-11-20T14:00'] },
-      { id: 7, preferred_name: 'Raj', full_name: 'Rajesh Kumar', email: 'r.kumar@university.edu', availableDates: ['2025-11-18'], availableSlots: ['2025-11-18T13:00'] },
-      { id: 8, preferred_name: 'Emma', full_name: 'Emma Johansson', email: 'e.johansson@university.edu', availableDates: ['2025-11-16', '2025-11-19'], availableSlots: ['2025-11-16T10:00', '2025-11-19T11:00'] },
-      { id: 9, preferred_name: 'Omar', full_name: 'Omar Al-Sayed', email: 'o.sayed@university.edu', availableDates: ['2025-11-17'], availableSlots: ['2025-11-17T12:00'] },
-      { id: 10, preferred_name: 'Grace', full_name: 'Grace Kim', email: 'g.kim@university.edu', availableDates: ['2025-11-15', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-20T14:00'] },
-      { id: 11, preferred_name: 'Noah', full_name: 'Noah Williams', email: 'n.williams@university.edu', availableDates: ['2025-11-16'], availableSlots: ['2025-11-16T10:00'] },
-      { id: 12, preferred_name: 'Zoe', full_name: 'Zoe Zhang', email: 'z.zhang@university.edu',  availableDates: ['2025-11-18'], availableSlots: ['2025-11-18T13:00'] },
-      { id: 13, preferred_name: 'Alex', full_name: 'Alexandra Chen', email: 'a.chen@university.edu', availableDates: ['2025-11-15', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-20T16:00'] },
-      { id: 14, preferred_name: 'Ben', full_name: 'Benjamin Okoro', email: 'b.okoro@university.edu', availableDates: ['2025-11-16'],  availableSlots: ['2025-11-16T10:00'] },
-      { id: 15, preferred_name: 'Maria', full_name: 'Maria Garcia', email: 'm.garcia@university.edu', availableDates: ['2025-11-15', '2025-11-18', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-18T16:00', '2025-11-20T14:00'] },
-      { id: 16, preferred_name: 'Sam', full_name: 'Samantha Patel', email: 's.patel@university.edu', availableDates: ['2025-11-19'], availableSlots: ['2025-11-19T11:00'] },
-      { id: 17, preferred_name: 'Toby', full_name: 'Tobias Müller', email: 't.muller@university.edu', availableDates: ['2025-11-15', '2025-11-17'], availableSlots: ['2025-11-15T09:00', '2025-11-17T16:00'] },
-      { id: 18, preferred_name: 'Lily', full_name: 'Lily Thompson', email: 'l.thompson@university.edu', availableDates: ['2025-11-20'], availableSlots: ['2025-11-20T14:00'] },
-      { id: 19, preferred_name: 'Raj', full_name: 'Rajesh Kumar', email: 'r.kumar@university.edu', availableDates: ['2025-11-18'], availableSlots: ['2025-11-18T13:00'] },
-      { id: 20, preferred_name: 'Emma', full_name: 'Emma Johansson', email: 'e.johansson@university.edu', availableDates: ['2025-11-16', '2025-11-19'], availableSlots: ['2025-11-16T10:00', '2025-11-19T11:00'] },
-      { id: 21, preferred_name: 'Omar', full_name: 'Omar Al-Sayed', email: 'o.sayed@university.edu', availableDates: ['2025-11-17'], availableSlots: ['2025-11-17T12:00'] },
-      { id: 22, preferred_name: 'Grace', full_name: 'Grace Kim', email: 'g.kim@university.edu', availableDates: ['2025-11-15', '2025-11-20'], availableSlots: ['2025-11-15T09:00', '2025-11-20T14:00'] },
-      { id: 23, preferred_name: 'Noah', full_name: 'Noah Williams', email: 'n.williams@university.edu', availableDates: ['2025-11-16'], availableSlots: ['2025-11-16T10:00'] },
-      { id: 24, preferred_name: 'Zoe', full_name: 'Zoe Zhang', email: 'z.zhang@university.edu', availableDates: ['2025-11-18'], availableSlots: ['2025-11-18T13:00'] },
-    ];
-
-    setTimeout(() => {
-      setInvigilators(fake);
-      setFiltered(fake);
-      setLoading(false);
-    }, 500);
-  }, []);
-
   // Filtering logic
   useEffect(() => {
     let result = invigilators;
@@ -178,7 +199,7 @@ export const AdminInvigilators: React.FC = () => {
     if (lastLetter !== 'All') {
       result = result.filter(i => {
         const parts = (i.full_name || '').split(' ');
-        const last = parts[parts.length - 1];
+        const last = parts[parts.length - 1] || '';
         return last.charAt(0).toUpperCase() === lastLetter;
       });
     }
@@ -187,8 +208,8 @@ export const AdminInvigilators: React.FC = () => {
     if (searchQuery.trim() !== '') {
       const query = searchQuery.trim().toLowerCase();
       result = result.filter(i => {
-        const preferred = i.preferred_name?.toLowerCase() || '';
-        const full = i.full_name?.toLowerCase() || '';
+        const preferred = (i.preferred_name || '').toLowerCase();
+        const full = (i.full_name || '').toLowerCase();
         const first = full.split(' ')[0] || '';
         const last = full.split(' ').slice(-1)[0] || '';
         return preferred.includes(query) || first.includes(query) || last.includes(query);
@@ -206,9 +227,9 @@ export const AdminInvigilators: React.FC = () => {
   const sortInvigilators = (data: Invigilator[]) => {
     return [...data].sort((a, b) => {
       const getName = (i: Invigilator) => {
-        if (sortField === 'firstName') return (i.preferred_name || i.full_name || '').split(' ')[0].toUpperCase();
+        if (sortField === 'firstName') return ((i.preferred_name || i.full_name || '').split(' ')[0] || '').toUpperCase();
         const parts = (i.full_name || '').split(' ');
-        return parts[parts.length - 1].toUpperCase();
+        return (parts[parts.length - 1] || '').toUpperCase();
       };
 
       const nameA = getName(a);
@@ -219,6 +240,40 @@ export const AdminInvigilators: React.FC = () => {
       return 0;
     });
   };
+
+  const queryClient = useQueryClient();
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilators/bulk-delete/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Bulk delete failed");
+      }
+      return true;
+    },
+    onSuccess: async (_data, ids) => {
+      const count = ids?.length ?? 0;
+      setSuccessMessage(
+        count === 1
+          ? "Invigilator account deleted!"
+          : `${count} invigilator accounts deleted!`
+      );
+      setSuccessOpen(true);
+      setSelected([]);
+      setBulkAction("");
+      setDeleteOpen(false);
+      setDeleteError(null);
+      await queryClient.invalidateQueries({ queryKey: ["invigilators"] });
+    },
+    onError: (err: any) => {
+      setDeleteError(err?.message || "Delete failed");
+    },
+  });
 
   // Find invigilators available on a specific date
   const getAvailableOnDate = (date: Dayjs) => {
@@ -260,12 +315,124 @@ export const AdminInvigilators: React.FC = () => {
       .slice(0, 2);
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const selectedCount = selected.length;
+  const selectionLabel = (singular: string, plural: string) => selectedCount === 1 ? singular : plural;
+  const selectedRecipients = React.useMemo(
+    () =>
+      invigilators
+        .filter((inv) => selected.includes(inv.id))
+        .map((inv) => ({
+          id: inv.id,
+          name: displayName(inv),
+          emails: [inv.university_email, inv.personal_email].filter(
+            (email): email is string => Boolean(email)
+          ),
+        })),
+    [invigilators, selected]
+  );
 
-  if (loading) {
+  const escapeCsv = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined) return "";
+    const str = String(value);
+    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  };
+
+  const exportSelected = async (ids: number[]) => {
+    if (!ids.length || exporting) return;
+    setExporting(true);
+    try {
+      const invigilatorPayloads = await Promise.all(
+        ids.map(async (id) => {
+          const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`);
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `Failed to fetch timetable for invigilator #${id}`);
+          }
+          return (await response.json()) as Invigilator;
+        })
+      );
+
+      invigilatorPayloads.forEach((invigilator) => {
+        const assignments = invigilator.assignments || [];
+        const headers = [
+          "assignment_id",
+          "invigilator_id",
+          "invigilator_name",
+          "exam_name",
+          "venue_name",
+          "exam_venue_id",
+          "exam_start",
+          "exam_length",
+          "assigned_start",
+          "assigned_end",
+          "role",
+          "break_time_minutes",
+          "notes",
+        ];
+
+        const rows = assignments.map((assignment) =>
+          [
+            assignment.id,
+            invigilator.id,
+            invigilator.preferred_name || invigilator.full_name || `Invigilator ${invigilator.id}`,
+            assignment.exam_name || "",
+            assignment.venue_name || "",
+            assignment.exam_venue,
+            assignment.exam_start || "",
+            assignment.exam_length ?? "",
+            assignment.assigned_start,
+            assignment.assigned_end,
+            assignment.role || "",
+            assignment.break_time_minutes ?? "",
+            assignment.notes || "",
+          ]
+            .map(escapeCsv)
+            .join(",")
+        );
+
+        const csv = [headers.map(escapeCsv).join(","), ...rows].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const safeName = (invigilator.preferred_name || invigilator.full_name || `invigilator-${invigilator.id}`)
+          .replace(/[^a-z0-9]+/gi, "_")
+          .replace(/^_+|_+$/g, "")
+          .toLowerCase();
+        link.href = url;
+        link.download = `${safeName || "invigilator"}_timetable.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      });
+
+      setSuccessMessage(
+        ids.length === 1 ? "Timetable downloaded!" : `${ids.length} timetables downloaded!`
+      );
+      setSuccessOpen(true);
+      setBulkAction("");
+    } catch (err: any) {
+      alert(err?.message || "Failed to export timetables");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  if (isLoading) {
     return (
       <Box sx={{ p: 6, textAlign: 'center' }}>
         <CircularProgress size={60} />
         <Typography sx={{ mt: 2 }}>Loading invigilators…</Typography>
+      </Box>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Box sx={{ p: 6, textAlign: 'center' }}>
+        <Typography color="error" variant="h6">
+          {error?.message || 'Failed to load invigilators'}
+        </Typography>
       </Box>
     );
   }
@@ -275,7 +442,10 @@ export const AdminInvigilators: React.FC = () => {
       <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
         {/* Header */}
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h4">Invigilators</Typography>
+          <Stack direction="column">
+            <Typography variant="h4" fontWeight={700}>Invigilators</Typography>
+            <Typography variant="body2" color="text.secondary">Browse and manage invigilator details, availability, and scheduling.</Typography>
+          </Stack>
           <ToggleButtonGroup value={viewMode} exclusive onChange={handleViewChange} color="primary">
             <ToggleButton value="grid"><GridView /></ToggleButton>
             <ToggleButton value="list"><ViewList /></ToggleButton>
@@ -305,7 +475,7 @@ export const AdminInvigilators: React.FC = () => {
           </Box>
 
           {/* Sort by First Name */}
-          <Button
+          <PillButton
             variant="outlined"
             size="medium"
             endIcon={
@@ -324,15 +494,13 @@ export const AdminInvigilators: React.FC = () => {
             sx={{
               minWidth: 160,
               justifyContent: 'space-between',
-              textTransform: 'none',
-              fontWeight: 500,
             }}
           >
-            FIRST NAME
-          </Button>
+            First Name
+          </PillButton>
 
           {/* Sort by Last Name */}
-          <Button
+          <PillButton
             variant="outlined"
             size="medium"
             endIcon={
@@ -351,12 +519,10 @@ export const AdminInvigilators: React.FC = () => {
             sx={{
               minWidth: 160,
               justifyContent: 'space-between',
-              textTransform: 'none',
-              fontWeight: 500,
             }}
           >
-            LAST NAME
-          </Button>
+            Last Name
+          </PillButton>
         </Stack>
 
         {/* A-Z Filters */}
@@ -393,7 +559,7 @@ export const AdminInvigilators: React.FC = () => {
               m: 3,
               borderRadius: 3,
               overflow: 'hidden',
-              display: 'flex018',
+              display: 'flex',
               flexDirection: 'column',
               height: 'calc(100vh - 165px)',
             }}
@@ -442,9 +608,14 @@ export const AdminInvigilators: React.FC = () => {
                       }}
                       slotProps={{
                         day: (ownerState) => ({
-                          sx: invigilators.some((i) =>
-                            i.availableDates?.includes((ownerState.day as Dayjs).format('YYYY-MM-DD'))
-                          )
+                          sx: invigilators.some((i) => {
+                            const dateStr = (ownerState.day as Dayjs).format('YYYY-MM-DD');
+                            const hasLegacyDate = i.availableDates?.includes(dateStr);
+                            const hasAvailability = i.availabilities?.some(
+                              (a) => a.available && a.date === dateStr
+                            );
+                            return hasLegacyDate || hasAvailability;
+                          })
                             ? {
                                 '&::after': {
                                   content: '""',
@@ -478,26 +649,26 @@ export const AdminInvigilators: React.FC = () => {
 
             {/* Navigation */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-              <Button
+              <PillButton
                 variant="contained"
                 startIcon={<ArrowBack />}
                 onClick={() => setCurrentMonthIndex(prev => prev - 1)}
                 size="large"
               >
                 Previous
-              </Button>
-              <Button
+              </PillButton>
+              <PillButton
                 variant="contained"
                 endIcon={<ArrowForward />}
                 onClick={() => setCurrentMonthIndex(prev => prev + 1)}
                 size="large"
               >
                 Next
-              </Button>
+              </PillButton>
             </Box>
           </Paper>
         ) : viewMode === 'list' ? (
-          <Paper>
+          <Panel disableDivider sx={{ p: 0, mb: 0, overflow: 'hidden' }}>
             <List>
               {paginated.map(i => (
                 <ListItem key={i.id} divider sx={{ pl: 1 }}>
@@ -532,25 +703,30 @@ export const AdminInvigilators: React.FC = () => {
                         )}
                       </Box>
                     }
-                    secondary={i.email}
+                    secondary={i.university_email || i.personal_email || 'No email'}
                   />
                 </ListItem>
               ))}
             </List>
-          </Paper>
+          </Panel>
         ) : (
           <Grid container spacing={3}>
             {paginated.map(i => (
               // @ts-ignore
               <Grid component="div" item xs={12} sm={6} md={4} lg={3} key={i.id}>
-                <Card
+                <Panel
+                  disableDivider
                   sx={{
-                    width: 200,
+                    width: '100%',
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
-                    '&:hover': { boxShadow: 8 },
+                    p: 0,
+                    mb: 0,
+                    height: '100%',
+                    cursor: "pointer",
                     transition: '0.2s',
+                    '&:hover': { transform: "translateY(-6px)", boxShadow: 8 },
                   }}
                 >
                   {/* Checkbox in top-right */}
@@ -566,7 +742,7 @@ export const AdminInvigilators: React.FC = () => {
                       p: 0.5
                     }}
                   />
-                  <CardContent sx={{ textAlign: 'center', pt: 4 }}>
+                  <Box sx={{ textAlign: 'center', pt: 4, px: 2, pb: 2 }}>
                     <Avatar sx={{ width: 80, height: 80, mx: 'auto', bgcolor: 'primary.main', fontSize: '2rem' }}>
                       {getInitials(i)}
                     </Avatar>
@@ -606,10 +782,10 @@ export const AdminInvigilators: React.FC = () => {
                     })()}
 
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontFamily: theme => theme.typography.fontFamily}}>
-                      {i.email || 'No email'}
+                      {i.university_email || i.personal_email || 'No email'}
                     </Typography>
-                  </CardContent>
-                </Card>
+                  </Box>
+                </Panel>
               </Grid>
             ))}
           </Grid>
@@ -626,16 +802,21 @@ export const AdminInvigilators: React.FC = () => {
         {/* Pagination & Bulk Actions */}
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3} mt={4}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Button variant="outlined" startIcon={selected.length === filtered.length ? (<PersonRemove />) : (<PersonAddAlt1 />)} onClick={toggleSelectAll}>
+            <PillButton
+              variant="outlined"
+              startIcon={selected.length === filtered.length ? (<Clear />) : (<Done />)}
+              onClick={toggleSelectAll}
+            >
               {selected.length === filtered.length
                 ? "Deselect all invigilators"
                 : `Select all ${filtered.length} invigilators`}
-            </Button>
+            </PillButton>
             <FormControl size="small" sx={{ minWidth: 200 }}>
               <InputLabel>With all selected users...</InputLabel>
               <Select
                 label="With all selected users..."
                 value={bulkAction}
+                disabled={selected.length === 0}
                 onChange={(e) => setBulkAction(e.target.value)}
               >
                 <MenuItem value="">
@@ -643,7 +824,7 @@ export const AdminInvigilators: React.FC = () => {
                 </MenuItem>
                 <MenuItem value="export">
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Download fontSize="small" /> Export timetable
+                    <Download fontSize="small" /> {selectionLabel("Export timetable", "Export timetables")}
                   </Stack>
                 </MenuItem>
                 <MenuItem value="notify">
@@ -651,26 +832,70 @@ export const AdminInvigilators: React.FC = () => {
                     <Notifications fontSize="small" /> Send notification
                   </Stack>
                 </MenuItem>
+                <MenuItem value="delete">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Delete fontSize="small" /> {selectionLabel("Delete account", "Delete accounts")}
+                  </Stack>
+                </MenuItem>
               </Select>
             </FormControl>
 
-            {/* Dynamic Icon */}
+            {/* Dynamic Action Icon */}
             <Tooltip
               title={
-                bulkAction === "export"
-                  ? "This downloads the selected invigilator's timetable(s)"
+                selected.length === 0
+                  ? "Select at least one invigilator"
+                  : bulkAction === "export"
+                  ? selectionLabel(
+                      "Download the selected invigilator's timetable",
+                      "Download the selected invigilators' timetables"
+                    )
                   : bulkAction === "notify"
-                  ? "Send a notification to the selected invigilator(s)"
+                  ? selectionLabel(
+                      "Send a notification to the selected invigilator",
+                      "Send a notification to the selected invigilators"
+                    )
+                  : bulkAction === "delete"
+                  ? selectionLabel(
+                      "Delete the selected invigilator's account",
+                      "Delete the selected invigilators' accounts"
+                    )
                   : "Choose an action"
               }
             >
-              {bulkAction === "export" ? (
-                <Download color="action" />
-              ) : bulkAction === "notify" ? (
-                <Notifications color="action" />
-              ) : (
-                <Pending color="disabled" /> // neutral icon before selection
-              )}
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={selected.length === 0 || !bulkAction || exporting}
+                  onClick={() => {
+                    if (bulkAction === "delete") {
+                      setDeleteError?.(null);
+                      setDeleteOpen(true);
+                      return;
+                    }
+
+                    if (bulkAction === "export") {
+                      exportSelected(selected);
+                      return;
+                    }
+
+                    if (bulkAction === "notify") {
+                      setNotifyOpen(true);
+                      return;
+                    }
+                  }}
+                >
+                  {bulkAction === "export" ? (
+                    <Download color="action" />
+                  ) : bulkAction === "notify" ? (
+                    <Notifications color="action" />
+                  ) : bulkAction === "delete" ? (
+                    <Delete color="error" />
+                  ) : (
+                    <Pending color="disabled" />
+                  )}
+                </IconButton>
+              </span>
             </Tooltip>
           </Stack>
 
@@ -679,15 +904,116 @@ export const AdminInvigilators: React.FC = () => {
 
         {/* Show All Button */}
         {filtered.length > itemsPerPage && (
-          <Box sx={{ textAlign: 'center', mt: 2 }}>
-            <Button
-              variant="text"
-              onClick={() => setShowAll(prev => !prev)}
+          <Box sx={{ textAlign: 'center', mt: 2, display: 'flex', justifyContent: 'center', gap: 1.5 }}>
+            <PillButton
+              variant="outlined"
+              onClick={() => setShowAll(false)}
+              disabled={!showAll}
             >
-              {showAll ? `Show less` : `Show all ${filtered.length} invigilators`}
-            </Button>
+              Show less
+            </PillButton>
+            <PillButton
+              variant="contained"
+              onClick={() => setShowAll(true)}
+              disabled={showAll}
+            >
+              {`Show all ${filtered.length}`}
+            </PillButton>
           </Box>
         )}
+
+        <Tooltip title="Add a new invigilator">
+          <Fab
+            color="primary"
+            size="large"
+            onClick={() => setAddOpen(true)}
+            sx={{
+              position: 'fixed',
+              bottom: 32,
+              right: 32,
+              boxShadow: 3,
+            }}
+          >
+            <PersonAddAlt1 fontSize="medium" />
+          </Fab>
+        </Tooltip>
+
+        {/* Add Invigilator Dialog */}
+        <AddInvigilatorDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onSuccess={(name) => {
+            setSuccessMessage(`${name} added successfully!`);
+            setSuccessOpen(true);
+          }}
+        />
+
+        <NotifyDialog
+          open={notifyOpen}
+          recipients={selectedRecipients}
+          onClose={() => {
+            setNotifyOpen(false);
+            setBulkAction("");
+          }}
+          onSent={(count) => {
+            setSuccessMessage(
+              count === 1
+                ? "Mail merge ready for 1 invigilator."
+                : `Mail merge ready for ${count} invigilators.`
+            );
+            setSuccessOpen(true);
+            setNotifyOpen(false);
+            setBulkAction("");
+          }}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          open={deleteOpen}
+          title="Delete invigilator accounts?"
+          description={
+            <>
+              You are about to permanently delete <strong>{selected.length}</strong>{" "}
+              invigilator's {selectionLabel("account", "accounts")}.
+              {deleteError ? (
+                <Typography sx={{ mt: 2 }} color="error">
+                  {deleteError}
+                </Typography>
+              ) : null}
+            </>
+          }
+          confirmText={`Delete ${selected.length}`}
+          loading={bulkDeleteMutation.isPending}
+          onClose={() => {
+            if (!bulkDeleteMutation.isPending) {
+              setDeleteOpen(false);
+              setDeleteError(null);
+            }
+          }}
+          onConfirm={() => bulkDeleteMutation.mutate(selected)}
+        />
+
+        <Snackbar
+          open={successOpen}
+          autoHideDuration={3000}
+          onClose={() => setSuccessOpen(false)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={() => setSuccessOpen(false)}
+            severity="success"
+            variant="filled"
+            sx={{
+              backgroundColor: '#d4edda',
+              color: '#155724',
+              border: '1px solid #155724',
+              borderRadius: '50px',
+              fontWeight: 500,
+            }}
+          >
+            {successMessage}
+          </Alert>
+        </Snackbar>
       </Box>
     </LocalizationProvider>
   );

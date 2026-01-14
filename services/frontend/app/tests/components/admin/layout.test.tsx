@@ -42,11 +42,8 @@ describe("Components - AdminLayout", () => {
     expect(screen.getByText("Venues").closest("a")).toHaveAttribute("href", "/admin/venues");
     expect(screen.getByText("Calendar").closest("a")).toHaveAttribute("href", "/admin/calendar");
     expect(screen.getByText("Invigilators").closest("a")).toHaveAttribute("href", "/admin/invigilators");
-    const profileLinks = screen.getAllByRole("link").filter(
-      link => link.getAttribute("href") ==="/admin/profile"
-    );
-    expect(profileLinks).toHaveLength(1);
-    expect(profileLinks[0]).toHaveAttribute("href", "/admin/profile");
+    // Avatar button is present to open the account menu.
+    expect(screen.getByLabelText(/account menu/i)).toBeInTheDocument();
   });
 
   it ("renders children in the outlet", () => {

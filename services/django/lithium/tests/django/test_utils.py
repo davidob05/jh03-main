@@ -14,6 +14,7 @@ from timetabling_system.utils.file_classifier import (
 from timetabling_system.utils.excel_parser import (
     _apply_best_header,
     _sanitize_dataframe,
+    validate_required_columns,
     parse_excel_file,
     prepare_exam_provision_df,
 )
@@ -286,6 +287,33 @@ class TestFileClassifier(TestCase):
         assert result["status"] == "ok"
         assert result["type"] == "Exam"
         assert "school" in result["columns"]
+
+    def test_validate_required_columns_for_venue(self):
+        df = pd.DataFrame({"Something": [1]})
+        assert validate_required_columns(df, "Venue") == []
+
+    def test_parse_excel_file_provisions_success(self):
+        from tempfile import NamedTemporaryFile
+
+        df = pd.DataFrame(
+            {
+                "Student ID": ["S1"],
+                "Student Name": ["Alice"],
+                "Exam Code": ["CHEM101"],
+                "School": ["Chemistry"],
+                "Exam provision data as presented to registry": ["Extra time"],
+                "Additional Information": ["Note"],
+            }
+        )
+
+        with NamedTemporaryFile(suffix=".xlsx") as tmp:
+            df.to_excel(tmp.name, index=False)
+            tmp.seek(0)
+            result = parse_excel_file(tmp)
+
+        assert result["status"] == "ok"
+        assert result["type"] == "Provisions"
+        assert result["rows"][0]["student_id"] == "S1"
 
     def test_detect_venue_with_weekday_columns(self):
         df = pd.DataFrame(
