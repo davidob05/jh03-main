@@ -42,7 +42,7 @@ Any other relevant information or context
 -
 
 ## Commits
-✅ Review the full commit list in the **Commits** tab.
+- [ ] Review the full commit list in the **Commits** tab.
 <!-- Optional: paste commit summaries if you want extra context -->
 <!-- Paste output of: git log --oneline <target-branch>..HEAD -->
 - 
