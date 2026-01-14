@@ -2,12 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
-  Chip,
   CircularProgress,
   Divider,
   Grid,
   MenuItem,
-  Paper,
   Select,
   Snackbar,
   Stack,
@@ -53,7 +51,6 @@ export const InvigilatorRestrictions: React.FC = () => {
   const queryClient = useQueryClient();
   const [selectedDiet, setSelectedDiet] = useState<string | null>(null);
   const [days, setDays] = useState<AvailabilityResponse["days"]>([]);
-  const [successOpen, setSuccessOpen] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
     open: false,
     message: "",
@@ -186,8 +183,8 @@ export const InvigilatorRestrictions: React.FC = () => {
       setSnackbar({ open: true, message: "Restrictions updated!", severity: "success" });
       queryClient.invalidateQueries({ queryKey: ["invigilator-availability"] });
     },
-    onError: (err: any) => {
-      setSnackbar({ open: true, message: err?.message || "Failed to update restrictions", severity: "error" });
+    onError: (_err: any) => {
+      setSnackbar({ open: true, message: "Failed to update restrictions", severity: "error" });
     },
   });
 
