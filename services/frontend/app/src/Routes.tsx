@@ -23,6 +23,7 @@ import { InvigilatorLayout } from "./components/invigilator/Layout";
 import { InvigilatorDashboard } from "./pages/invigilator/Dashboard";
 import { InvigilatorTimetable } from "./pages/invigilator/Timetable";
 import { InvigilatorProfile } from "./pages/invigilator/Profile";
+import { InvigilatorRestrictions } from "./pages/invigilator/Restrictions";
 import { AdminStudents } from "./pages/admin/Students";
 
 export const Routes: React.FC = () => {
@@ -67,6 +68,7 @@ export const Routes: React.FC = () => {
               <RouterRoute path="/invigilator" element={<InvigilatorLayout />}>
                 <RouterRoute index element={<InvigilatorDashboard />} /> 
                 <RouterRoute path="timetable" element={<InvigilatorTimetable />} />
+                <RouterRoute path="restrictions" element={<InvigilatorRestrictions />} />
                 <RouterRoute path="profile" element={<InvigilatorProfile />} />
               </RouterRoute>
             </RouterRoute>

@@ -6,7 +6,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
-from datetime import timedelta
+from datetime import date, timedelta
 from django.conf import settings
 from django.core.mail import EmailMessage
 from timetabling_system.models import (
@@ -20,7 +20,9 @@ from timetabling_system.models import (
     StudentExam,
     Provisions,
     Notification,
+    SlotChoices,
 )
+from timetabling_system.constants import DIET_DATE_RANGES
 from timetabling_system.services import ingest_upload_result
 from timetabling_system.services.venue_matching import venue_supports_caps
 from timetabling_system.services.upload_processor import (
@@ -617,6 +619,171 @@ class InvigilatorNotificationsView(APIView):
     def get(self, request, *args, **kwargs):
         qs = Notification.objects.order_by("-timestamp")[:20]
         return Response(NotificationSerializer(qs, many=True).data)
+
+
+class InvigilatorAvailabilityView(APIView):
+    """
+    Allow invigilators to view and update availability (restrictions) for a given diet.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes: list = []
+
+    def _get_invigilator(self, request):
+        invigilator = getattr(request.user, "invigilator_profile", None)
+        if invigilator is None:
+            invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        return invigilator
+
+    def _validate_diet(self, diet_code: str | None):
+        if not diet_code or diet_code not in DIET_DATE_RANGES:
+            raise ValidationError({"diet": "Invalid or unsupported diet."})
+        return diet_code
+
+    def _ensure_availability_rows(self, invigilator, diet_code: str):
+        start_date, end_date = DIET_DATE_RANGES[diet_code]
+        current_date = start_date
+        to_create = []
+        while current_date <= end_date:
+            for slot in SlotChoices.values:
+                to_create.append(
+                    InvigilatorAvailability(
+                        invigilator=invigilator,
+                        date=current_date,
+                        slot=slot,
+                        available=True,
+                    )
+                )
+            current_date += timedelta(days=1)
+        InvigilatorAvailability.objects.bulk_create(to_create, ignore_conflicts=True)
+
+    def _serialize_days(self, qs, start_date: date, end_date: date):
+        by_date = {}
+        for item in qs:
+            key = item.date.isoformat()
+            by_date.setdefault(key, []).append(
+                {"slot": item.slot, "available": bool(item.available)}
+            )
+
+        days = []
+        current_date = start_date
+        while current_date <= end_date:
+            key = current_date.isoformat()
+            slots = by_date.get(key, [])
+            # Ensure consistent ordering of slots
+            slots_sorted = sorted(slots, key=lambda s: SlotChoices.values.index(s["slot"]))
+            days.append({"date": key, "slots": slots_sorted})
+            current_date += timedelta(days=1)
+        return days
+
+    def get(self, request, *args, **kwargs):
+        invigilator = self._get_invigilator(request)
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        available_diets = [
+            {"code": code, "start_date": str(span[0]), "end_date": str(span[1])}
+            for code, span in DIET_DATE_RANGES.items()
+        ]
+
+        diet = request.query_params.get("diet") or (available_diets[0]["code"] if available_diets else None)
+        self._validate_diet(diet)
+
+        start_date, end_date = DIET_DATE_RANGES[diet]
+        self._ensure_availability_rows(invigilator, diet)
+
+        qs = InvigilatorAvailability.objects.filter(
+            invigilator=invigilator,
+            date__range=(start_date, end_date),
+        ).order_by("date", "slot")
+
+        return Response(
+            {
+                "diet": diet,
+                "start_date": str(start_date),
+                "end_date": str(end_date),
+                "diets": available_diets,
+                "days": self._serialize_days(qs, start_date, end_date),
+            }
+        )
+
+    def put(self, request, *args, **kwargs):
+        invigilator = self._get_invigilator(request)
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        payload = request.data or {}
+        diet = self._validate_diet(payload.get("diet"))
+        unavailable = payload.get("unavailable") or []
+
+        start_date, end_date = DIET_DATE_RANGES[diet]
+        self._ensure_availability_rows(invigilator, diet)
+
+        # Normalize and validate unavailable slots
+        unavailable_set = set()
+        for entry in unavailable:
+            try:
+                date_str = (entry.get("date") or "").strip()
+                slot = (entry.get("slot") or "").strip()
+            except AttributeError:
+                continue
+            if slot not in SlotChoices.values:
+                continue
+            try:
+                parsed_date = date.fromisoformat(date_str)
+            except Exception:
+                continue
+            if parsed_date < start_date or parsed_date > end_date:
+                continue
+            unavailable_set.add((parsed_date, slot))
+
+        qs = list(
+            InvigilatorAvailability.objects.filter(
+                invigilator=invigilator,
+                date__range=(start_date, end_date),
+            )
+        )
+
+        # Reset all to available, then apply restrictions
+        to_update = []
+        for item in qs:
+            item.available = True
+        for item in qs:
+            if (item.date, item.slot) in unavailable_set:
+                item.available = False
+            to_update.append(item)
+        InvigilatorAvailability.objects.bulk_update(to_update, ["available"])
+
+        # Prepare notification
+        inv_name = invigilator.preferred_name or invigilator.full_name or "Invigilator"
+        count_unavailable = len(unavailable_set)
+        sample = ", ".join(
+            [f"{d.isoformat()} {s}" for d, s in list(unavailable_set)[:6]]
+        )
+        if count_unavailable:
+            message = f"{inv_name} updated restrictions for {diet}: {count_unavailable} slot(s) unavailable"
+            if sample:
+                message += f" (e.g. {sample})"
+        else:
+            message = f"{inv_name} cleared restrictions for {diet} (all slots available)"
+        log_notification(Notification.NotificationType.AVAILABILITY, message, user=request.user)
+
+        refreshed_qs = InvigilatorAvailability.objects.filter(
+            invigilator=invigilator,
+            date__range=(start_date, end_date),
+        ).order_by("date", "slot")
+
+        return Response(
+            {
+                "status": "ok",
+                "diet": diet,
+                "unavailable_count": count_unavailable,
+                "start_date": str(start_date),
+                "end_date": str(end_date),
+                "days": self._serialize_days(refreshed_qs, start_date, end_date),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class InvigilatorStatsView(APIView):
