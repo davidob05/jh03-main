@@ -103,6 +103,9 @@ class ExamSerializer(serializers.ModelSerializer):
             "venues",
             "exam_venues",
         )
+        extra_kwargs = {
+            "school_contact": {"required": False, "allow_null": True, "allow_blank": True}
+        }
 
     def get_venues(self, obj):
         """Return venue names associated with an exam via ExamVenue."""
@@ -192,6 +195,7 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
             "role",
             "assigned_start",
             "assigned_end",
+            "confirmed",
             "notes",
         )
 

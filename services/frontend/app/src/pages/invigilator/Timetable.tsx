@@ -45,9 +45,9 @@ interface InvigilatorAssignment {
   role?: string | null;
   break_time_minutes?: number | null;
   notes?: string | null;
+  confirmed?: boolean | null;
+  cancel?: boolean | null;
 }
-
-const HOUR_HEIGHT = 45;
 
 const timeToMinutes = (time: string) => {
   const [h, m] = time.split(":").map(Number);
@@ -79,6 +79,7 @@ export const InvigilatorTimetable: React.FC = () => {
       }
       const data = await res.json();
       if (Array.isArray(data)) return data as InvigilatorAssignment[];
+      if (Array.isArray(data?.results)) return data.results as InvigilatorAssignment[];
       if (Array.isArray(data?.assignments)) return data.assignments as InvigilatorAssignment[];
       throw new Error("Assignments data missing");
     },
@@ -87,15 +88,26 @@ export const InvigilatorTimetable: React.FC = () => {
   const examEvents: Exam[] = useMemo(
     () =>
       (assignments || []).map((a) => {
-        const start = dayjs(a.assigned_start);
-        const end = dayjs(a.assigned_end);
+        const assignedStart = a.assigned_start ? dayjs(a.assigned_start) : null;
+        const assignedEnd = a.assigned_end ? dayjs(a.assigned_end) : null;
+
+        const fallbackStart = a.exam_start ? dayjs(a.exam_start) : null;
+        const fallbackEnd =
+          fallbackStart && a.exam_length != null
+            ? fallbackStart.add(a.exam_length, "minute")
+            : null;
+
+        const start = assignedStart && assignedStart.isValid() ? assignedStart : fallbackStart;
+        const end = assignedEnd && assignedEnd.isValid() ? assignedEnd : fallbackEnd;
         return {
           id: String(a.id),
           title: a.exam_name || "Exam",
           location: a.venue_name || "Venue TBC",
-          start: start.isValid() ? start.format("HH:mm") : "",
-          end: end.isValid() ? end.format("HH:mm") : "",
-          date: start.isValid() ? start.format("YYYY-MM-DD") : "",
+          start: start && start.isValid() ? start.format("HH:mm") : "",
+          end: end && end.isValid() ? end.format("HH:mm") : "",
+          date: start && start.isValid() ? start.format("YYYY-MM-DD") : "",
+          confirmed: Boolean(a.confirmed),
+          cancel: Boolean(a.cancel),
         };
       }),
     [assignments]
@@ -440,6 +452,7 @@ export const InvigilatorTimetable: React.FC = () => {
                       const arrival = Math.max(0, start - 30);
                       const arrivalTime = minutesToTime(arrival);
                       const totalDuration = duration + 30;
+                      const isConfirmed = event.confirmed === true;
 
                       return (
                         <Grid item xs={12} sm={6} key={event.id}>
@@ -480,7 +493,17 @@ export const InvigilatorTimetable: React.FC = () => {
                             </Stack>
 
                             <Stack spacing={1.2} justifyContent="center">
-                              <Typography variant="h5" fontWeight={800}>
+                              <Typography
+                                variant="h6"
+                                fontWeight={700}
+                                sx={{
+                                  maxWidth: 240,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                                title={event.title}
+                              >
                                 {event.title}
                               </Typography>
                               <Stack
@@ -501,16 +524,22 @@ export const InvigilatorTimetable: React.FC = () => {
                               </Stack>
                               <Divider sx={{ width: "100%", my: 0.5 }} />
                               <Stack direction="column" spacing={0.8} alignItems="flex-start">
-                                <Tooltip title="This shift is confirmed">
+                                <Tooltip
+                                  title={
+                                    isConfirmed
+                                      ? "This shift is confirmed"
+                                      : "Awaiting confirmation"
+                                  }
+                                >
                                   <Chip
                                     size="small"
-                                    label="Confirmed"
+                                    label={isConfirmed ? "Confirmed" : "Pending confirmation"}
                                     icon={<CheckIcon fontSize="small" />}
                                     sx={{
-                                      bgcolor: "#e8f5e9",
-                                      color: "#1b5e20",
+                                      bgcolor: isConfirmed ? "#e8f5e9" : "#fff4e5",
+                                      color: isConfirmed ? "#1b5e20" : "#b45309",
                                       fontWeight: 700,
-                                      "& .MuiChip-icon": { color: "#1b5e20" },
+                                      "& .MuiChip-icon": { color: isConfirmed ? "#1b5e20" : "#b45309" },
                                     }}
                                   />
                                 </Tooltip>

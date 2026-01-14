@@ -249,6 +249,13 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         if user and (user.is_staff or user.is_superuser):
             return qs.all()
         invigilator = getattr(user, "invigilator_profile", None) if user else None
+        if invigilator is None and user:
+            # Fallback: try to resolve invigilator by user link or name/email when profile is missing
+            invigilator = (
+                Invigilator.objects.filter(user=user).first()
+                or Invigilator.objects.filter(preferred_name__iexact=getattr(user, "first_name", "") or user.username).first()
+                or Invigilator.objects.filter(full_name__icontains=getattr(user, "username", "")).first()
+            )
         if invigilator is None:
             return qs.none()
         return qs.filter(invigilator=invigilator)
