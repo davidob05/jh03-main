@@ -1,4 +1,5 @@
 from rest_framework import permissions, status, viewsets
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -13,6 +14,8 @@ from timetabling_system.models import (
     ExamVenue,
     Invigilator,
     InvigilatorAssignment,
+    InvigilatorAvailability,
+    InvigilatorRestriction,
     Venue,
     Notification,
 )
@@ -463,3 +466,67 @@ class NotificationsView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class InvigilatorNotificationsView(APIView):
+    """
+    Return recent notifications (last 20) for authenticated invigilators.
+    Currently returns global notifications as the model is not scoped per-invigilator.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes: list = []  # Lightweight
+
+    def get(self, request, *args, **kwargs):
+        qs = Notification.objects.order_by("-timestamp")[:20]
+        return Response(NotificationSerializer(qs, many=True).data)
+
+
+class InvigilatorStatsView(APIView):
+    """
+    Returns stats for the currently authenticated invigilator.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes: list = []  # Lightweight endpoint
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        invigilator = getattr(user, "invigilator_profile", None)
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        now = timezone.now()
+        assignments = InvigilatorAssignment.objects.filter(invigilator=invigilator)
+        upcoming_qs = assignments.filter(assigned_start__gte=now, cancel=False)
+        cancelled_qs = assignments.filter(cancel=True)
+        next_assignment = upcoming_qs.order_by("assigned_start").first()
+
+        def _duration_hours(qs):
+            total = 0.0
+            for a in qs:
+                try:
+                    total += float(a.total_hours())
+                except Exception:
+                    continue
+            return round(total, 2)
+
+        data = {
+            "total_shifts": assignments.count(),
+            "upcoming_shifts": upcoming_qs.count(),
+            "cancelled_shifts": cancelled_qs.count(),
+            "hours_assigned": _duration_hours(assignments),
+            "hours_upcoming": _duration_hours(upcoming_qs),
+            "restrictions": InvigilatorRestriction.objects.filter(invigilator=invigilator).count(),
+            "availability_entries": InvigilatorAvailability.objects.filter(invigilator=invigilator).count(),
+            "next_assignment": None,
+        }
+        if next_assignment:
+            data["next_assignment"] = {
+                "exam_name": getattr(next_assignment.exam_venue.exam, "exam_name", None) if next_assignment.exam_venue else None,
+                "venue_name": getattr(next_assignment.exam_venue.venue, "venue_name", None) if next_assignment.exam_venue else None,
+                "start": next_assignment.assigned_start,
+                "end": next_assignment.assigned_end,
+                "role": next_assignment.role,
+            }
+        return Response(data, status=status.HTTP_200_OK)

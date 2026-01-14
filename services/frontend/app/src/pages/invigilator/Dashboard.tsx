@@ -1,310 +1,473 @@
-import React, { useState } from "react";
-import {
-  Box,
-  Grid,
-  Paper,
-  Typography,
-  Button,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  Chip,
-  Avatar,
-  ListItemIcon,
-  Stack,
-} from "@mui/material";
+import React, { useEffect, useMemo, useState } from "react";
+import { Avatar, Box, Grid, IconButton, Stack, Typography, CircularProgress } from "@mui/material";
+import { useQuery } from "@tanstack/react-query";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
-import NotificationsIcon from "@mui/icons-material/Notifications";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import AccountBoxOutlined from "@mui/icons-material/AccountBoxOutlined";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import { Panel } from "../../components/Panel";
+import { PillButton } from "../../components/PillButton";
+import { NotificationItem, NotificationsPanel } from "../../components/admin/NotificationsPanel";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
-interface Notification {
+type Announcement = {
   id: number;
-  type: 
-    | "availability"
-    | "cancellation"
-    | "verification"
-    | "timetableUpdate";
-  message: string;
-  timestamp: string;
-}
+  title: string;
+  body: string;
+  imageUrl?: string | null;
+  image?: string | null;
+  publishedAt?: string;
+  published_at?: string;
+  expiresAt?: string | null;
+  expires_at?: string | null;
+};
 
-const fakeNotifications: Notification[] = [
-  { id: 1,
-    type: "availability",
-    message: "Your availability for Week 12 has been approved.",
-    timestamp: "2025-11-19T09:15:00Z",
-  },
-  { id: 2,
-    type: "timetableUpdate",
-    message: "Admin updated your assigned venue for MATH101.",
-    timestamp: "2025-10-19T09:15:00Z",
-  },
-  { id: 3,
-    type: "timetableUpdate",
-    message: "You have a new exam assignment for COMP204.",
-    timestamp: "2025-09-19T09:15:00Z",
-  },
-  { id: 4,
-    type: "verification",
-    message: "Your qualification level has been verified.",
-    timestamp: "2025-08-19T09:15:00Z",
-  },
+type InvigilatorStats = {
+  total_shifts: number;
+  upcoming_shifts: number;
+  cancelled_shifts: number;
+  hours_assigned: number;
+  hours_upcoming: number;
+  restrictions: number;
+  availability_entries: number;
+  next_assignment?: {
+    exam_name?: string | null;
+    venue_name?: string | null;
+    start?: string | null;
+    end?: string | null;
+    role?: string | null;
+  } | null;
+};
+
+type InvigilatorStatKey =
+  | "total_shifts"
+  | "upcoming_shifts"
+  | "cancelled_shifts"
+  | "hours_assigned"
+  | "hours_upcoming"
+  | "restrictions"
+  | "availability_entries";
+
+const notifications: NotificationItem[] = [
 ];
 
 export const InvigilatorDashboard: React.FC = () => {
-  // Placeholder data (replace with future API calls)
-  const nextShift = {
-    date: "2025-02-14",
-    time: "09:00 - 11:00",
-    exam: "MATH101 Final Examination",
-    venue: "Exam Hall A",
+  const [visibleCount, setVisibleCount] = useState(4);
+  const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+  } = useQuery<InvigilatorStats>({
+    queryKey: ["invigilator-stats"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilator/stats/`);
+      if (!res.ok) throw new Error("Unable to load stats");
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const nextShift = useMemo(() => {
+    const ns = stats?.next_assignment;
+    if (!ns) return null;
+    const start = ns.start ? new Date(ns.start) : null;
+    const end = ns.end ? new Date(ns.end) : null;
+    const formattedDate = start
+      ? start.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : "TBC";
+    const formattedTime =
+      start && end
+        ? `${start.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} - ${end.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+        : "Time TBC";
+    return {
+      date: formattedDate,
+      time: formattedTime,
+      exam: ns.exam_name || "Upcoming exam",
+      venue: ns.venue_name || "Venue TBC",
+      role: ns.role || "Invigilator",
+    };
+  }, [stats]);
+
+  // Placeholder announcement when no announcements are available
+  const placeholderAnnouncement: Announcement = {
+    id: 0,
+    title: "Exam operations",
+    body: "The exams team will post important updates here. Check back soon.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1623075840956-c95a6b0ea89e?q=80&w=1674&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    publishedAt: new Date().toISOString(),
   };
 
-  const announcements = [
-    "Reminder: Training seminar on Wednesday at 3 PM.",
-    "Exam season peak begins next week — please update availability.",
+  const {
+    data: announcementsFromApi = [],
+    isError: announcementsError,
+    isLoading: announcementsLoading,
+  } = useQuery<Announcement[]>({
+    queryKey: ["invigilator-announcements"],
+    queryFn: async () => {
+      const res = await apiFetch(
+        `${apiBaseUrl}/announcements/?audience=invigilator&active=true`
+      );
+      if (res.status === 404) return [];
+      if (!res.ok) throw new Error("Unable to load announcements");
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const announcements = useMemo(() => {
+    const now = new Date();
+    const safeData = announcementsError ? [] : announcementsFromApi;
+    return safeData.filter((a) => {
+      if (!a) return false;
+      const expires = a.expiresAt ?? a.expires_at;
+      if (expires) {
+        const exp = new Date(expires);
+        if (!Number.isNaN(exp.getTime()) && exp < now) return false;
+      }
+      return true;
+    });
+  }, [announcementsError, announcementsFromApi]);
+
+  const {
+    data: notificationsFromApi = [],
+    isError: notificationsError,
+  } = useQuery<NotificationItem[]>({
+    queryKey: ["invigilator-notifications"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilator/notifications/`);
+      if (res.status === 404) return [];
+      if (!res.ok) throw new Error("Unable to load notifications");
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const activityStats: { label: string; key: InvigilatorStatKey; tone: string }[] = [
+    { label: "Total shifts", key: "total_shifts", tone: "#0b4f8c" },
+    { label: "Upcoming shifts", key: "upcoming_shifts", tone: "#1565c0" },
+    { label: "Cancelled shifts", key: "cancelled_shifts", tone: "#d84315" },
+    { label: "Hours assigned", key: "hours_assigned", tone: "#546e7a" },
+    { label: "Hours upcoming", key: "hours_upcoming", tone: "#00796b" },
+    { label: "Restrictions", key: "restrictions", tone: "#2e7d32" },
+    { label: "Availability entries", key: "availability_entries", tone: "#4a148c" },
   ];
 
-  const [visibleCount, setVisibleCount] = useState(3);
+  useEffect(() => {
+    const total = announcements.length || 1;
+    setActiveAnnouncementIndex(0);
+    const timer = window.setInterval(() => {
+      setActiveAnnouncementIndex((prev) => (prev + 1) % total);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [announcements.length]);
+
+  const showPrevAnnouncement = () => {
+    const total = announcements.length || 1;
+    setActiveAnnouncementIndex((prev) => (prev === 0 ? total - 1 : prev - 1));
+  };
+
+  const showNextAnnouncement = () => {
+    const total = announcements.length || 1;
+    setActiveAnnouncementIndex((prev) => (prev + 1) % total);
+  };
+
+  const activeAnnouncement =
+    announcements[activeAnnouncementIndex] ?? placeholderAnnouncement;
+  const announcementCount = announcements.length;
+  const heroImage =
+    activeAnnouncement.imageUrl ||
+    activeAnnouncement.image ||
+    placeholderAnnouncement.imageUrl;
+  const publishedAtDisplay =
+    activeAnnouncement.publishedAt ||
+    activeAnnouncement.published_at ||
+    placeholderAnnouncement.publishedAt ||
+    new Date().toISOString();
 
   return (
-    <Box sx={{ p: 3 }}>
-
-      {/* Title */}
-      <Typography variant="h4" sx={{ mb: 3 }}>
+    <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
+      <Typography variant="h4" fontWeight={700}>
         Dashboard
       </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Stay on top of upcoming exams, important information, and your actions.
+      </Typography>
 
-      <Grid container spacing={3}>
-        
-        <Stack direction={{ xs: "column", md: "row"}} justifyContent="space-between" mb={4} spacing={2}>
-          {/* Next Shift */}
-          <Grid item xs={12} md={8}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Your Next Exam
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Avatar sx={{ bgcolor: "primary.main" }}>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2.5}
+        alignItems="stretch"
+        sx={{ width: "100%" }}
+      >
+        <Box sx={{ flex: { xs: "1 1 100%", md: "0 0 350px" }, display: "flex" }}>
+          <Panel title="Your Next Exam" sx={{ flex: 1 }}>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar sx={{ bgcolor: "primary.main", width: 52, height: 52 }}>
                   <EventAvailableIcon />
                 </Avatar>
                 <Box>
-                  <Typography variant="subtitle1">{nextShift.exam}</Typography>
-                  <Typography variant="body2">
-                    {nextShift.date} • {nextShift.time}
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    {nextShift?.exam || "No upcoming exam"}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Venue: {nextShift.venue}
+                  <Typography variant="body2">
+                    {nextShift ? `${nextShift.date} - ${nextShift.time}` : "Awaiting schedule"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Venue: {nextShift?.venue || "TBC"}
                   </Typography>
                 </Box>
-              </Box>
+              </Stack>
 
-              <Button
-                variant="contained"
-                color="primary"
-                sx={{ mt: 2 }}
-                startIcon={<CalendarMonthIcon />}
-                href="/invigilator/timetable"
-              >
-                View Full Timetable
-              </Button>
-            </Paper>
-          </Grid>
-
-          {/* Quick Links */}
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Quick Actions
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<EditCalendarIcon />}
+              <Box sx={{ display: "flex", justifyContent: "center" }}>
+                <PillButton
+                  variant="contained"
+                  startIcon={<CalendarMonthIcon />}
                   href="/invigilator/timetable"
                 >
-                  View Timetable
-                </Button>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<AccessTimeIcon />}
-                  href="/invigilator/availability"
-                >
-                  Submit Availability
-                </Button>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<AccountBoxOutlined />}
-                  href="/invigilator/profile"
-                >
-                  Edit Profile
-                </Button>
+                  Show more
+                </PillButton>
               </Box>
-            </Paper>
-          </Grid>
-        </Stack>
+            </Stack>
+          </Panel>
+        </Box>
 
-      <Stack direction={{ xs: "row", md: "column"}} justifyContent="space-between" alignItems="center" mb={4} spacing={2}>
-        {/* Announcements */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Announcements
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
+        <Box sx={{ flex: { xs: "1 1 100%", md: "0 0 250px" }, display: "flex" }}>
+          <Panel title="Quick Actions" sx={{ flex: 1 }}>
+            <Stack spacing={1}>
+              <PillButton
+                variant="outlined"
+                fullWidth
+                startIcon={<EditCalendarIcon />}
+                href="/invigilator/timetable"
+              >
+                View timetable
+              </PillButton>
+              <PillButton
+                variant="outlined"
+                fullWidth
+                startIcon={<AccessTimeIcon />}
+                href="/invigilator/availability"
+              >
+                Submit restrictions
+              </PillButton>
+              <PillButton
+                variant="outlined"
+                fullWidth
+                startIcon={<AccountBoxOutlined />}
+                href="/invigilator/profile"
+              >
+                Edit profile
+              </PillButton>
+            </Stack>
+          </Panel>
+        </Box>
 
-            <List>
-              {announcements.map((msg, i) => (
-                <ListItem key={i}>
-                  <ListItemIcon sx={{ minWidth: 20 }}>
-                    •
-                  </ListItemIcon>
-                  <ListItemText primary={msg} />
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
-        </Grid>
-
-        {/* Stats */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Your Activity
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <Box textAlign="center">
-                  <Typography variant="h4">12</Typography>
-                  <Typography>Total Shifts This Month</Typography>
-                </Box>
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <Box textAlign="center">
-                  <Typography variant="h4">4</Typography>
-                  <Typography>Cancellations</Typography>
-                </Box>
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <Box textAlign="center">
-                  <Typography variant="h4">28 hrs</Typography>
-                  <Typography>Total Hours Assigned</Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
-        </Grid>
-      </Stack>
-
-        {/* Notifications */}
-        <Grid item xs="row" md="column">
-          <Paper sx={{ p: 3}}>
-            <Typography variant="h6" gutterBottom>
-              Notifications
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-
-            {fakeNotifications.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                No notifications yet.
-              </Typography>
+        <Box sx={{ flex: { xs: "1 1 100%", md: "1 1 auto" }, display: "flex" }}>
+          <Panel
+            title={activeAnnouncement ? activeAnnouncement.title : "Announcements"}
+            actions={
+              <Stack direction="row" spacing={1}>
+                <IconButton
+                  aria-label="Previous announcement"
+                  onClick={showPrevAnnouncement}
+                  sx={{
+                    color: "#fff",
+                    backgroundColor: "rgba(255,255,255,0.14)",
+                    "&:hover": { backgroundColor: "rgba(255,255,255,0.24)" },
+                  }}
+                >
+                  <ChevronLeftIcon />
+                </IconButton>
+                <IconButton
+                  aria-label="Next announcement"
+                  onClick={showNextAnnouncement}
+                  sx={{
+                    color: "#fff",
+                    backgroundColor: "rgba(255,255,255,0.14)",
+                    "&:hover": { backgroundColor: "rgba(255,255,255,0.24)" },
+                  }}
+                >
+                  <ChevronRightIcon />
+                </IconButton>
+              </Stack>
+            }
+            disableDivider
+            sx={{
+              flex: 1,
+              width: "100%",
+              position: "relative",
+              overflow: "hidden",
+              minHeight: { xs: 220, md: 240 },
+              color: "#fff",
+              backgroundImage: heroImage
+                ? `linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.65) 100%), url(${heroImage})`
+                : undefined,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              "& .MuiTypography-h6": { color: "#fff" },
+            }}
+          >
+            {activeAnnouncement && (
+              <Stack
+                key={activeAnnouncement.id}
+                spacing={1.2}
+                sx={{
+                  pt: 0.5,
+                  color: "#fff",
+                  maxWidth: "82%",
+                  animation: "fadeIn 0.6s ease-in-out",
+                  "@keyframes fadeIn": {
+                    from: { opacity: 0, transform: "translateY(6px)" },
+                    to: { opacity: 1, transform: "translateY(0)" },
+                  },
+                }}
+              >
+                <Typography variant="overline" sx={{ letterSpacing: 0.6, opacity: 0.9 }}>
+                  {new Date(publishedAtDisplay).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </Typography>
+                <Typography variant="body1" sx={{ color: "#e8ecf1" }}>
+                  {activeAnnouncement.body}
+                </Typography>
+              </Stack>
             )}
 
-            <List>
-              {fakeNotifications.slice(0, visibleCount).map((n) => {
-                const color =
-                  n.type === "cancellation"
-                    ? "error.main"
-                    : n.type === "availability"
-                    ? "success.main"
-                    : n.type === "timetableUpdate"
-                    ? "info.main"
-                    : n.type === "verification"
-                    ? "success.main"
-                    : "warning.main";
+            {announcementsLoading && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backdropFilter: "blur(2px)",
+                  backgroundColor: "rgba(0,0,0,0.45)",
+                }}
+              >
+                <Stack spacing={1} alignItems="center" sx={{ color: "#fff" }}>
+                  <CircularProgress size={32} sx={{ color: "#fff" }} />
+                  <Typography variant="caption" sx={{ color: "#e8ecf1" }}>
+                    Loading announcements...
+                  </Typography>
+                </Stack>
+              </Box>
+            )}
 
-                return (
-                  <ListItem
-                    key={n.id}
-                    sx={{
-                      // base appearance
-                      position: "relative",
-                      mb: 0.5,
-                      p: 2,
-                      borderRadius: 0.5,
-                      backgroundColor: `${color}22`, // transparent tint
-                      overflow: "visible",
-                    }}
-                    >
-
-                      {/* left bar */}
-                      <Box
+            {announcementCount > 1 && (
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{
+                  position: "absolute",
+                  bottom: 12,
+                  left: 16,
+                  zIndex: 2,
+                }}
+              >
+                {announcements.map((a, idx) => {
+                  const isActive = idx === activeAnnouncementIndex;
+                  return (
+                    <Box
+                      key={a.id}
+                      onClick={() => setActiveAnnouncementIndex(idx)}
                       sx={{
-                        position: "absolute",
-                        left: 0,
-                        top: 10,
-                        bottom: 0,
-                        width: "3px",
-                        height: "70%",
-                        backgroundColor: color,
-                        borderRadius: "4px 0 0 4px",
+                        width: isActive ? 12 : 10,
+                        height: isActive ? 12 : 10,
+                        borderRadius: "50%",
+                        backgroundColor: isActive ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.45)",
+                        border: "1px solid rgba(255,255,255,0.7)",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        boxShadow: isActive ? "0 0 0 3px rgba(255,255,255,0.18)" : "none",
                       }}
                     />
-
-                    {/* underline */}
-                    <Box
-                      sx={{
-                        display: "inline-block",
-                        pb: 0.5,
-                        borderBottom: `3px solid`,
-                        borderColor: color,
-                      }}
-                    >
-                      <ListItemText primary={n.message} />
-                    </Box>
-                  </ListItem>
-                );
-              })}
-            </List>
-
-            {fakeNotifications.length > 3 && (
-              <Box sx={{ textAlign: "center", mt: 1 }}>
-                <Button
-                  variant="text"
-                  onClick={() =>
-                    setVisibleCount((prev) =>
-                      prev >= fakeNotifications.length ? 3 : prev + 3
-                    )
-                  }
-                >
-                  {visibleCount >= fakeNotifications.length
-                    ? "Show less"
-                    : `Show ${Math.min(
-                        3,
-                        fakeNotifications.length - visibleCount
-                      )} more notifications`}
-                </Button>
-              </Box>
+                  );
+                })}
+              </Stack>
             )}
-          </Paper>
-        </Grid>
+          </Panel>
+        </Box>
+      </Stack>
 
-      </Grid>
+      <Panel title="Your Activity" disableDivider sx={{ mt: 1 }}>
+        <Grid container spacing={2.5}>
+          {activityStats.map((item) => (
+            <Grid item xs={12} sm={6} md={4} lg={2} key={item.label}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  backgroundColor: "#f8f8f8",
+                  textAlign: "center",
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ color: item.tone, fontWeight: 700, mb: 0.5 }}>
+                  {item.label}
+                </Typography>
+                <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
+                  {statsError
+                    ? "—"
+                    : statsLoading || !stats
+                    ? "..."
+                    : (stats?.[item.key] ?? 0).toString()}
+                </Typography>
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      </Panel>
+
+      <Box sx={{ mt: 1.5 }}>
+        <NotificationsPanel
+          notifications={(notificationsError ? [] : notificationsFromApi).slice(0, visibleCount)}
+        />
+        {(notificationsError ? [] : notificationsFromApi).length > 0 && (
+          <Box
+            sx={{
+              textAlign: "center",
+              mt: 2,
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 1.5,
+            }}
+          >
+            <PillButton
+              variant="outlined"
+              onClick={() => setVisibleCount(4)}
+              disabled={visibleCount <= 4}
+            >
+              Show less
+            </PillButton>
+            <PillButton
+              variant="contained"
+              onClick={() =>
+                setVisibleCount((prev) =>
+                  Math.min(prev + 4, (notificationsError ? [] : notificationsFromApi).length)
+                )
+              }
+              disabled={visibleCount >= (notificationsError ? 0 : notificationsFromApi.length)}
+            >
+              {`Show ${Math.min(
+                4,
+                Math.max((notificationsError ? 0 : notificationsFromApi.length) - visibleCount, 0)
+              )} more`}
+            </PillButton>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 };
+
