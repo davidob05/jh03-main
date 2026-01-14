@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Avatar, Box, Grid, IconButton, Stack, Typography } from "@mui/material";
+import React, { useEffect, useMemo, useState } from "react";
+import { Avatar, Box, Grid, IconButton, Stack, Typography, CircularProgress } from "@mui/material";
+import { useQuery } from "@tanstack/react-query";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
@@ -10,13 +11,18 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { NotificationItem, NotificationsPanel } from "../../components/admin/NotificationsPanel";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 type Announcement = {
   id: number;
   title: string;
   body: string;
-  imageUrl: string;
-  publishedAt: string;
+  imageUrl?: string | null;
+  image?: string | null;
+  publishedAt?: string;
+  published_at?: string;
+  expiresAt?: string | null;
+  expires_at?: string | null;
 };
 
 const notifications: NotificationItem[] = [
@@ -67,8 +73,36 @@ export const InvigilatorDashboard: React.FC = () => {
     publishedAt: new Date().toISOString(),
   };
 
-  // TODO: Replace with API data when backend is ready
-  const announcements: Announcement[] = [];
+  const {
+    data: announcementsFromApi = [],
+    isError: announcementsError,
+    isLoading: announcementsLoading,
+  } = useQuery<Announcement[]>({
+    queryKey: ["invigilator-announcements"],
+    queryFn: async () => {
+      const res = await apiFetch(
+        `${apiBaseUrl}/announcements/?audience=invigilator&active=true`
+      );
+      if (res.status === 404) return [];
+      if (!res.ok) throw new Error("Unable to load announcements");
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const announcements = useMemo(() => {
+    const now = new Date();
+    const safeData = announcementsError ? [] : announcementsFromApi;
+    return safeData.filter((a) => {
+      if (!a) return false;
+      const expires = a.expiresAt ?? a.expires_at;
+      if (expires) {
+        const exp = new Date(expires);
+        if (!Number.isNaN(exp.getTime()) && exp < now) return false;
+      }
+      return true;
+    });
+  }, [announcementsError, announcementsFromApi]);
 
   const activityStats = [
     { label: "Total shifts", value: "120", tone: "#0b4f8c" },
@@ -82,6 +116,7 @@ export const InvigilatorDashboard: React.FC = () => {
 
   useEffect(() => {
     const total = announcements.length || 1;
+    setActiveAnnouncementIndex(0);
     const timer = window.setInterval(() => {
       setActiveAnnouncementIndex((prev) => (prev + 1) % total);
     }, 7000);
@@ -101,6 +136,15 @@ export const InvigilatorDashboard: React.FC = () => {
   const activeAnnouncement =
     announcements[activeAnnouncementIndex] ?? placeholderAnnouncement;
   const announcementCount = announcements.length;
+  const heroImage =
+    activeAnnouncement.imageUrl ||
+    activeAnnouncement.image ||
+    placeholderAnnouncement.imageUrl;
+  const publishedAtDisplay =
+    activeAnnouncement.publishedAt ||
+    activeAnnouncement.published_at ||
+    placeholderAnnouncement.publishedAt ||
+    new Date().toISOString();
 
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
@@ -218,8 +262,8 @@ export const InvigilatorDashboard: React.FC = () => {
               overflow: "hidden",
               minHeight: { xs: 220, md: 240 },
               color: "#fff",
-              backgroundImage: activeAnnouncement
-                ? `linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.65) 100%), url(${activeAnnouncement.imageUrl})`
+              backgroundImage: heroImage
+                ? `linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.65) 100%), url(${heroImage})`
                 : undefined,
               backgroundSize: "cover",
               backgroundPosition: "center",
@@ -242,7 +286,7 @@ export const InvigilatorDashboard: React.FC = () => {
                 }}
               >
                 <Typography variant="overline" sx={{ letterSpacing: 0.6, opacity: 0.9 }}>
-                  {new Date(activeAnnouncement.publishedAt).toLocaleDateString("en-GB", {
+                  {new Date(publishedAtDisplay).toLocaleDateString("en-GB", {
                     day: "numeric",
                     month: "short",
                     year: "numeric",
@@ -252,6 +296,28 @@ export const InvigilatorDashboard: React.FC = () => {
                   {activeAnnouncement.body}
                 </Typography>
               </Stack>
+            )}
+
+            {announcementsLoading && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backdropFilter: "blur(2px)",
+                  backgroundColor: "rgba(0,0,0,0.45)",
+                }}
+              >
+                <Stack spacing={1} alignItems="center" sx={{ color: "#fff" }}>
+                  <CircularProgress size={32} sx={{ color: "#fff" }} />
+                  <Typography variant="caption" sx={{ color: "#e8ecf1" }}>
+                    Loading announcements...
+                  </Typography>
+                </Stack>
+              </Box>
             )}
 
             {announcementCount > 1 && (
