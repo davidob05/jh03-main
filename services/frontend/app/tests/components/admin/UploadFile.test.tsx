@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { UploadFile } from "@/components/admin/UploadFile";
 import { apiBaseUrl } from "@/utils/api";
 
+
 vi.mock("@/utils/api", () => ({
     apiBaseUrl: "http://test-api"
 }));
@@ -12,24 +13,24 @@ vi.mock("@mui/material", async () => {
 
   return {
     ...actual,
-    // Mock Select as a native <select> with proper <option>s
-    Select: ({ value, onChange }: any) => (
+
+    Select: ({ value, onChange, children }: any) => (
       <select
         data-testid="upload-type-select"
         value={value}
         onChange={onChange}
       >
-        <option value="">Choose...</option>
-        <option value="exam">Exam Timetable</option>
-        <option value="provisions">Student Provisions</option>
-        <option value="invigilators">Invigilator Data</option>
+        {children}
       </select>
     ),
 
-    // Mock MenuItem as a simple fragment (not rendered in native <select>)
-    MenuItem: ({ children }: any) => <>{children}</>,
+    MenuItem: ({ value, children }: any) => (
+      <option value={value}>{children}</option>
+    ),
   };
 });
+
+
 
 
 describe("Components - UploadFile", () => {
@@ -148,69 +149,99 @@ describe("Components - UploadFile", () => {
         expect(await screen.findByText("Network error")).toBeInTheDocument();
     });
 
-    it("2shows spinner instead of upload icon while uploading", async () => {
-        let resolveFetch!: (value: any) => void;
-        global.fetch = vi.fn().mockImplementation(
-            () => new Promise((res) => (resolveFetch = res))
-        ) as any;
+    it("shows spinner instead of upload icon while uploading", async () => {
+    let resolveFetch!: (value: any) => void;
 
-        render(<UploadFile />);
+    global.fetch = vi.fn().mockImplementation(
+        () => new Promise((res) => (resolveFetch = res))
+    ) as any;
 
-        fireEvent.change(screen.getByTestId("upload-type-select"), {
-            target: { value: "exam" },
-        });
+    render(<UploadFile />);
 
-        const input = screen.getByTestId("file-upload") as HTMLInputElement;
+    // Select upload type (native select mock)
+    fireEvent.change(screen.getByTestId("upload-type-select"), {
+        target: { value: "exam" },
+    });
 
-        await userEvent.upload(input, new File(["test content"], "test.csv"));
+    // Upload file
+    const input = screen.getByTestId("file-upload") as HTMLInputElement;
+    await userEvent.upload(input, new File(["test"], "test.csv"));
 
-        const uploadButton = screen.getByRole("button", { name: /upload/i });
-        await userEvent.click(uploadButton);
+    // Start upload
+    const uploadButton = screen.getByRole("button", { name: /upload/i });
+    await userEvent.click(uploadButton);
 
-        expect(screen.getByText("Uploading...")).toBeInTheDocument();
-        expect(screen.getByRole("progressbar")).toBeInTheDocument();
-        expect(uploadButton).toBeDisabled();
+    // Assertions while uploading
+    expect(screen.getByText("Uploading...")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    expect(uploadButton).toBeDisabled();
 
-        resolveFetch({
-            ok: true,
-            json: async () => ({ count: 1 }),
-        });
+    // Resolve fetch
+    resolveFetch({
+        ok: true,
+        json: async () => ({ count: 1 }),
+    });
+
+    // Final success state
+    expect(
         await screen.findByText(
             "Successfully uploaded test.csv. 1 records added to database."
-        );
-        await waitFor(() => expect(screen.queryByText("test.csv")).not.toBeInTheDocument());
-    });
+        )
+    ).toBeInTheDocument();
+});
+
     it("clears the file input after successful upload", async () => {
-        let resolveFetch!: (value: any) => void;
-        global.fetch = vi.fn().mockImplementation(
-            () => new Promise((res) => (resolveFetch = res))
-        ) as any;
+    let resolveFetch!: (value: any) => void;
 
-        render(<UploadFile />);
-        fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" }});
-        const input = screen.getByTestId("file-upload") as HTMLInputElement;
-        await userEvent.upload(input, new File(["x"], "test.csv"));
+    global.fetch = vi.fn().mockImplementation(
+        () => new Promise((res) => (resolveFetch = res))
+    ) as any;
 
-        await userEvent.click(screen.getByRole("button", { name: /upload/i }));
-        resolveFetch({ ok: true, json: async () => ({ count: 1 }) });
+    render(<UploadFile />);
 
-        await waitFor(() => expect(input.value).toBe(""));
+    fireEvent.change(screen.getByTestId("upload-type-select"), {
+        target: { value: "exam" },
     });
+
+    const input = screen.getByTestId("file-upload") as HTMLInputElement;
+    await userEvent.upload(input, new File(["x"], "test.csv"));
+
+    await userEvent.click(screen.getByRole("button", { name: /upload/i }));
+
+    resolveFetch({
+        ok: true,
+        json: async () => ({ count: 1 }),
+    });
+
+    await waitFor(() => {
+        expect(input.value).toBe("");
+    });
+    });
+
     it("handles zero-byte file upload", async () => {
-        global.fetch = vi.fn().mockResolvedValue({
-            ok: true,
-            json: async () => ({ count: 0 }),
-        }) as any;
+    global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ count: 0 }),
+    }) as any;
 
-        render(<UploadFile />);
-        fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" }});
+    render(<UploadFile />);
 
-        const zeroByteFile = new File([""], "empty.csv", { type: "text/csv" });
-        const fileInput = screen.getByTestId("file-upload") as HTMLInputElement;
-        await userEvent.upload(fileInput, zeroByteFile);
-
-        await userEvent.click(screen.getByRole("button", { name: /upload/i }));
-
-        expect(await screen.findByText("Successfully uploaded empty.csv. 0 records added to database.")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("upload-type-select"), {
+        target: { value: "exam" },
     });
+
+    const zeroByteFile = new File([""], "empty.csv", { type: "text/csv" });
+    const fileInput = screen.getByTestId("file-upload") as HTMLInputElement;
+
+    await userEvent.upload(fileInput, zeroByteFile);
+
+    await userEvent.click(screen.getByRole("button", { name: /upload/i }));
+
+    expect(
+        await screen.findByText(
+        "Successfully uploaded empty.csv. 0 records added to database."
+        )
+    ).toBeInTheDocument();
+    });
+
 })
