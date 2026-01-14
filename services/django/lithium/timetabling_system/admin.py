@@ -12,6 +12,7 @@ from .models import (
     ExamVenueProvisionType,
     UploadLog,
     Notification,
+    Announcement,
     Invigilator,
     InvigilatorQualification,
     InvigilatorRestriction,
@@ -173,3 +174,11 @@ class NotificationAdmin(admin.ModelAdmin):
     list_display = ("type", "message", "timestamp")
     list_filter = ("type",)
     search_fields = ("message",)
+
+
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = ("title", "audience", "is_active", "priority", "published_at", "expires_at")
+    list_filter = ("audience", "is_active")
+    search_fields = ("title", "body")
+    ordering = ("-priority", "-published_at")
