@@ -511,9 +511,14 @@ export const AdminVenues: React.FC = () => {
                       </TableCell>
 
                       <TableCell id={labelId} component="th" scope="row" padding="none">
-                        <Link to={`/admin/venues/${encodeURIComponent(row.id)}`}>
-                          <MUILink sx={{ cursor: 'pointer', fontWeight: 600 }}>{row.name}</MUILink>
-                        </Link>
+                        <MUILink
+                          component={Link}
+                          to={`/admin/venues/${encodeURIComponent(row.id)}`}
+                          sx={{ cursor: 'pointer', fontWeight: 600 }}
+                          underline="hover"
+                        >
+                          {row.name}
+                        </MUILink>
                       </TableCell>
 
                       <TableCell align="right">{row.capacity}</TableCell>

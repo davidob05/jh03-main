@@ -23,6 +23,7 @@ import { InvigilatorLayout } from "./components/invigilator/Layout";
 import { InvigilatorDashboard } from "./pages/invigilator/Dashboard";
 import { InvigilatorTimetable } from "./pages/invigilator/Timetable";
 import { InvigilatorProfile } from "./pages/invigilator/Profile";
+import { AdminStudents } from "./pages/admin/Students";
 
 export const Routes: React.FC = () => {
 
@@ -55,6 +56,7 @@ export const Routes: React.FC = () => {
                 <RouterRoute path="venues/:venueId" element={<AdminVenuePage />} />
                 <RouterRoute path="calendar" element={<AdminCalendar />} />
                 <RouterRoute path="profile" element={<AdminProfile />} />
+                <RouterRoute path="students" element={<AdminStudents />} />
                 <RouterRoute path="invigilators" element={<AdminInvigilators />} />
                 <RouterRoute path="invigilators/:id" element={<AdminInvigilatorProfile />} />
               </RouterRoute>

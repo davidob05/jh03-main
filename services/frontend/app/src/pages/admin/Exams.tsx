@@ -99,7 +99,8 @@ const fetchExams = async (): Promise<ExamData[]> => {
 };
 
 const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
-  return exam.exam_venues.find((v) => v.core) || exam.exam_venues[0];
+  const venues = exam.exam_venues || [];
+  return venues.find((v) => v.core) || venues[0];
 };
 
 function formatDateTime(dateTime: string): string {
@@ -406,7 +407,14 @@ export const AdminExams: React.FC = () => {
                           <Checkbox color="primary" checked={isItemSelected} onClick={(event) => handleClick(event, row.id)} inputProps={{ 'aria-labelledby': labelId }} />
                         </TableCell>
                         <TableCell component="th" id={labelId} scope="row" padding="none">
-                        <Link to={`/admin/exam/${row.id}`}><MUILink sx={{ cursor: 'pointer', fontWeight: 600 }}>{row.code}</MUILink></Link>
+                        <MUILink
+                          component={Link}
+                          to={`/admin/exam/${row.id}`}
+                          sx={{ cursor: 'pointer', fontWeight: 600 }}
+                          underline="hover"
+                        >
+                          {row.code}
+                        </MUILink>
                         </TableCell>
                         <TableCell>{row.subject}</TableCell>
                         <TableCell>{row.coreVenue || '—'}</TableCell>

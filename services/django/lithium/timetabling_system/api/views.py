@@ -17,9 +17,19 @@ from timetabling_system.models import (
     InvigilatorAvailability,
     InvigilatorRestriction,
     Venue,
+    StudentExam,
+    Provisions,
     Notification,
 )
 from timetabling_system.services import ingest_upload_result
+from timetabling_system.services.venue_matching import venue_supports_caps
+from timetabling_system.services.upload_processor import (
+    _allowed_venue_types,
+    _needs_accessible_venue,
+    _needs_computer,
+    _needs_separate_room,
+    _required_capabilities,
+)
 from timetabling_system.utils.excel_parser import parse_excel_file
 from timetabling_system.utils.venue_ingest import upsert_venues
 from .serializers import (
@@ -513,6 +523,86 @@ class NotificationsView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class StudentProvisionListView(APIView):
+    """
+    Return provision records for students, optionally filtered to those
+    whose allocated venue does not yet meet their needs.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []  # Admin-only
+
+    def get(self, request, *args, **kwargs):
+        unallocated_only = str(request.query_params.get("unallocated") or "").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        provisions = Provisions.objects.select_related("student", "exam").all()
+        student_exam_map = {
+            (se.student_id, se.exam_id): se
+            for se in StudentExam.objects.select_related("exam_venue__venue", "student", "exam")
+        }
+
+        rows = []
+        for provision in provisions:
+            student_exam = student_exam_map.get((provision.student_id, provision.exam_id))
+            exam_venue = getattr(student_exam, "exam_venue", None)
+            venue = getattr(exam_venue, "venue", None)
+
+            required_caps = _required_capabilities(provision.provisions)
+            needs_accessible = _needs_accessible_venue(provision.provisions)
+            needs_separate_room = _needs_separate_room(provision.provisions)
+            needs_computer = _needs_computer(provision.provisions)
+            allowed_types = _allowed_venue_types(needs_computer, needs_separate_room)
+
+            matches_needs = False
+            allocation_issue = None
+
+            if not exam_venue:
+                allocation_issue = "No exam venue assigned"
+            elif not venue:
+                allocation_issue = "No physical venue allocated"
+            else:
+                if allowed_types is not None and venue.venuetype not in allowed_types:
+                    allocation_issue = "Venue type does not satisfy requirements"
+                elif needs_accessible and not venue.is_accessible:
+                    allocation_issue = "Venue is not marked accessible"
+                elif required_caps and not venue_supports_caps(venue, required_caps):
+                    allocation_issue = "Venue is missing required provisions"
+                else:
+                    matches_needs = True
+
+            if unallocated_only and matches_needs:
+                continue
+
+            rows.append(
+                {
+                    "student_id": provision.student.student_id,
+                    "student_name": provision.student.student_name,
+                    "exam_id": provision.exam.exam_id,
+                    "exam_name": provision.exam.exam_name,
+                    "course_code": provision.exam.course_code,
+                    "provisions": provision.provisions,
+                    "notes": provision.notes,
+                    "exam_venue_id": exam_venue.pk if exam_venue else None,
+                    "exam_venue_caps": getattr(exam_venue, "provision_capabilities", []) or [],
+                    "venue_name": venue.venue_name if venue else None,
+                    "venue_type": venue.venuetype if venue else None,
+                    "venue_accessible": venue.is_accessible if venue else None,
+                    "required_capabilities": required_caps,
+                    "allowed_venue_types": sorted(list(allowed_types)) if allowed_types else [],
+                    "matches_needs": matches_needs,
+                    "allocation_issue": allocation_issue,
+                    "student_exam_id": student_exam.pk if student_exam else None,
+                }
+            )
+
+        rows.sort(key=lambda r: (r.get("student_name") or "", r.get("course_code") or ""))
+        return Response(rows)
 
 
 class InvigilatorNotificationsView(APIView):

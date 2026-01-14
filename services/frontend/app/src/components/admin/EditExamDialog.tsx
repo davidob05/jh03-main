@@ -14,6 +14,7 @@ import {
   CircularProgress,
   Typography,
   Chip,
+  Box,
   Paper,
 } from "@mui/material";
 import { Add, Close, Delete } from "@mui/icons-material";
@@ -45,6 +46,12 @@ type ExamData = {
 type VenueOption = {
   venue_name: string;
   is_accessible: boolean;
+  provision_capabilities: string[];
+};
+
+type ProvisionOption = {
+  value: string;
+  label: string;
 };
 
 type EditableVenue = {
@@ -52,6 +59,7 @@ type EditableVenue = {
   venue_name: string;
   start_time: string;
   exam_length: number | null;
+  provision_capabilities: string[];
 };
 
 type Props = {
@@ -60,6 +68,13 @@ type Props = {
   onClose: () => void;
   onSuccess?: (name: string) => void;
 };
+
+const PROVISION_CHOICES: ProvisionOption[] = [
+  { value: "separate_room_on_own", label: "Separate room on own" },
+  { value: "separate_room_not_on_own", label: "Separate room not on own" },
+  { value: "use_computer", label: "Use of a computer" },
+  { value: "accessible_hall", label: "Accessible hall" },
+];
 
 const fetchExam = async (examId: number): Promise<ExamData> => {
   const response = await apiFetch(`${apiBaseUrl}/exams/${examId}/`);
@@ -121,8 +136,42 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
   const [mainVenue, setMainVenue] = useState("");
   const [mainStart, setMainStart] = useState("");
   const [mainLength, setMainLength] = useState<number | "">("");
+  const [mainProvisions, setMainProvisions] = useState<string[]>([]);
   const [extraVenues, setExtraVenues] = useState<EditableVenue[]>([]);
   const [initialExtraIds, setInitialExtraIds] = useState<Set<number>>(new Set());
+
+  const formatProvisionLabel = (prov: string) => {
+    const spaced = prov.replace(/_/g, " ");
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  };
+
+  const toggleProvision = (current: string[], value: string) => {
+    const mutuallyExclusive = new Set(["separate_room_on_own", "separate_room_not_on_own"]);
+    let next = current.includes(value) ? current.filter((p) => p !== value) : [...current, value];
+    if (mutuallyExclusive.has(value)) {
+      const other = value === "separate_room_on_own" ? "separate_room_not_on_own" : "separate_room_on_own";
+      next = next.filter((p) => p !== other);
+    }
+    return next;
+  };
+
+  const venueOptions = useMemo(
+    () =>
+      (venues || []).map((v) => {
+        const provs = v.provision_capabilities || [];
+        const suffix = provs.length ? ` (${provs.map(formatProvisionLabel).join(", ")})` : "";
+        return { value: v.venue_name, label: `${v.venue_name}${suffix}`, caps: provs };
+      }),
+    [venues]
+  );
+
+  const filteredVenueOptions = (requiredCaps: string[]) => {
+    if (!requiredCaps.length) return venueOptions;
+    return venueOptions.filter((v) => {
+      const caps = v.caps || [];
+      return requiredCaps.every((cap) => caps.includes(cap));
+    });
+  };
 
   useEffect(() => {
     if (!exam) return;
@@ -135,6 +184,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
     setMainVenue(coreVenue?.venue_name || "");
     setMainStart(toLocalInputValue(coreVenue?.start_time));
     setMainLength(coreVenue?.exam_length ?? "");
+    setMainProvisions(coreVenue?.provision_capabilities || []);
 
     const extras = (exam.exam_venues || []).filter((ev) => !coreVenue || ev.examvenue_id !== coreVenue.examvenue_id);
     setInitialExtraIds(new Set(extras.map((ev) => ev.examvenue_id)));
@@ -144,6 +194,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
         venue_name: ev.venue_name || "",
         start_time: toLocalInputValue(ev.start_time),
         exam_length: ev.exam_length,
+        provision_capabilities: ev.provision_capabilities || [],
       }))
     );
   }, [exam, coreVenue]);
@@ -156,6 +207,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
         venue_name: "",
         start_time: mainStart || "",
         exam_length: typeof mainLength === "number" ? mainLength : null,
+        provision_capabilities: [],
       },
     ]);
   };
@@ -314,9 +366,30 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
               <Typography variant="subtitle1" fontWeight={700}>Main venue</Typography>
               {coreVenue && (
                 <Alert severity="info" sx={{ mb: 1 }}>
-                  Main venue already assigned ({coreVenue.venue_name || "Unassigned"}). Editing core venues is not yet supported.
+                  Main venue already assigned ({coreVenue.venue_name || "Unassigned"}). Editing core venues is not supported.
                 </Alert>
               )}
+              <Box>
+                <Typography variant="body2" fontWeight={700} mb={0.5}>Provision capabilities</Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1}>
+                  {PROVISION_CHOICES.map((p) => {
+                    const selected = mainProvisions.includes(p.value);
+                    return (
+                      <Chip
+                        key={p.value}
+                        label={p.label}
+                        color={selected ? "primary" : "default"}
+                        variant={selected ? "filled" : "outlined"}
+                        onClick={() => {
+                          if (coreVenue) return;
+                          setMainProvisions((prev) => toggleProvision(prev, p.value));
+                        }}
+                        sx={{ cursor: coreVenue ? "not-allowed" : "pointer" }}
+                      />
+                    );
+                  })}
+                </Stack>
+              </Box>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
                   label="Venue"
@@ -326,8 +399,8 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                   fullWidth
                   disabled={Boolean(coreVenue)}
                 >
-                  {venueOptions.map((v) => (
-                    <MenuItem key={v} value={v}>{v}</MenuItem>
+                  {filteredVenueOptions(mainProvisions).map((v) => (
+                    <MenuItem key={v.value} value={v.value}>{v.label}</MenuItem>
                   ))}
                 </TextField>
                 <TextField
@@ -363,6 +436,26 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
               {extraVenues.map((v) => (
                 <Paper key={v.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                   <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12}>
+                      <Typography variant="body2" fontWeight={700} mb={0.5}>Provision capabilities</Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1}>
+                        {PROVISION_CHOICES.map((p) => {
+                          const selected = v.provision_capabilities.includes(p.value);
+                          return (
+                            <Chip
+                              key={p.value}
+                              label={p.label}
+                              color={selected ? "primary" : "default"}
+                              variant={selected ? "filled" : "outlined"}
+                              onClick={() =>
+                                updateExtraVenue(v.id, "provision_capabilities", toggleProvision(v.provision_capabilities, p.value))
+                              }
+                              sx={{ cursor: "pointer" }}
+                            />
+                          );
+                        })}
+                      </Stack>
+                    </Grid>
                     <Grid item xs={12} sm={5}>
                       <TextField
                         label="Venue"
@@ -372,8 +465,8 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                         fullWidth
                         sx={{ minWidth: { sm: 220, xs: "100%" } }}
                       >
-                        {venueOptions.map((opt) => (
-                          <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                        {filteredVenueOptions(v.provision_capabilities).map((opt) => (
+                          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
                         ))}
                       </TextField>
                     </Grid>
