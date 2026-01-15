@@ -312,6 +312,8 @@ export const AdminDashboard: React.FC = () => {
                     <Box
                       key={a.id}
                       onClick={() => setActiveAnnouncementIndex(idx)}
+                      role="button"
+                      aria-label={`Go to announcement ${idx + 1}`}
                       sx={{
                         width: isActive ? 12 : 10,
                         height: isActive ? 12 : 10,
