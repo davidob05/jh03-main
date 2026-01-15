@@ -13,6 +13,7 @@ export const AdminLayout: React.FC = () => {
     { text: "Exams", path: "/admin/exams" },
     { text: "Venues", path: "/admin/venues" },
     { text: "Calendar", path: "/admin/calendar" },
+    { text: "Students", path: "/admin/students" },
     { text: "Invigilators", path: "/admin/invigilators" }
   ];
 

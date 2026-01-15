@@ -47,6 +47,7 @@ type VenueOption = {
   venue_name: string;
   is_accessible: boolean;
   provision_capabilities: string[];
+  venuetype?: string;
 };
 
 type ProvisionOption = {
@@ -159,17 +160,27 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
     () =>
       (venues || []).map((v) => {
         const provs = v.provision_capabilities || [];
-        const suffix = provs.length ? ` (${provs.map(formatProvisionLabel).join(", ")})` : "";
-        return { value: v.venue_name, label: `${v.venue_name}${suffix}`, caps: provs };
+        const visibleCaps = provs.filter(
+          (p) => p !== "separate_room_on_own" && p !== "separate_room_not_on_own"
+        );
+        const suffix = visibleCaps.length ? ` (${visibleCaps.map(formatProvisionLabel).join(", ")})` : "";
+        return { value: v.venue_name, label: `${v.venue_name}${suffix}`, caps: provs, type: v.venuetype };
       }),
     [venues]
   );
 
   const filteredVenueOptions = (requiredCaps: string[]) => {
     if (!requiredCaps.length) return venueOptions;
+    const needsSeparateRoom = requiredCaps.some(
+      (cap) => cap === "separate_room_on_own" || cap === "separate_room_not_on_own"
+    );
+    const remainingCaps = requiredCaps.filter(
+      (cap) => cap !== "separate_room_on_own" && cap !== "separate_room_not_on_own"
+    );
     return venueOptions.filter((v) => {
       const caps = v.caps || [];
-      return requiredCaps.every((cap) => caps.includes(cap));
+      if (needsSeparateRoom && v.type !== "separate_room") return false;
+      return remainingCaps.every((cap) => caps.includes(cap));
     });
   };
 
@@ -234,7 +245,8 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
           exam_type: examType,
           no_students: students === "" ? 0 : Number(students),
           exam_school: school,
-          school_contact: contact ? contact : null,
+          // Some databases still enforce NOT NULL on this column; send an empty string instead of null
+          school_contact: contact ?? "",
         }),
       });
       if (!examRes.ok) {

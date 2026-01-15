@@ -4,6 +4,7 @@ from timetabling_system.models import (
     Exam,
     Venue,
     ExamVenue,
+    VenueType,
     Invigilator,
     InvigilatorQualification,
     InvigilatorRestriction,
@@ -17,6 +18,8 @@ from timetabling_system.constants import DIET_DATE_RANGES
 class ExamVenueSerializer(serializers.ModelSerializer):
     venue_name = serializers.SerializerMethodField()
     exam_name = serializers.CharField(source="exam.exam_name", read_only=True)
+    venue_type = serializers.SerializerMethodField()
+    venue_accessible = serializers.SerializerMethodField()
 
     class Meta:
         model = ExamVenue
@@ -29,11 +32,21 @@ class ExamVenueSerializer(serializers.ModelSerializer):
             "exam_length",
             "core",
             "provision_capabilities",
+            "venue_type",
+            "venue_accessible",
         )
 
     def get_venue_name(self, obj):
         # Some ExamVenue rows act as placeholders before a venue is allocated.
         return obj.venue.venue_name if obj.venue else None
+
+    def get_venue_type(self, obj):
+        venue = getattr(obj, "venue", None)
+        return venue.venuetype if venue else None
+
+    def get_venue_accessible(self, obj):
+        venue = getattr(obj, "venue", None)
+        return venue.is_accessible if venue is not None else None
 
 
 class ExamVenueWriteSerializer(serializers.ModelSerializer):
@@ -69,6 +82,53 @@ class ExamVenueWriteSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if self.instance and self.instance.core:
             raise serializers.ValidationError("Core exam venues cannot be modified via this endpoint.")
+
+        # If marked as a separate room venue, ensure no overlap with another exam at the same time.
+        prov_caps = attrs.get("provision_capabilities")
+        if prov_caps is None and self.instance:
+            prov_caps = getattr(self.instance, "provision_capabilities", []) or []
+        venue_obj = None
+        if "venue_name" in attrs:
+            venue_obj = self._resolve_venue(attrs.get("venue_name", None))
+        elif self.instance:
+            venue_obj = getattr(self.instance, "venue", None)
+
+        has_separate_room = (
+            (prov_caps and any(
+                cap in ("separate_room_on_own", "separate_room_not_on_own") for cap in prov_caps
+            ))
+            or (venue_obj and getattr(venue_obj, "venuetype", None) == VenueType.SEPARATE_ROOM)
+        )
+        if has_separate_room:
+            venue = venue_obj
+            start_time = attrs.get("start_time", getattr(self.instance, "start_time", None))
+            exam_length = attrs.get("exam_length", getattr(self.instance, "exam_length", None))
+            exam_id = attrs.get("exam", getattr(self.instance, "exam_id", None))
+
+            if venue and start_time and exam_length is not None:
+                new_end = start_time + timedelta(minutes=exam_length)
+                conflicts = []
+                for ev in ExamVenue.objects.filter(venue=venue).exclude(pk=getattr(self.instance, "pk", None)):
+                    if ev.start_time is None or ev.exam_length is None:
+                        continue
+                    # Skip same exam; requirement is to avoid clashes with another exam.
+                    if exam_id and ev.exam_id == exam_id:
+                        continue
+                    existing_end = ev.start_time + timedelta(minutes=ev.exam_length)
+                    overlap = start_time < existing_end and ev.start_time < new_end
+                    if overlap:
+                        conflicts.append(ev.exam.exam_name if ev.exam else "another exam")
+                if conflicts:
+                    raise serializers.ValidationError(
+                        {
+                            "venue_name": f"This separate room is already allocated at that time to {', '.join(conflicts)}."
+                        }
+                    )
+            elif venue:
+                raise serializers.ValidationError(
+                    {"non_field_errors": "Start time and duration are required for separate room venues."}
+                )
+
         return super().validate(attrs)
 
     def create(self, validated_data):
@@ -114,6 +174,9 @@ class ExamSerializer(serializers.ModelSerializer):
         return [ev.venue.venue_name for ev in exam_venues if ev.venue]
 
 
+DISALLOWED_VENUE_CAPS = {"separate_room_on_own", "separate_room_not_on_own"}
+
+
 class VenueSerializer(serializers.ModelSerializer):
     exams = serializers.SerializerMethodField()
     exam_venues = ExamVenueSerializer(source="examvenue_set", many=True, read_only=True)
@@ -138,6 +201,12 @@ class VenueSerializer(serializers.ModelSerializer):
         if exam_venues is None: exam_venues = obj.examvenue_set.select_related("exam").all()
         return [ev.exam.exam_name for ev in exam_venues]
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        caps = data.get("provision_capabilities") or []
+        data["provision_capabilities"] = [c for c in caps if c not in DISALLOWED_VENUE_CAPS]
+        return data
+
 
 class VenueWriteSerializer(serializers.ModelSerializer):
     class Meta:
@@ -151,6 +220,23 @@ class VenueWriteSerializer(serializers.ModelSerializer):
             "qualifications",
             "availability",
         )
+
+    def _clean_caps(self, caps):
+        return [c for c in (caps or []) if c not in DISALLOWED_VENUE_CAPS]
+
+    def validate(self, attrs):
+        if "provision_capabilities" in attrs:
+            attrs["provision_capabilities"] = self._clean_caps(attrs.get("provision_capabilities"))
+        return super().validate(attrs)
+
+    def create(self, validated_data):
+        validated_data["provision_capabilities"] = self._clean_caps(validated_data.get("provision_capabilities"))
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if "provision_capabilities" in validated_data:
+            validated_data["provision_capabilities"] = self._clean_caps(validated_data.get("provision_capabilities"))
+        return super().update(instance, validated_data)
 
     def to_representation(self, instance):
         return VenueSerializer(instance).data

@@ -37,9 +37,7 @@ const VENUE_TYPES = [
   { value: "admin", label: "Admin" },
 ];
 
-const PROVISION_CHOICES = [
-  { value: "separate_room_on_own", label: "Separate room on own" },
-  { value: "separate_room_not_on_own", label: "Separate room not on own" },
+const ALLOWED_PROVISION_CHOICES = [
   { value: "use_computer", label: "Use of a computer" },
   { value: "accessible_hall", label: "Accessible hall" },
 ];
@@ -58,6 +56,8 @@ interface VenueData {
   is_accessible: boolean;
   provision_capabilities: string[];
 }
+
+const ALLOWED_CAPS = new Set(ALLOWED_PROVISION_CHOICES.map((p) => p.value));
 
 export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
@@ -83,7 +83,7 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
     setCapacity(data.capacity);
     setVenueType(data.venuetype);
     setIsAccessible(data.is_accessible);
-    setProvisions(data.provision_capabilities || []);
+    setProvisions((data.provision_capabilities || []).filter((p) => ALLOWED_CAPS.has(p)));
   }, [data]);
 
   const toggleProvision = (value: string) => {
@@ -94,6 +94,7 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
 
   const updateMutation = useMutation({
     mutationFn: async () => {
+      const allowedCaps = provisions.filter((p) => ALLOWED_CAPS.has(p));
       const res = await apiFetch(`${apiBaseUrl}/venues/${venueId}/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -102,7 +103,7 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
           capacity: capacity ? Number(capacity) : 0,
           venuetype: venueType,
           is_accessible: isAccessible,
-          provision_capabilities: provisions,
+          provision_capabilities: allowedCaps,
           qualifications: [],
           availability: [],
         }),
@@ -160,7 +161,7 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
                 Provision Capabilities
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1}>
-                {PROVISION_CHOICES.map((p) => {
+                {ALLOWED_PROVISION_CHOICES.map((p) => {
                   const selected = provisions.includes(p.value);
                   return (
                     <Tooltip key={p.value} title={selected ? "Click to remove" : "Click to add"}>

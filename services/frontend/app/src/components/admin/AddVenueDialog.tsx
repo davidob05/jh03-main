@@ -37,8 +37,6 @@ const VENUE_TYPES = [
 ];
 
 const PROVISION_CHOICES = [
-  { value: "separate_room_on_own", label: "Separate room on own" },
-  { value: "separate_room_not_on_own", label: "Separate room not on own" },
   { value: "use_computer", label: "Use of a computer" },
   { value: "accessible_hall", label: "Accessible hall" },
 ];
@@ -67,6 +65,7 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
 
   const addMutation = useMutation({
     mutationFn: async () => {
+      const allowedCaps = provisions.filter((p) => p === "use_computer" || p === "accessible_hall");
       const response = await apiFetch(`${apiBaseUrl}/venues/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,7 +74,7 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
           capacity: capacity ? Number(capacity) : 0,
           venuetype: venueType,
           is_accessible: isAccessible,
-          provision_capabilities: provisions,
+          provision_capabilities: allowedCaps,
           qualifications: [],
           availability: [],
         }),

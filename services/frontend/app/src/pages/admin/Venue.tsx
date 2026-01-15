@@ -291,7 +291,7 @@ export const AdminVenuePage: React.FC = () => {
                 onClick={() => setVisibleCount((prev) => Math.min(prev + 4, examCount))}
                 disabled={visibleCount >= examCount}
               >
-                {`Show ${Math.min(4, examCount - visibleCount)} more`}
+                {examCount - visibleCount <= 0 ? "No more exams to show" : `Show ${Math.min(4, examCount - visibleCount)} more`}
               </PillButton>
             </Box>
           </>
