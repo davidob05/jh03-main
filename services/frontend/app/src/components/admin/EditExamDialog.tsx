@@ -162,18 +162,8 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
     () =>
       (venues || []).map((v) => {
         const provs = v.provision_capabilities || [];
-        const visibleCaps = provs.filter(
-          (p) => p !== "separate_room_on_own" && p !== "separate_room_not_on_own"
-        );
-        const suffix = visibleCaps.length ? ` (${visibleCaps.map(formatProvisionLabel).join(", ")})` : "";
-        return {
-          value: v.venue_name,
-          label: `${v.venue_name}${suffix}`,
-          caps: provs,
-          type: v.venuetype,
-          availability: v.availability || [],
-          examVenues: v.exam_venues || [],
-        };
+        const suffix = provs.length ? ` (${provs.map(formatProvisionLabel).join(", ")})` : "";
+        return { value: v.venue_name, label: `${v.venue_name}${suffix}`, caps: provs };
       }),
     [venues]
   );

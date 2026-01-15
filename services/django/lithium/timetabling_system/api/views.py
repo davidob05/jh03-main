@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
+from django.core.exceptions import ValidationError as DjangoValidationError
 from datetime import date, timedelta
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -640,6 +641,60 @@ class DietViewSet(viewsets.ModelViewSet):
     serializer_class = DietSerializer
     permission_classes = [permissions.IsAdminUser]
     throttle_classes: list = []
+    
+    
+def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
+    student_exam = student_exam or StudentExam(student=provision.student, exam=provision.exam, exam_venue=None)
+    exam_venue = getattr(student_exam, "exam_venue", None)
+    venue = getattr(exam_venue, "venue", None)
+
+    room_caps = {"separate_room_on_own", "separate_room_not_on_own"}
+    required_caps_raw = _required_capabilities(provision.provisions)
+    required_caps = [cap for cap in required_caps_raw if cap not in room_caps]
+    needs_accessible = _needs_accessible_venue(provision.provisions)
+    needs_separate = _needs_separate_room(provision.provisions)
+    needs_computer = _needs_computer(provision.provisions)
+    allowed_types = _allowed_venue_types(needs_computer, needs_separate)
+
+    matches_needs = False
+    allocation_issue = None
+
+    if not exam_venue:
+        allocation_issue = "No exam venue assigned"
+    elif not venue:
+        allocation_issue = "No physical venue allocated"
+    else:
+        if allowed_types is not None and venue.venuetype not in allowed_types:
+            allocation_issue = "Venue type does not satisfy requirements"
+        elif needs_accessible and not venue.is_accessible:
+            allocation_issue = "Venue is not marked accessible"
+        elif required_caps and not venue_supports_caps(venue, required_caps):
+            allocation_issue = "Venue is missing required provisions"
+        else:
+            matches_needs = True
+
+    exam_caps = getattr(exam_venue, "provision_capabilities", []) or []
+    filtered_exam_caps = [cap for cap in exam_caps if cap not in room_caps]
+
+    return {
+        "student_id": provision.student.student_id,
+        "student_name": provision.student.student_name,
+        "exam_id": provision.exam.exam_id,
+        "exam_name": provision.exam.exam_name,
+        "course_code": provision.exam.course_code,
+        "provisions": provision.provisions,
+        "notes": provision.notes,
+        "exam_venue_id": exam_venue.pk if exam_venue else None,
+        "exam_venue_caps": filtered_exam_caps,
+        "venue_name": venue.venue_name if venue else None,
+        "venue_type": venue.venuetype if venue else None,
+        "venue_accessible": venue.is_accessible if venue else None,
+        "required_capabilities": required_caps,
+        "allowed_venue_types": sorted(list(allowed_types)) if allowed_types else [],
+        "matches_needs": matches_needs,
+        "allocation_issue": allocation_issue,
+        "student_exam_id": student_exam.pk if student_exam else None,
+    }
 
 
 class StudentProvisionListView(APIView):

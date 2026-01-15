@@ -43,6 +43,8 @@ interface VenueData {
   provision_capabilities: string[];
 }
 
+
+
 const ALLOWED_CAPS = new Set(ALLOWED_PROVISION_CHOICES.map((p) => p.value));
 
 export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId, onClose, onSuccess }) => {

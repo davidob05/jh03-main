@@ -96,6 +96,7 @@ class ExamVenueWriteSerializer(serializers.ModelSerializer):
             prov_caps = getattr(self.instance, "provision_capabilities", []) or []
         venue_obj = None
         if "venue_name" in attrs:
+<<<<<<< HEAD
             venue_name = attrs.get("venue_name", None)
             if venue_name:
                 try:
@@ -104,6 +105,9 @@ class ExamVenueWriteSerializer(serializers.ModelSerializer):
                     # Defer missing venue validation to create/update so tests expecting
                     # save-time errors still pass.
                     venue_obj = None
+=======
+            venue_obj = self._resolve_venue(attrs.get("venue_name", None))
+>>>>>>> de21ee7b (added student allocation to examvenue functionality + refined neccesary changes to examvenue edit)
         elif self.instance:
             venue_obj = getattr(self.instance, "venue", None)
 
@@ -113,13 +117,21 @@ class ExamVenueWriteSerializer(serializers.ModelSerializer):
             ))
             or (venue_obj and getattr(venue_obj, "venuetype", None) == VenueType.SEPARATE_ROOM)
         )
+<<<<<<< HEAD
         if has_separate_room and venue_obj:
+=======
+        if has_separate_room:
+>>>>>>> de21ee7b (added student allocation to examvenue functionality + refined neccesary changes to examvenue edit)
             venue = venue_obj
             start_time = attrs.get("start_time", getattr(self.instance, "start_time", None))
             exam_length = attrs.get("exam_length", getattr(self.instance, "exam_length", None))
             exam_id = attrs.get("exam", getattr(self.instance, "exam_id", None))
 
+<<<<<<< HEAD
             if start_time and exam_length is not None:
+=======
+            if venue and start_time and exam_length is not None:
+>>>>>>> de21ee7b (added student allocation to examvenue functionality + refined neccesary changes to examvenue edit)
                 new_end = start_time + timedelta(minutes=exam_length)
                 conflicts = []
                 for ev in ExamVenue.objects.filter(venue=venue).exclude(pk=getattr(self.instance, "pk", None)):
@@ -138,7 +150,11 @@ class ExamVenueWriteSerializer(serializers.ModelSerializer):
                             "venue_name": f"This separate room is already allocated at that time to {', '.join(conflicts)}."
                         }
                     )
+<<<<<<< HEAD
             else:
+=======
+            elif venue:
+>>>>>>> de21ee7b (added student allocation to examvenue functionality + refined neccesary changes to examvenue edit)
                 raise serializers.ValidationError(
                     {"non_field_errors": "Start time and duration are required for separate room venues."}
                 )
