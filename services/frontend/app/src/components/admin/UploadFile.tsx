@@ -106,8 +106,12 @@ export const UploadFile: React.FC = () => {
   };
 
   return (
-    <Panel title="Upload data" disableDivider sx={{ mt: 3, mb: 3 }}>
-      <Stack spacing={1.5}>
+    <Panel
+      title="Upload data"
+      disableDivider
+      sx={{ mt: 1, mb: 0, height: "100%" }}
+    >
+      <Stack spacing={1.25}>
         <Typography variant="body2" color="text.secondary">
           Select a file type and upload a CSV or Excel file to populate the database.
         </Typography>
