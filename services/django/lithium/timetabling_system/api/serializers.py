@@ -10,6 +10,7 @@ from timetabling_system.models import (
     InvigilatorAvailability,
     InvigilatorAssignment,
     Notification,
+    Announcement,
     SlotChoices
 )
 from timetabling_system.constants import DIET_DATE_RANGES
@@ -172,6 +173,23 @@ class NotificationSerializer(serializers.ModelSerializer):
             "email": getattr(user, "email", None),
             "username": getattr(user, "username", None),
         }
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Announcement
+        fields = (
+            "id",
+            "title",
+            "body",
+            "image",
+            "audience",
+            "published_at",
+            "expires_at",
+            "is_active",
+            "priority",
+        )
+        read_only_fields = ("id",)
 
 
 class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
