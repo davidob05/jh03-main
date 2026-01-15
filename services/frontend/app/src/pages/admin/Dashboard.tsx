@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from "react";
-import { Box, Fab, Grid, Paper, Tooltip, Typography } from "@mui/material";
-import NoteAddIcon from "@mui/icons-material/NoteAdd";
+import React, { useEffect, useMemo, useState } from "react";
+import { Box, Fab, Grid, IconButton, Paper, Stack, Tooltip, Typography, CircularProgress } from "@mui/material";
+import AddCommentIcon from "@mui/icons-material/AddComment";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
@@ -8,6 +10,18 @@ import { NotificationsPanel, NotificationItem } from "../../components/admin/Not
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { AddAnnouncementDialog } from "../../components/admin/AddAnnouncementDialog";
+
+type Announcement = {
+  id: number;
+  title: string;
+  body: string;
+  imageUrl?: string | null;
+  image?: string | null;
+  publishedAt?: string;
+  published_at?: string;
+  expiresAt?: string | null;
+  expires_at?: string | null;
+};
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -36,6 +50,7 @@ interface VenueData {
 export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
+  const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
 
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
@@ -107,13 +122,214 @@ export const AdminDashboard: React.FC = () => {
 
   const notifications = (notificationsError ? [] : notificationsFromApi) || [];
 
+  const placeholderAnnouncement: Announcement = {
+    id: 0,
+    title: "Future operations",
+    body: "Announcements for staff will appear here. Publish a new one using the comment button.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1521791136064-7986c2920216?q=80&w=1887&auto=format&fit=crop&ixlib=rb-4.1.0",
+    publishedAt: new Date().toISOString(),
+  };
+
+  const {
+    data: announcementsFromApi = [],
+    isError: announcementsError,
+    isLoading: announcementsLoading,
+  } = useQuery<Announcement[]>({
+    queryKey: ["admin-announcements", "all"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/announcements/?audience=all&active=true`);
+      if (res.status === 404) return [];
+      if (!res.ok) throw new Error("Unable to load announcements");
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const announcements = useMemo(() => {
+    const now = new Date();
+    const safeData = announcementsError ? [] : announcementsFromApi;
+    return safeData.filter((a) => {
+      if (!a) return false;
+      const expires = a.expiresAt ?? a.expires_at;
+      if (expires) {
+        const exp = new Date(expires);
+        if (!Number.isNaN(exp.getTime()) && exp < now) return false;
+      }
+      return true;
+    });
+  }, [announcementsError, announcementsFromApi]);
+
+  useEffect(() => {
+    const total = announcements.length || 1;
+    setActiveAnnouncementIndex(0);
+    const timer = window.setInterval(() => {
+      setActiveAnnouncementIndex((prev) => (prev + 1) % total);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [announcements.length]);
+
+  const showPrevAnnouncement = () => {
+    const total = announcements.length || 1;
+    setActiveAnnouncementIndex((prev) => (prev === 0 ? total - 1 : prev - 1));
+  };
+
+  const showNextAnnouncement = () => {
+    const total = announcements.length || 1;
+    setActiveAnnouncementIndex((prev) => (prev + 1) % total);
+  };
+
+  const activeAnnouncement = announcements[activeAnnouncementIndex] ?? placeholderAnnouncement;
+  const announcementCount = announcements.length;
+  const heroImage =
+    activeAnnouncement.imageUrl ||
+    activeAnnouncement.image ||
+    placeholderAnnouncement.imageUrl;
+  const publishedAtDisplay =
+    activeAnnouncement.publishedAt ||
+    activeAnnouncement.published_at ||
+    placeholderAnnouncement.publishedAt ||
+    new Date().toISOString();
+
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
       <Typography variant="h4" fontWeight={700}>Dashboard</Typography>
       <Typography variant="body2" color="text.secondary">Browse and manage the exam scheduling system.</Typography>
 
-      {/* UploadTimetable Component */}
-      <UploadFile />
+      <Stack direction={{ xs: "column", md: "row" }} spacing={2.5} sx={{ mt: 1.5, mb: 3 }} alignItems="stretch">
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <UploadFile />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Panel
+            title={activeAnnouncement ? activeAnnouncement.title : "Announcements"}
+            actions={
+              <Stack direction="row" spacing={1}>
+                <IconButton
+                  aria-label="Previous announcement"
+                  onClick={showPrevAnnouncement}
+                  sx={{
+                    color: "#fff",
+                    backgroundColor: "rgba(255,255,255,0.14)",
+                    "&:hover": { backgroundColor: "rgba(255,255,255,0.24)" },
+                  }}
+                >
+                  <ChevronLeftIcon />
+                </IconButton>
+                <IconButton
+                  aria-label="Next announcement"
+                  onClick={showNextAnnouncement}
+                  sx={{
+                    color: "#fff",
+                    backgroundColor: "rgba(255,255,255,0.14)",
+                    "&:hover": { backgroundColor: "rgba(255,255,255,0.24)" },
+                  }}
+                >
+                  <ChevronRightIcon />
+                </IconButton>
+              </Stack>
+            }
+            disableDivider
+            sx={{
+              mt: 1,
+              flex: 1,
+              width: "100%",
+              height: "100%",
+              overflow: "hidden",
+              color: "#fff",
+              backgroundImage: heroImage
+                ? `linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.65) 100%), url(${heroImage})`
+                : undefined,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              "& .MuiTypography-h6": { color: "#fff" },
+            }}
+          >
+            {activeAnnouncement && (
+              <Stack
+                key={activeAnnouncement.id}
+                spacing={1.2}
+                sx={{
+                  pt: 0.5,
+                  color: "#fff",
+                  maxWidth: "82%",
+                  animation: "fadeIn 0.6s ease-in-out",
+                  "@keyframes fadeIn": {
+                    from: { opacity: 0, transform: "translateY(6px)" },
+                    to: { opacity: 1, transform: "translateY(0)" },
+                  },
+                }}
+              >
+                <Typography variant="overline" sx={{ letterSpacing: 0.6, opacity: 0.9 }}>
+                  {new Date(publishedAtDisplay).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </Typography>
+                <Typography variant="body1" sx={{ color: "#e8ecf1" }}>
+                  {activeAnnouncement.body}
+                </Typography>
+              </Stack>
+            )}
+
+            {announcementsLoading && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backdropFilter: "blur(2px)",
+                  backgroundColor: "rgba(0,0,0,0.45)",
+                }}
+              >
+                <Stack spacing={1} alignItems="center" sx={{ color: "#fff" }}>
+                  <CircularProgress size={32} sx={{ color: "#fff" }} />
+                  <Typography variant="caption" sx={{ color: "#e8ecf1" }}>
+                    Loading announcements...
+                  </Typography>
+                </Stack>
+              </Box>
+            )}
+
+            {announcementCount > 1 && (
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{
+                  position: "absolute",
+                  bottom: 12,
+                  left: 16,
+                  zIndex: 2,
+                }}
+              >
+                {announcements.map((a, idx) => {
+                  const isActive = idx === activeAnnouncementIndex;
+                  return (
+                    <Box
+                      key={a.id}
+                      onClick={() => setActiveAnnouncementIndex(idx)}
+                      sx={{
+                        width: isActive ? 12 : 10,
+                        height: isActive ? 12 : 10,
+                        borderRadius: "50%",
+                        backgroundColor: isActive ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.45)",
+                        border: "1px solid rgba(255,255,255,0.7)",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        boxShadow: isActive ? "0 0 0 3px rgba(255,255,255,0.18)" : "none",
+                      }}
+                    />
+                  );
+                })}
+              </Stack>
+            )}
+          </Panel>
+        </Box>
+      </Stack>
 
       {/* Statistics */}
       <Panel title="Statistics" disableDivider>
@@ -184,7 +400,7 @@ export const AdminDashboard: React.FC = () => {
             boxShadow: 3,
           }}
         >
-          <NoteAddIcon  fontSize="medium"/>
+          <AddCommentIcon  fontSize="medium"/>
         </Fab>
       </Tooltip>
 
