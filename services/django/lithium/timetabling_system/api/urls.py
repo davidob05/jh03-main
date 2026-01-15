@@ -12,6 +12,7 @@ from accounts.api import (
     SessionLogoutView,
 )
 from .views import (
+    AnnouncementViewSet,
     ExamVenueViewSet,
     ExamViewSet,
     InvigilatorAssignmentViewSet,
@@ -31,6 +32,7 @@ router.register("venues", VenueViewSet, basename="venue")
 router.register("exam-venues", ExamVenueViewSet, basename="exam-venue")
 router.register("invigilators", InvigilatorViewSet, basename="invigilator")
 router.register("invigilator-assignments", InvigilatorAssignmentViewSet, basename="invigilator-assignment")
+router.register("announcements", AnnouncementViewSet, basename="announcement")
 
 urlpatterns = [
     path("auth/token/login/", ObtainAuthTokenView.as_view(), name="api-login"),

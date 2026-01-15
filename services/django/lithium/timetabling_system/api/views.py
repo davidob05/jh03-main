@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import models
 from datetime import date, timedelta
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -24,6 +25,7 @@ from timetabling_system.models import (
     StudentExam,
     Provisions,
     Notification,
+    Announcement,
     SlotChoices,
 )
 from timetabling_system.constants import DIET_DATE_RANGES
@@ -47,6 +49,7 @@ from .serializers import (
     VenueSerializer,
     VenueWriteSerializer,
     NotificationSerializer,
+    AnnouncementSerializer,
 )
 
 
@@ -529,8 +532,8 @@ class NotificationsView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
-
+        
+        
 def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
     student_exam = student_exam or StudentExam(student=provision.student, exam=provision.exam, exam_venue=None)
     exam_venue = getattr(student_exam, "exam_venue", None)
@@ -591,6 +594,44 @@ def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
         "allocation_issue": allocation_issue,
         "student_exam_id": student_exam.pk if student_exam else None,
     }
+    
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for announcements shown on dashboards.
+    Admin-only for mutations; authenticated invigilators/admins can read.
+    """
+
+    queryset = Announcement.objects.all()
+    serializer_class = AnnouncementSerializer
+    throttle_classes: list = []
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [IsInvigilatorOrAdmin()]
+        return [permissions.IsAdminUser()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+
+        audience = self.request.query_params.get("audience")
+        if audience:
+            qs = qs.filter(audience=audience)
+
+        active_flag = self.request.query_params.get("active")
+        if active_flag is not None:
+            should_be_active = str(active_flag).lower() in {"1", "true", "yes"}
+            if should_be_active:
+                now = timezone.now()
+                qs = qs.filter(is_active=True).filter(
+                    models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now)
+                )
+            else:
+                qs = qs.filter(is_active=False)
+
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=_get_request_user(self, serializer))
 
 
 class StudentProvisionListView(APIView):

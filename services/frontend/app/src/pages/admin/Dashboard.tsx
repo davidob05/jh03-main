@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { Box, Grid, Typography, Paper } from "@mui/material";
+import { Box, Fab, Grid, Paper, Tooltip, Typography } from "@mui/material";
+import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { NotificationsPanel, NotificationItem } from "../../components/admin/NotificationsPanel";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
+import { AddAnnouncementDialog } from "../../components/admin/AddAnnouncementDialog";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -33,6 +35,7 @@ interface VenueData {
 
 export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
+  const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
 
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
@@ -167,6 +170,29 @@ export const AdminDashboard: React.FC = () => {
           </PillButton>
         </Box>
       )}
+
+      {/* Add announcement floating action button */}
+      <Tooltip title="Post an announcement">
+        <Fab
+          color="primary"
+          size="large"
+          onClick={() => setAnnouncementDialogOpen(true)}
+          sx={{
+            position: "fixed",
+            bottom: 32,
+            right: 32,
+            boxShadow: 3,
+          }}
+        >
+          <NoteAddIcon  fontSize="medium"/>
+        </Fab>
+      </Tooltip>
+
+      <AddAnnouncementDialog
+        open={announcementDialogOpen}
+        onClose={() => setAnnouncementDialogOpen(false)}
+        onCreated={() => setAnnouncementDialogOpen(false)}
+      />
     </Box>
   );
 };

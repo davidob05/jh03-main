@@ -1,7 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   Box,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -14,10 +13,9 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { Close } from "@mui/icons-material";
+import { Close, Upload } from "@mui/icons-material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../PillButton";
-import { Panel } from "../Panel";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 type Audience = "invigilator" | "all";
@@ -44,22 +42,30 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [audience, setAudience] = useState<Audience>("invigilator");
-  const [imageUrl, setImageUrl] = useState("");
+  const [audience, setAudience] = useState<Audience | "">("");
+  const [imageData, setImageData] = useState("");
+  const [imageName, setImageName] = useState<string | null>(null);
   const [publishedAt, setPublishedAt] = useState(formatDateTimeInput(new Date()));
   const [expiresAt, setExpiresAt] = useState("");
-  const [priority, setPriority] = useState<number | "">(0);
+  const [priority, setPriority] = useState<number | "">("");
   const [isActive, setIsActive] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const isValidDateInput = (value: string) => {
+    if (!value) return true;
+    const d = new Date(value);
+    return !Number.isNaN(d.getTime());
+  };
 
   const resetForm = () => {
     setTitle("");
     setBody("");
-    setAudience("invigilator");
-    setImageUrl("");
+    setAudience("");
+    setImageData("");
+    setImageName(null);
     setPublishedAt(formatDateTimeInput(new Date()));
     setExpiresAt("");
-    setPriority(0);
+    setPriority("");
     setIsActive(true);
     setError(null);
   };
@@ -72,6 +78,10 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!imageData) {
+        throw new Error("Image is required.");
+      }
+
       const response = await apiFetch(`${apiBaseUrl}/announcements/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -79,7 +89,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
           title: title.trim(),
           body: body.trim(),
           audience,
-          image: imageUrl.trim() || null,
+          image: imageData,
           published_at: publishedAt ? new Date(publishedAt).toISOString() : undefined,
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           is_active: isActive,
@@ -105,41 +115,25 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
     },
   });
 
-  const previewDate = useMemo(() => {
-    const base = publishedAt ? new Date(publishedAt) : new Date();
-    if (Number.isNaN(base.getTime())) return "Publish date TBC";
-    return base.toLocaleString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }, [publishedAt]);
-
-  const expiresHint = useMemo(() => {
-    if (!expiresAt) return "No expiry set";
-    const exp = new Date(expiresAt);
-    if (Number.isNaN(exp.getTime())) return "Invalid expiry date";
-    return `Expires ${exp.toLocaleString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-  }, [expiresAt]);
+  const isSaveDisabled =
+    !title.trim() ||
+    !body.trim() ||
+    !imageData ||
+    !audience ||
+    priority === "" ||
+    !isValidDateInput(publishedAt) ||
+    !isValidDateInput(expiresAt);
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        Add announcement
+        Post announcement
         <IconButton aria-label="Close dialog" size="small" onClick={handleClose}>
           <Close fontSize="small" />
         </IconButton>
       </DialogTitle>
       <DialogContent dividers>
-        <Stack spacing={2}>
+        <Stack spacing={2.2}>
           <TextField
             label="Title"
             value={title}
@@ -156,17 +150,49 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
             multiline
             minRows={3}
           />
-          <TextField
-            label="Audience"
-            select
-            value={audience}
-            onChange={(e) => setAudience(e.target.value as Audience)}
-            fullWidth
-          >
-            <MenuItem value="invigilator">Invigilators only</MenuItem>
-            <MenuItem value="all">All users</MenuItem>
-          </TextField>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ md: "center" }}>
+            <TextField
+              label="Audience"
+              select
+              value={audience}
+              onChange={(e) => setAudience(e.target.value as Audience | "")}
+              fullWidth
+            >
+              <MenuItem value="" disabled>
+                Select audience
+              </MenuItem>
+              <MenuItem value="invigilator">Invigilators only</MenuItem>
+              <MenuItem value="all">All users</MenuItem>
+            </TextField>
+            <TextField
+              label="Priority"
+              select
+              value={priority === "" ? "" : String(priority)}
+              onChange={(e) => setPriority(Number(e.target.value))}
+              fullWidth
+            >
+              <MenuItem value="" disabled>
+                Select priority
+              </MenuItem>
+              <MenuItem value="1">Low</MenuItem>
+              <MenuItem value="2">Medium</MenuItem>
+              <MenuItem value="3">High</MenuItem>
+            </TextField>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="Active"
+              sx={{ ml: { md: 1 }, mt: { xs: 1, md: 0 } }}
+            />
+          </Stack>
+
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
             <TextField
               label="Publish at"
               type="datetime-local"
@@ -184,68 +210,69 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               InputLabelProps={{ shrink: true }}
             />
           </Stack>
-          <TextField
-            label="Image URL (optional)"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://example.com/hero.jpg"
-            fullWidth
-          />
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-            <TextField
-              label="Priority"
-              type="number"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value === "" ? "" : Number(e.target.value))}
-              helperText="Higher numbers are shown first."
-              fullWidth
-              inputProps={{ min: 0 }}
-            />
-            <Panel
-              sx={{
-                flex: 1,
-                p: 2,
-                mb: 0,
-                backgroundColor: "#f9fafb",
-              }}
-              disableDivider
-            >
-              <Stack spacing={1}>
-                <Typography variant="caption" color="text.secondary">
-                  Status
+
+          <Stack spacing={1}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  Image
                 </Typography>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                  <Chip
-                    size="small"
-                    label={audience === "all" ? "All users" : "Invigilators"}
-                    sx={{ backgroundColor: "#e3f2fd", color: "#0d47a1", fontWeight: 600 }}
-                  />
-                  <Chip
-                    size="small"
-                    label={isActive ? "Active" : "Inactive"}
-                    color={isActive ? "success" : "default"}
-                    variant={isActive ? "filled" : "outlined"}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    {expiresHint}
+                <Typography variant="caption" color="text.secondary">
+                  JPEG or PNG; shown as the announcement hero.
+                </Typography>
+                {imageName ? (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                    Selected: {imageName}
                   </Typography>
-                </Stack>
-                <Typography variant="caption" color="text.secondary">
-                  {`Publishes ${previewDate}`}
-                </Typography>
-              </Stack>
-            </Panel>
-          </Stack>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                color="primary"
+                ) : null}
+              </Box>
+              <PillButton
+                variant="outlined"
+                size="small"
+                component="label"
+                startIcon={<Upload />}
+                disabled={mutation.isPending}
+              >
+                Upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!file.type.startsWith("image/")) {
+                      setError("Please select an image file.");
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      setImageData(reader.result as string);
+                      setImageName(file.name);
+                      setError(null);
+                    };
+                    reader.onerror = () => {
+                      setError("Failed to read image file.");
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </PillButton>
+            </Stack>
+            {imageData && (
+              <Box
+                sx={{
+                  height: 180,
+                  borderRadius: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  backgroundImage: `url(${imageData})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
               />
-            }
-            label="Show this announcement immediately"
-          />
+            )}
+          </Stack>
 
           {error && (
             <Box
@@ -265,9 +292,6 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
-        <PillButton variant="outlined" onClick={handleClose}>
-          Cancel
-        </PillButton>
         <PillButton
           variant="contained"
           onClick={() => {
@@ -275,12 +299,24 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               setError("Title and body are required.");
               return;
             }
+            if (!imageData) {
+              setError("Image is required.");
+              return;
+            }
+            if (publishedAt && Number.isNaN(new Date(publishedAt).getTime())) {
+              setError("Publish date is invalid.");
+              return;
+            }
+            if (expiresAt && Number.isNaN(new Date(expiresAt).getTime())) {
+              setError("Expiry date is invalid.");
+              return;
+            }
             setError(null);
             mutation.mutate();
           }}
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || isSaveDisabled}
         >
-          {mutation.isPending ? "Saving..." : "Save announcement"}
+          {mutation.isPending ? "Posting..." : "Post"}
         </PillButton>
       </DialogActions>
     </Dialog>
