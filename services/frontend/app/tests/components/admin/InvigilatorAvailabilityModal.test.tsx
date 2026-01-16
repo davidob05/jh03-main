@@ -1,5 +1,4 @@
-import {render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { InvigilatorAvailabilityModal } from "@/components/admin/InvigilatorAvailabilityModal";
 import dayjs from "dayjs";
@@ -170,11 +169,10 @@ describe("Components - InvigilatorAvailabilityModal", () => {
         expect(link).toHaveAttribute("href", "/admin/invigilators/6");
     });
     it ("calls onClose when Close button is clicked", async () => {
-        const user = userEvent.setup();
-        const onClose = vi.fn();
+    const onClose = vi.fn();
 
-        renderComponent({ onClose });
-        await user.click(screen.getByRole("button", { name: "Close" }));
-        expect(onClose).toHaveBeenCalledTimes(1);
+    renderComponent({ onClose });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

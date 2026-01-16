@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from datetime import timedelta
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from timetabling_system.models import (
     Exam,
     Venue,
@@ -249,11 +251,15 @@ class InvigilatorSerializer(serializers.ModelSerializer):
     qualifications = InvigilatorQualificationSerializer(many=True, required=False)
     restrictions = InvigilatorRestrictionSerializer(many=True, required=False)
     availabilities = InvigilatorAvailabilitySerializer(many=True, read_only=True)
+    user = serializers.DictField(write_only=True, required=False, allow_null=True)
+    user_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Invigilator
         fields = (
             "id",
+            "user",
+            "user_id",
             "preferred_name",
             "full_name",
             "mobile",
@@ -271,10 +277,43 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "availabilities",
         )
 
+    def validate_user(self, value):
+        if value in (None, {}):
+            return None
+        username = (value.get("username") or "").strip()
+        email = (value.get("email") or "").strip() or None
+        password = value.get("password") or None
+
+        if not username:
+            raise serializers.ValidationError("username is required when providing user details.")
+
+        User = get_user_model()
+        if User.objects.filter(username=username).exists():
+            raise serializers.ValidationError("A user with that username already exists.")
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError("A user with that email already exists.")
+
+        return {"username": username, "email": email, "password": password}
+
+    def _create_user_for_invigilator(self, user_data):
+        if not user_data:
+            return None
+        User = get_user_model()
+        password = user_data.get("password") or User.objects.make_random_password()
+        return User.objects.create_user(
+            username=user_data["username"],
+            email=user_data.get("email"),
+            password=password,
+        )
+
     def create(self, validated_data):
+        user_data = validated_data.pop("user", None)
         qualifications_data = validated_data.pop("qualifications", [])
         restrictions_data = validated_data.pop("restrictions", [])
-        invigilator = Invigilator.objects.create(**validated_data)
+
+        with transaction.atomic():
+            user = self._create_user_for_invigilator(user_data)
+            invigilator = Invigilator.objects.create(user=user, **validated_data)
 
         for q in qualifications_data:
             InvigilatorQualification.objects.create(
@@ -293,6 +332,7 @@ class InvigilatorSerializer(serializers.ModelSerializer):
         self._generate_availability(invigilator, diets)
 
         return invigilator
+
     def _generate_availability(self, invigilator, diets):
         availability_objects = []
 
@@ -321,10 +361,14 @@ class InvigilatorSerializer(serializers.ModelSerializer):
         )
 
     def update(self, instance, validated_data):
+        user_data = validated_data.pop("user", None)
         qualifications_data = validated_data.pop("qualifications", None)
         restrictions_data = validated_data.pop("restrictions", None)
 
-        instance = super().update(instance, validated_data)
+        with transaction.atomic():
+            if user_data and instance.user is None:
+                instance.user = self._create_user_for_invigilator(user_data)
+            instance = super().update(instance, validated_data)
 
         if qualifications_data is not None:
             InvigilatorQualification.objects.filter(invigilator=instance).delete()
