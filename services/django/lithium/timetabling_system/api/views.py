@@ -27,8 +27,8 @@ from timetabling_system.models import (
     Notification,
     Announcement,
     SlotChoices,
+    Diet,
 )
-from timetabling_system.constants import DIET_DATE_RANGES
 from timetabling_system.services import ingest_upload_result
 from timetabling_system.services.venue_matching import venue_supports_caps
 from timetabling_system.services.upload_processor import (
@@ -764,11 +764,13 @@ class InvigilatorAvailabilityView(APIView):
             invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
         return invigilator
 
-    def _validate_diet(self, diet_code: str | None):
+    def _validate_diet(self, diet_code: str | None) -> Diet:
         if not diet_code:
             raise ValidationError({"diet": "Diet is required."})
-        # Allow diets outside DIET_DATE_RANGES so that legacy/new codes still work.
-        return diet_code
+        diet = Diet.objects.filter(code=diet_code).first()
+        if not diet:
+            raise ValidationError({"diet": f"Unknown diet '{diet_code}'."})
+        return diet
 
     def _ensure_availability_rows(self, invigilator, diet_code: str, start_date: date | None, end_date: date | None):
         if start_date is None or end_date is None:
@@ -842,19 +844,32 @@ class InvigilatorAvailabilityView(APIView):
         restriction_diets = list(
             InvigilatorRestriction.objects.filter(invigilator=invigilator).values_list("diet", flat=True)
         )
-        available_diets = []
-        for code, span in DIET_DATE_RANGES.items():
-            available_diets.append({"code": code, "start_date": str(span[0]), "end_date": str(span[1])})
-        for code in restriction_diets:
-            if not any(d["code"] == code for d in available_diets):
-                available_diets.append({"code": code, "start_date": None, "end_date": None})
+        diet_qs = list(Diet.objects.all().order_by("-is_active", "-start_date", "code"))
+        if not diet_qs:
+            return Response({"detail": "No diets are configured."}, status=status.HTTP_400_BAD_REQUEST)
 
-        diet = request.query_params.get("diet") or (available_diets[0]["code"] if available_diets else None)
-        self._validate_diet(diet)
+        available_diets = [
+            {
+                "code": d.code,
+                "start_date": str(d.start_date) if d.start_date else None,
+                "end_date": str(d.end_date) if d.end_date else None,
+            }
+            for d in diet_qs
+        ]
 
-        start_date = end_date = None
-        if diet in DIET_DATE_RANGES:
-            start_date, end_date = DIET_DATE_RANGES[diet]
+        requested_diet_code = request.query_params.get("diet")
+        diet_obj = None
+        if requested_diet_code:
+            diet_obj = self._validate_diet(requested_diet_code)
+        else:
+            diet_obj = next((d for d in diet_qs if d.is_active), diet_qs[0] if diet_qs else None)
+
+        if diet_obj is None:
+            return Response({"detail": "No diets are configured."}, status=status.HTTP_400_BAD_REQUEST)
+
+        diet = diet_obj.code
+        start_date = diet_obj.start_date
+        end_date = diet_obj.end_date
 
         self._ensure_availability_rows(invigilator, diet, start_date, end_date)
 
@@ -882,12 +897,12 @@ class InvigilatorAvailabilityView(APIView):
             return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
 
         payload = request.data or {}
-        diet = self._validate_diet(payload.get("diet"))
+        diet_obj = self._validate_diet(payload.get("diet"))
+        diet = diet_obj.code
         unavailable = payload.get("unavailable") or []
 
-        start_date = end_date = None
-        if diet in DIET_DATE_RANGES:
-            start_date, end_date = DIET_DATE_RANGES[diet]
+        start_date = diet_obj.start_date
+        end_date = diet_obj.end_date
 
         self._ensure_availability_rows(invigilator, diet, start_date, end_date)
 
