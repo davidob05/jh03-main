@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -15,15 +15,17 @@ import {
   Box,
   IconButton,
   Tooltip,
+  InputAdornment,
+  Divider,
 } from "@mui/material";
-import { Close } from "@mui/icons-material";
+import { Close, Visibility, VisibilityOff } from "@mui/icons-material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
 import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 
-const STEPS = ["Personal Details", "Qualifications", "Restrictions", "Availability"];
+const STEPS = ["Personal Details", "Login Details", "Qualifications", "Restrictions", "Availability"];
 
 const DIET_CHOICES = [
   { value: "DEC_2025", label: "December 2025" },
@@ -61,12 +63,16 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const DEFAULT_TEMP_PASSWORD = "TempPass123!";
   const queryClient = useQueryClient();
   const [activeStep, setActiveStep] = useState(0);
 
   // Personal details
   const [preferredName, setPreferredName] = useState("");
   const [fullName, setFullName] = useState("");
+  const [loginUsername, setLoginUsername] = useState("");
+  const [tempPassword, setTempPassword] = useState(DEFAULT_TEMP_PASSWORD);
+  const [showPassword, setShowPassword] = useState(false);
   const [mobile, setMobile] = useState("");
   const [mobileTextOnly, setMobileTextOnly] = useState("");
   const [janetTxt, setJanetTxt] = useState("");
@@ -95,6 +101,8 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
     setActiveStep(0);
     setPreferredName("");
     setFullName("");
+    setLoginUsername("");
+    setTempPassword(DEFAULT_TEMP_PASSWORD);
     setMobile("");
     setMobileTextOnly("");
     setJanetTxt("");
@@ -111,6 +119,22 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
 
   const addMutation = useMutation({
     mutationFn: async () => {
+      const deriveUsernameFromEmail = (email: string) => {
+        const trimmed = (email || "").trim();
+        if (!trimmed) return "";
+        const atIdx = trimmed.indexOf("@");
+        return atIdx === -1 ? trimmed : trimmed.slice(0, atIdx);
+      };
+      const emailUsername = deriveUsernameFromEmail(universityEmail);
+      const usernameToUse = (loginUsername || emailUsername || "").trim();
+      const passwordToUse = (tempPassword || "").trim();
+      if (!usernameToUse) {
+        throw new Error("Username is required to create the invigilator login.");
+      }
+      if (!passwordToUse) {
+        throw new Error("Temporary password cannot be empty.");
+      }
+
       const response = await apiFetch(`${apiBaseUrl}/invigilators/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,6 +150,11 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
           contracted_hours: contractedHours ? Number(contractedHours) : null,
           notes,
           resigned,
+          user: {
+            username: usernameToUse,
+            email: universityEmail || personalEmail || undefined,
+            password: passwordToUse,
+          },
 
           qualifications: qualifications.map(q => ({ qualification: q })),
 
@@ -156,6 +185,15 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
     },
   });
 
+  useEffect(() => {
+    // Autofill username from university email to save admin effort.
+    if (!loginUsername && universityEmail) {
+      const atIdx = universityEmail.indexOf("@");
+      const derived = atIdx === -1 ? universityEmail : universityEmail.slice(0, atIdx);
+      setLoginUsername(derived);
+    }
+  }, [loginUsername, universityEmail]);
+
   const renderStepContent = () => {
     switch (activeStep) {
       case 0:
@@ -183,6 +221,42 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
 
       case 1:
         return (
+          <Stack spacing={2} divider={<Divider flexItem />}>
+            <TextField
+              label="Username"
+              value={loginUsername}
+              onChange={e => setLoginUsername(e.target.value)}
+              fullWidth
+              required
+              helperText="Auto-filled from University Email if left blank."
+            />
+            <TextField
+              label="Temporary Password"
+              value={tempPassword}
+              onChange={e => setTempPassword(e.target.value)}
+              fullWidth
+              required
+              helperText="Starter password which the invigilator can change after first login."
+              type={showPassword ? "text" : "password"}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      onClick={() => setShowPassword((s) => !s)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Stack>
+        );
+
+      case 2:
+        return (
           <CollapsibleSection title="Qualifications" defaultExpanded>
             {QUALIFICATION_CHOICES.map(q => (
               <Tooltip key={q.value} title={q.help || q.label}>
@@ -198,7 +272,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
           </CollapsibleSection>
         );
 
-      case 2:
+      case 3:
         return (
           <Stack spacing={2}>
             {/* General Requirements */}
@@ -266,7 +340,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
           </Stack>
         );
 
-      case 3:
+      case 4:
         return (
           <Stack direction="row" spacing={1} flexWrap="wrap">
             {DIET_CHOICES.map(diet => {
@@ -298,7 +372,13 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
   };
 
   const mandatoryFieldsFilled =
-    preferredName && fullName && mobile && universityEmail && personalEmail;
+    preferredName &&
+    fullName &&
+    mobile &&
+    universityEmail &&
+    personalEmail &&
+    (loginUsername || universityEmail || personalEmail) &&
+    tempPassword;
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>

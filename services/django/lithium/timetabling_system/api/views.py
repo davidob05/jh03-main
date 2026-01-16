@@ -840,15 +840,38 @@ class InvigilatorAvailabilityView(APIView):
         # Prepare notification
         inv_name = invigilator.preferred_name or invigilator.full_name or "Invigilator"
         count_unavailable = len(unavailable_set)
-        sample = ", ".join(
-            [f"{d.isoformat()} {s}" for d, s in list(unavailable_set)[:6]]
-        )
+
+        def _format_slot(slot: str) -> str:
+            return slot.replace("_", " ").title()
+
+        slot_order = {slot: idx for idx, slot in enumerate(SlotChoices.values)}
+
+        def _summarize_unavailable() -> str:
+            by_date: dict[date, list[str]] = {}
+            for unavailable_date, slot in unavailable_set:
+                by_date.setdefault(unavailable_date, []).append(slot)
+
+            parts: list[str] = []
+            for unavailable_date in sorted(by_date.keys())[:3]:
+                slots_for_day = sorted(by_date[unavailable_date], key=lambda s: slot_order.get(s, len(slot_order)))
+                slot_labels = ", ".join(_format_slot(slot) for slot in slots_for_day)
+                parts.append(f"{unavailable_date.strftime('%b %d')}: {slot_labels}")
+
+            remaining_days = len(by_date) - len(parts)
+            if remaining_days > 0:
+                parts.append(f"+{remaining_days} more day{'s' if remaining_days != 1 else ''}")
+
+            return "; ".join(parts)
+
         if count_unavailable:
-            message = f"{inv_name} updated restrictions for {diet}: {count_unavailable} slot(s) unavailable"
-            if sample:
-                message += f" (e.g. {sample})"
+            slot_word = "slot" if count_unavailable == 1 else "slots"
+            summary = _summarize_unavailable()
+            if summary:
+                message = f"{inv_name} updated availability for {diet}: unavailable on {summary} ({count_unavailable} {slot_word})"
+            else:
+                message = f"{inv_name} updated availability for {diet}: {count_unavailable} {slot_word} unavailable"
         else:
-            message = f"{inv_name} cleared restrictions for {diet} (all slots available)"
+            message = f"{inv_name} set availability for {diet}: all slots available"
         log_notification(Notification.NotificationType.AVAILABILITY, message, user=request.user)
 
         refreshed_qs = InvigilatorAvailability.objects.filter(invigilator=invigilator)

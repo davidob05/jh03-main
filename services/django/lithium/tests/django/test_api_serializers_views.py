@@ -154,8 +154,8 @@ class InvigilatorSerializerTests(TestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
         invig = serializer.save()
         self.assertEqual(invig.qualifications.count(), 1)
-        # Single day diet range -> 3 slots
-        self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 3)
+        # Single day diet range -> 2 slots (morning + evening)
+        self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 2)
 
     def test_update_replaces_qualifications_and_restrictions(self):
         invig = Invigilator.objects.create(preferred_name="Sam", full_name="Sam Invig")
@@ -173,7 +173,7 @@ class InvigilatorSerializerTests(TestCase):
         invig.refresh_from_db()
         self.assertEqual(invig.qualifications.count(), 1)
         self.assertEqual(invig.restrictions.count(), 1)
-        self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 3)
+        self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 2)
 
     def test_generate_availability_skips_unknown_diet_ranges(self):
         with mock.patch("timetabling_system.api.serializers.DIET_DATE_RANGES", {}):

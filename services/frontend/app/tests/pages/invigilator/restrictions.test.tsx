@@ -24,7 +24,6 @@ const sampleResponse = {
       date: "2025-12-01",
       slots: [
         { slot: "MORNING", available: true },
-        { slot: "AFTERNOON", available: true },
         { slot: "EVENING", available: true },
       ],
     },
@@ -32,17 +31,14 @@ const sampleResponse = {
       date: "2025-12-02",
       slots: [
         { slot: "MORNING", available: true },
-        { slot: "AFTERNOON", available: true },
         { slot: "EVENING", available: true },
       ],
     },
   ],
   availabilities: [
     { date: "2025-12-01", slot: "MORNING", available: true },
-    { date: "2025-12-01", slot: "AFTERNOON", available: true },
     { date: "2025-12-01", slot: "EVENING", available: true },
     { date: "2025-12-02", slot: "MORNING", available: true },
-    { date: "2025-12-02", slot: "AFTERNOON", available: true },
     { date: "2025-12-02", slot: "EVENING", available: true },
   ],
 };
@@ -100,9 +96,9 @@ describe("Page - Invigilator Restrictions", () => {
     expect(await screen.findByText(/Mon, 1 Dec/i)).toBeInTheDocument();
     expect(await screen.findByText(/Tue, 2 Dec/i)).toBeInTheDocument();
     const morningButtons = await screen.findAllByRole("button", { name: /morning/i });
-    const afternoonButtons = await screen.findAllByRole("button", { name: /afternoon/i });
+    const eveningButtons = await screen.findAllByRole("button", { name: /evening/i });
     expect(morningButtons.length).toBeGreaterThan(0);
-    expect(afternoonButtons.length).toBeGreaterThan(0);
+    expect(eveningButtons.length).toBeGreaterThan(0);
   });
 
   it("sends deselected slots on submit and shows success snackbar", async () => {
@@ -110,12 +106,12 @@ describe("Page - Invigilator Restrictions", () => {
     await screen.findByText(/Mon, 1 Dec/i);
 
     const firstCard = screen.getByText(/Mon, 1 Dec/i).closest("[role='region']") || screen.getByText(/Mon, 1 Dec/i).parentElement?.parentElement;
-    const afternoonBtn =
-      firstCard && within(firstCard).queryByRole("button", { name: /Afternoon/i })
-        ? within(firstCard).getByRole("button", { name: /Afternoon/i })
-        : (await screen.findAllByRole("button", { name: /Afternoon/i }))[0];
+    const eveningBtn =
+      firstCard && within(firstCard).queryByRole("button", { name: /Evening/i })
+        ? within(firstCard).getByRole("button", { name: /Evening/i })
+        : (await screen.findAllByRole("button", { name: /Evening/i }))[0];
 
-    fireEvent.click(afternoonBtn);
+    fireEvent.click(eveningBtn);
     fireEvent.click(screen.getByRole("button", { name: /submit restrictions/i }));
 
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledTimes(2));
@@ -123,7 +119,7 @@ describe("Page - Invigilator Restrictions", () => {
     const putCall = apiFetchMock.mock.calls.find(([, options]) => (options as any)?.method === "PUT");
     expect(putCall).toBeTruthy();
     const body = JSON.parse((putCall?.[1] as RequestInit).body as string);
-    expect(body.unavailable).toContainEqual({ date: "2025-12-01", slot: "AFTERNOON" });
+    expect(body.unavailable).toContainEqual({ date: "2025-12-01", slot: "EVENING" });
 
     await waitFor(() => expect(screen.getByText(/restrictions updated/i)).toBeInTheDocument());
   });
@@ -183,7 +179,7 @@ describe("Page - Invigilator Restrictions", () => {
     renderPage();
     await screen.findByText(/Mon, 1 Dec/i);
 
-    fireEvent.click((await screen.findAllByRole("button", { name: /afternoon/i }))[0]);
+    fireEvent.click((await screen.findAllByRole("button", { name: /evening/i }))[0]);
     fireEvent.click(screen.getByRole("button", { name: /submit restrictions/i }));
 
     expect(await screen.findByText(/Failed to update restrictions/i)).toBeInTheDocument();
