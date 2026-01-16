@@ -473,6 +473,23 @@ def _normalize_provisions(value: Any) -> List[str]:
     else:
         tokens = re.split(r"[;,/]", str(value))
 
+    def _match_extra_time_token(token: str, slug: str) -> Optional[str]:
+        if "extra" not in slug or "time" not in slug:
+            return None
+        numbers = [int(n) for n in re.findall(r"\d+", slug)]
+        if 100 in numbers:
+            return ProvisionType.EXTRA_TIME_100
+        if "hour" in slug:
+            if 30 in numbers:
+                return ProvisionType.EXTRA_TIME_30_PER_HOUR
+            if 20 in numbers:
+                return ProvisionType.EXTRA_TIME_20_PER_HOUR
+            if 15 in numbers:
+                return ProvisionType.EXTRA_TIME_15_PER_HOUR
+        if "extra_time" in slug or ("extra" in slug and "time" in slug):
+            return ProvisionType.EXTRA_TIME
+        return None
+
     normalized: List[str] = []
     seen = set()
     for token in tokens:
@@ -562,6 +579,8 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             .filter(core=True, venue__isnull=False)
             .order_by("pk")
         )
+        core_venue = core_evs[0].venue if core_evs else None
+        core_venue_names = {ev.venue_id for ev in core_evs}
         core_venue = core_evs[0].venue if core_evs else None
         core_venue_names = {ev.venue_id for ev in core_evs}
         base_start, base_length = _core_exam_timing(exam)

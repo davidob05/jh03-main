@@ -27,6 +27,8 @@ import {
   Alert,
   Fab,
   Link as MUILink,
+  MenuItem,
+  TextField,
 } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, AddLocationAlt as AddLocationAltIcon } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
@@ -35,6 +37,7 @@ import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
 import { PillButton } from '../../components/PillButton';
 import { Panel } from '../../components/Panel';
+import { VENUE_TYPES } from '../../components/admin/venueTypes';
 
 interface ExamVenueData {
   exam_name: string;
@@ -65,6 +68,7 @@ interface RowData {
   name: string;
   capacity: number;
   type: string;
+  venueType: string;
   accessibility: string;
   provisionCapabilities: string;
   examDetails: VenueExamDetail[];
@@ -291,6 +295,8 @@ export const AdminVenues: React.FC = () => {
   const [successOpen, setSuccessOpen] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState('');
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [venueTypeOverrides, setVenueTypeOverrides] = React.useState<Record<string, string>>({});
+  const [updatingVenueIds, setUpdatingVenueIds] = React.useState<Record<string, boolean>>({});
 
   const {
     data: venuesData = [],
@@ -305,10 +311,11 @@ export const AdminVenues: React.FC = () => {
   const rows = React.useMemo<RowData[]>(
     () =>
       venuesData.map((venue) => ({
+        venueType: venueTypeOverrides[venue.venue_name] ?? venue.venuetype,
         id: venue.venue_name,
         name: venue.venue_name,
         capacity: venue.capacity,
-        type: formatLabel(venue.venuetype),
+        type: formatLabel(venueTypeOverrides[venue.venue_name] ?? venue.venuetype),
         accessibility: venue.is_accessible ? 'Yes' : 'No',
         provisionCapabilities: (venue.provision_capabilities || []).join(', '),
         examDetails: (venue.exam_venues || []).map((ex) => ({
@@ -319,8 +326,55 @@ export const AdminVenues: React.FC = () => {
         })),
         examSearch: (venue.exam_venues || []).map((ev) => ev.exam_name).join(', '),
       })),
-    [venuesData],
+    [venuesData, venueTypeOverrides],
   );
+
+  const updateVenueTypeMutation = useMutation({
+    mutationFn: async (payload: { venueName: string; venueType: string; previousType?: string }) => {
+      const res = await apiFetch(`${apiBaseUrl}/venues/${encodeURIComponent(payload.venueName)}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ venuetype: payload.venueType }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to update venue type");
+      }
+      return res.json();
+    },
+    onMutate: (payload) => {
+      setUpdatingVenueIds((prev) => ({ ...prev, [payload.venueName]: true }));
+    },
+    onSuccess: (_data, payload) => {
+      setSuccessMessage(`Updated venue type for ${payload.venueName}.`);
+      setSuccessOpen(true);
+      queryClient.invalidateQueries({ queryKey: ['venues'] });
+      queryClient.invalidateQueries({ queryKey: ['venue', payload.venueName] });
+    },
+    onError: (err: any, payload: { venueName: string; previousType?: string } | undefined) => {
+      if (payload?.venueName) {
+        if (payload.previousType) {
+          setVenueTypeOverrides((prev) => ({ ...prev, [payload.venueName]: payload.previousType }));
+        } else {
+          setVenueTypeOverrides((prev) => {
+            const next = { ...prev };
+            delete next[payload.venueName];
+            return next;
+          });
+        }
+      }
+      setErrorMessage(err?.message || "Failed to update venue type.");
+    },
+    onSettled: (_data, _error, payload) => {
+      if (payload?.venueName) {
+        setUpdatingVenueIds((prev) => {
+          const next = { ...prev };
+          delete next[payload.venueName];
+          return next;
+        });
+      }
+    },
+  });
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -380,6 +434,16 @@ export const AdminVenues: React.FC = () => {
   const handleSearchChange = (q: string) => {
     setSearchQuery(q);
     setPage(0);
+  };
+
+  const handleVenueTypeChange = (venueName: string, nextType: string, currentType: string) => {
+    if (!nextType || nextType === currentType) return;
+    setVenueTypeOverrides((prev) => ({ ...prev, [venueName]: nextType }));
+    updateVenueTypeMutation.mutate({
+      venueName,
+      venueType: nextType,
+      previousType: currentType,
+    });
   };
 
   const filteredRows = React.useMemo(() => {
@@ -497,6 +561,7 @@ export const AdminVenues: React.FC = () => {
                 const isItemSelected = selected.includes(row.id);
                 const labelId = `enhanced-table-checkbox-${index}`;
                 const isOpen = openRows[row.id] || false;
+                const isTypeUpdating = Boolean(updatingVenueIds[row.id]);
 
                 return (
                   <React.Fragment key={row.id}>
@@ -522,7 +587,22 @@ export const AdminVenues: React.FC = () => {
                       </TableCell>
 
                       <TableCell align="right">{row.capacity}</TableCell>
-                      <TableCell>{row.type}</TableCell>
+                      <TableCell>
+                        <TextField
+                          select
+                          size="small"
+                          value={row.venueType}
+                          onChange={(event) => handleVenueTypeChange(row.id, event.target.value, row.venueType)}
+                          disabled={isTypeUpdating}
+                          sx={{ minWidth: 180 }}
+                        >
+                          {VENUE_TYPES.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </TableCell>
                       <TableCell>{row.accessibility}</TableCell>
                       <TableCell>{row.provisionCapabilities || '—'}</TableCell>
 
