@@ -500,6 +500,9 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
 
         student_exam, _ = StudentExam.objects.get_or_create(student=student, exam=exam)
         required_caps = _required_capabilities(provisions)
+        requires_individual_room = (
+            ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN in required_caps
+        )
         needs_accessible = _needs_accessible_venue(provisions)
         requires_separate_room = _needs_separate_room(provisions)
         needs_computer = _needs_computer(provisions)
@@ -522,15 +525,21 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
                 preferred_venue = None
         allow_same_exam_overlap = bool(preferred_venue and small_extra_time)
 
-        exam_venue = _find_matching_exam_venue(
-            exam,
-            required_caps,
-            target_start,
-            target_length,
-            require_accessible=needs_accessible,
-            preferred_venue=preferred_venue,
-            allowed_venue_types=allowed_venue_types,
-        )
+        exam_venue = None
+        if requires_individual_room and student_exam.exam_venue_id:
+            exam_venue = student_exam.exam_venue
+        if not exam_venue:
+            exam_venue = _find_matching_exam_venue(
+                exam,
+                required_caps,
+                target_start,
+                target_length,
+                require_accessible=needs_accessible,
+                preferred_venue=preferred_venue,
+                allowed_venue_types=allowed_venue_types,
+                avoid_shared_room=requires_individual_room,
+                student_exam_id=student_exam.pk,
+            )
         if (
             allowed_venue_types is not None
             and exam_venue
@@ -548,6 +557,8 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
                 preferred_venue=preferred_venue,
                 allow_same_exam_overlap=allow_same_exam_overlap,
                 allowed_venue_types=allowed_venue_types,
+                avoid_shared_room=requires_individual_room,
+                student_exam_id=student_exam.pk,
             )
 
         if exam_venue:
@@ -681,6 +692,19 @@ def _allowed_venue_types(needs_computer: bool, requires_separate_room: bool) -> 
     return None
 
 
+def _exam_venue_is_reserved(
+    exam_venue: ExamVenue,
+    student_exam_id: Optional[int] = None,
+) -> bool:
+    caps = exam_venue.provision_capabilities or []
+    if ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN not in caps:
+        return False
+    assigned = StudentExam.objects.filter(exam_venue=exam_venue)
+    if student_exam_id:
+        assigned = assigned.exclude(pk=student_exam_id)
+    return assigned.exists()
+
+
 def _find_matching_exam_venue(
     exam: Exam,
     required_caps: List[str],
@@ -690,6 +714,8 @@ def _find_matching_exam_venue(
     require_accessible: bool = False,
     preferred_venue: Optional[Venue] = None,
     allowed_venue_types: Optional[set] = None,
+    avoid_shared_room: bool = False,
+    student_exam_id: Optional[int] = None,
 ) -> Optional[ExamVenue]:
     if not exam:
         return None
@@ -697,6 +723,14 @@ def _find_matching_exam_venue(
     evs = list(ExamVenue.objects.filter(exam=exam).select_related("venue"))
 
     def _matches(ev: ExamVenue) -> bool:
+        if _exam_venue_is_reserved(ev, student_exam_id):
+            return False
+        if avoid_shared_room:
+            assigned = StudentExam.objects.filter(exam_venue=ev)
+            if student_exam_id:
+                assigned = assigned.exclude(pk=student_exam_id)
+            if assigned.exists():
+                return False
         if ev.venue:
             if required_caps and not venue_supports_caps(ev.venue, required_caps):
                 return False
@@ -736,6 +770,8 @@ def _allocate_exam_venue(
     preferred_venue: Optional[Venue] = None,
     allow_same_exam_overlap: bool = False,
     allowed_venue_types: Optional[set] = None,
+    avoid_shared_room: bool = False,
+    student_exam_id: Optional[int] = None,
 ) -> Optional[ExamVenue]:
     if not exam:
         return None
@@ -749,6 +785,9 @@ def _allocate_exam_venue(
             ExamVenueProvisionType.SEPARATE_ROOM_NOT_ON_OWN,
         )
     )
+    requires_individual_room = ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN in required_caps
+    if requires_individual_room:
+        allow_same_exam_overlap = False
 
     def _merge_caps(ev: ExamVenue) -> List[str]:
         existing = ev.provision_capabilities or []
@@ -785,7 +824,7 @@ def _allocate_exam_venue(
             venue,
             target_start,
             target_length,
-            ignore_exam_id=exam.exam_id,
+            ignore_exam_id=None if requires_individual_room else exam.exam_id,
             allow_same_exam_overlap=allow_same_exam_overlap,
         ):
             continue
@@ -794,7 +833,15 @@ def _allocate_exam_venue(
             continue
         candidates.append(venue)
 
-    placeholder = ExamVenue.objects.filter(exam=exam, venue__isnull=True).first()
+    placeholder_qs = ExamVenue.objects.filter(exam=exam, venue__isnull=True)
+    if avoid_shared_room:
+        used_placeholders = StudentExam.objects.filter(
+            exam_venue__venue__isnull=True
+        ).values_list("exam_venue_id", flat=True)
+        placeholder_qs = placeholder_qs.exclude(pk__in=used_placeholders)
+    placeholder = placeholder_qs.first()
+    if placeholder and _exam_venue_is_reserved(placeholder, student_exam_id):
+        placeholder = None
 
     if not candidates:
         if placeholder:
@@ -844,6 +891,15 @@ def _allocate_exam_venue(
         start_time=target_start,
         exam_length=target_length,
     ).first()
+
+    if existing and _exam_venue_is_reserved(existing, student_exam_id):
+        existing = None
+    elif existing and avoid_shared_room:
+        assigned = StudentExam.objects.filter(exam_venue=existing)
+        if student_exam_id:
+            assigned = assigned.exclude(pk=student_exam_id)
+        if assigned.exists():
+            existing = None
 
     if existing:
         merged = _merge_caps(existing)
