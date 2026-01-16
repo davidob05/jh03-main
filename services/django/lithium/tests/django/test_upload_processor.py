@@ -923,6 +923,62 @@ class UploadProcessorTests(TestCase):
         )
         self.assertEqual(venue.venuetype, VenueType.COMPUTER_CLUSTER)
 
+    def test_extra_time_variants_for_one_hour_exam(self):
+        core_venue = Venue.objects.create(
+            venue_name="Core Hall Extra Hour",
+            capacity=120,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+        )
+        alt_venue = Venue.objects.create(
+            venue_name="Alt Hall Extra Hour",
+            capacity=40,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+        )
+        cases = [
+            ("Extra time 100%", 120),
+            ("Extra time 30 minutes every hour", 90),
+            ("Extra time 20 minutes every hour", 80),
+            ("Extra time 15 minutes every hour", 75),
+            ("Extra time", 75),
+        ]
+        for idx, (provision, expected_length) in enumerate(cases, start=1):
+            with self.subTest(provision=provision):
+                exam = Exam.objects.create(
+                    exam_name=f"Extra Hour {idx}",
+                    course_code=f"EXTRA{idx:03d}",
+                    exam_type="Written",
+                    no_students=0,
+                    exam_school="Computing",
+                    school_contact="",
+                )
+                base_start = timezone.make_aware(datetime(2025, 7, 20 + idx, 10, 0))
+                ExamVenue.objects.create(
+                    exam=exam,
+                    venue=core_venue,
+                    start_time=base_start,
+                    exam_length=60,
+                    core=True,
+                )
+
+                result = {
+                    "status": "ok",
+                    "type": "Provisions",
+                    "rows": [
+                        {
+                            "student_id": f"S98{idx:03d}",
+                            "student_name": f"Extra Student {idx}",
+                            "exam_code": exam.course_code,
+                            "provisions": provision,
+                        }
+                    ],
+                }
+
+                ingest_upload_result(result, file_name="prov.xlsx", uploaded_by=self.user)
+                student_exam = StudentExam.objects.get(student__student_id=f"S98{idx:03d}", exam=exam)
+                self.assertEqual(student_exam.exam_venue.exam_length, expected_length)
+
     def test_provision_exam_venue_inherits_core_timing_without_extra_time(self):
         core_start = timezone.make_aware(datetime(2025, 7, 15, 10, 0))
         exam = Exam.objects.create(
