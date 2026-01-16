@@ -50,7 +50,9 @@ build_with_kaniko:
 
 mirror_base_images:
   stage: build
-  image: gcr.io/go-containerregistry/crane:debug
+  image:
+    name: gcr.io/go-containerregistry/crane:debug
+    entrypoint: ["/busybox/sh", "-c"]
   variables:
     GIT_STRATEGY: none
   script: |
