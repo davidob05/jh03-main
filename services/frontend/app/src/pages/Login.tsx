@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Box, TextField, Typography, CircularProgress, Alert, Stack } from "@mui/material";
+import { Box, TextField, Typography, CircularProgress, Alert, Stack, InputAdornment, IconButton } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiBaseUrl, getAuthToken, getStoredRole, setAuthSession } from "../utils/api";
 import { Panel } from "../components/Panel";
@@ -12,6 +13,7 @@ export default function Login() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -141,7 +143,7 @@ export default function Login() {
                 variant="outlined"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 sx={{
                   "& .MuiOutlinedInput-root": {
@@ -156,6 +158,19 @@ export default function Login() {
                   "& .MuiInputLabel-root": {
                     top: -3,
                   },
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowPassword((s) => !s)}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
                 }}
               />
 
