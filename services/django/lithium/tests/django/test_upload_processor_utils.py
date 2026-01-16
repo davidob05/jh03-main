@@ -47,7 +47,7 @@ class UploadProcessorHelperTests(TestCase):
 
     def test_allowed_venue_types(self):
         self.assertIn(VenueType.COMPUTER_CLUSTER.value, up._allowed_venue_types(True, False))
-        self.assertEqual(up._allowed_venue_types(False, True), {VenueType.SEPARATE_ROOM.value})
+        self.assertIsNone(up._allowed_venue_types(False, True))
         self.assertIsNone(up._allowed_venue_types(False, False))
 
     def test_extract_venue_names_online_and_split(self):

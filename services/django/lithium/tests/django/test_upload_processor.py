@@ -297,10 +297,10 @@ class UploadProcessorTests(TestCase):
             exam_length=120,
             core=True,
         )
-        preferred = Venue.objects.create(
-            venue_name="Computer SR",
-            capacity=20,
-            venuetype=VenueType.SEPARATE_ROOM,
+        Venue.objects.create(
+            venue_name="Computer Cluster",
+            capacity=40,
+            venuetype=VenueType.COMPUTER_CLUSTER,
             provision_capabilities=[ExamVenueProvisionType.USE_COMPUTER],
             is_accessible=True,
         )
@@ -325,7 +325,7 @@ class UploadProcessorTests(TestCase):
         student_exam = StudentExam.objects.get(student__student_id="S8888", exam=exam)
         self.assertIn(
             student_exam.exam_venue.venue.venuetype,
-            {VenueType.SEPARATE_ROOM, VenueType.COMPUTER_CLUSTER, VenueType.PURPLE_CLUSTER},
+            {VenueType.COMPUTER_CLUSTER, VenueType.PURPLE_CLUSTER},
         )
 
     def test_assisted_evac_requires_accessible_venue(self):
