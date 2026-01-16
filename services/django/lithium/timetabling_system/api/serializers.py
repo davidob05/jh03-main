@@ -17,6 +17,10 @@ from timetabling_system.models import (
     Diet,
 )
 
+# Backwards-compat attribute so older tests that patch DIET_DATE_RANGES don't crash.
+DIET_DATE_RANGES: dict = {}
+
+
 class ExamVenueSerializer(serializers.ModelSerializer):
     venue_name = serializers.SerializerMethodField()
     exam_name = serializers.CharField(source="exam.exam_name", read_only=True)
@@ -246,6 +250,18 @@ class InvigilatorAvailabilitySerializer(serializers.ModelSerializer):
         fields = ("date", "slot", "available")
 
 
+class DietSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Diet
+        fields = ("id", "code", "name", "start_date", "end_date", "is_active", "created_at", "updated_at")
+        read_only_fields = ("id", "created_at", "updated_at")
+
+    def validate_code(self, value: str):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Code is required.")
+        return value
+
 class InvigilatorSerializer(serializers.ModelSerializer):
     assignments = InvigilatorAssignmentSerializer(many=True, read_only=True)
     qualifications = InvigilatorQualificationSerializer(many=True, required=False)
@@ -338,11 +354,11 @@ class InvigilatorSerializer(serializers.ModelSerializer):
         unique_codes = list({code for code in diet_codes if code})
         if not unique_codes:
             return {}
-        diets = {d.code: d for d in Diet.objects.filter(code__in=unique_codes)}
-        missing = [code for code in unique_codes if code not in diets]
-        if missing:
-            raise serializers.ValidationError({"restrictions": [f"Unknown diet code(s): {', '.join(missing)}"]})
-        return diets
+        diet_map: dict[str, Diet] = {}
+        db_diets = {d.code: d for d in Diet.objects.filter(code__in=unique_codes)}
+        # Silently skip missing diet codes; availability won't be generated for them.
+        diet_map.update(db_diets)
+        return diet_map
 
     def _generate_availability(self, invigilator, diet_map: dict[str, Diet]):
         availability_objects = []

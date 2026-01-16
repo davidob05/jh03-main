@@ -10,6 +10,7 @@ import { NotificationsPanel, NotificationItem } from "../../components/admin/Not
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { AddAnnouncementDialog } from "../../components/admin/AddAnnouncementDialog";
+import { DietManager } from "../../components/admin/DietManager";
 
 type Announcement = {
   id: number;
@@ -367,6 +368,9 @@ export const AdminDashboard: React.FC = () => {
           ))}
         </Grid>
       </Panel>
+
+      {/* Diets management */}
+      <DietManager />
 
       {/* Notifications */}
       <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
