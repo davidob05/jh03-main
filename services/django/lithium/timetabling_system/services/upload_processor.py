@@ -440,11 +440,30 @@ def _normalize_provisions(value: Any) -> List[str]:
     else:
         tokens = re.split(r"[;,/]", str(value))
 
+    def _match_extra_time_token(token: str, slug: str) -> Optional[str]:
+        if "extra" not in slug or "time" not in slug:
+            return None
+        numbers = [int(n) for n in re.findall(r"\d+", slug)]
+        if 100 in numbers:
+            return ProvisionType.EXTRA_TIME_100
+        if "hour" in slug:
+            if 30 in numbers:
+                return ProvisionType.EXTRA_TIME_30_PER_HOUR
+            if 20 in numbers:
+                return ProvisionType.EXTRA_TIME_20_PER_HOUR
+            if 15 in numbers:
+                return ProvisionType.EXTRA_TIME_15_PER_HOUR
+        if "extra_time" in slug or ("extra" in slug and "time" in slug):
+            return ProvisionType.EXTRA_TIME
+        return None
+
     normalized: List[str] = []
     seen = set()
     for token in tokens:
         slug = _slugify(token)
         mapped = PROVISION_SLUG_MAP.get(slug)
+        if not mapped:
+            mapped = _match_extra_time_token(str(token), slug)
         if mapped and mapped not in seen:
             normalized.append(mapped)
             seen.add(mapped)
@@ -507,17 +526,18 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         requires_separate_room = _needs_separate_room(provisions)
         needs_computer = _needs_computer(provisions)
         allowed_venue_types = _allowed_venue_types(needs_computer, requires_separate_room)
-        core_ev = (
+        core_evs = list(
             exam.examvenue_set.select_related("venue")
             .filter(core=True, venue__isnull=False)
             .order_by("pk")
-            .first()
         )
-        core_venue = core_ev.venue if core_ev else None
+        core_venue = core_evs[0].venue if core_evs else None
+        core_venue_names = {ev.venue_id for ev in core_evs}
         base_start, base_length = _core_exam_timing(exam)
         extra_minutes = _extra_time_minutes(provisions, base_length)
         target_start, target_length = _apply_extra_time(base_start, base_length, extra_minutes)
         small_extra_time = _has_small_extra_time(extra_minutes, base_length)
+        avoid_core_venues = bool(extra_minutes and not small_extra_time)
         preferred_venue = None
         if small_extra_time and not requires_separate_room and not needs_computer:
             preferred_venue = core_venue
@@ -539,6 +559,7 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
                 allowed_venue_types=allowed_venue_types,
                 avoid_shared_room=requires_individual_room,
                 student_exam_id=student_exam.pk,
+                avoid_venue_names=core_venue_names if avoid_core_venues else None,
             )
         if (
             allowed_venue_types is not None
@@ -559,6 +580,7 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
                 allowed_venue_types=allowed_venue_types,
                 avoid_shared_room=requires_individual_room,
                 student_exam_id=student_exam.pk,
+                avoid_venue_names=core_venue_names if avoid_core_venues else None,
             )
 
         if exam_venue:
@@ -716,6 +738,7 @@ def _find_matching_exam_venue(
     allowed_venue_types: Optional[set] = None,
     avoid_shared_room: bool = False,
     student_exam_id: Optional[int] = None,
+    avoid_venue_names: Optional[set] = None,
 ) -> Optional[ExamVenue]:
     if not exam:
         return None
@@ -732,6 +755,8 @@ def _find_matching_exam_venue(
             if assigned.exists():
                 return False
         if ev.venue:
+            if avoid_venue_names and ev.venue_id in avoid_venue_names:
+                return False
             if required_caps and not venue_supports_caps(ev.venue, required_caps):
                 return False
             if require_accessible and not ev.venue.is_accessible:
@@ -772,6 +797,7 @@ def _allocate_exam_venue(
     allowed_venue_types: Optional[set] = None,
     avoid_shared_room: bool = False,
     student_exam_id: Optional[int] = None,
+    avoid_venue_names: Optional[set] = None,
 ) -> Optional[ExamVenue]:
     if not exam:
         return None
@@ -804,6 +830,8 @@ def _allocate_exam_venue(
     core_venues = [
         ev.venue for ev in exam.examvenue_set.select_related("venue").filter(core=True, venue__isnull=False)
     ]
+    if avoid_venue_names:
+        core_venues = [venue for venue in core_venues if venue and venue.venue_name not in avoid_venue_names]
     candidate_order.extend(core_venues)
     candidate_order.extend(list(Venue.objects.all()))
 
@@ -812,6 +840,8 @@ def _allocate_exam_venue(
         if not venue or venue.venue_name in seen_names:
             continue
         seen_names.add(venue.venue_name)
+        if avoid_venue_names and venue.venue_name in avoid_venue_names:
+            continue
         if allowed_venue_types is not None and venue.venuetype not in allowed_venue_types:
             continue
         if required_caps and not venue_supports_caps(venue, required_caps):
