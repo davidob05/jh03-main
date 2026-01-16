@@ -32,7 +32,7 @@ from timetabling_system.services.upload_processor import (
     _allowed_venue_types,
     _needs_accessible_venue,
     _needs_computer,
-    _needs_separate_room,
+    _exam_requires_computer,
     _required_capabilities,
 )
 from timetabling_system.utils.excel_parser import parse_excel_file
@@ -536,11 +536,14 @@ def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
     venue = getattr(exam_venue, "venue", None)
 
     room_caps = {"separate_room_on_own", "separate_room_not_on_own"}
+    ignored_caps = room_caps | {"use_computer"}
     required_caps_raw = _required_capabilities(provision.provisions)
-    required_caps = [cap for cap in required_caps_raw if cap not in room_caps]
+    required_caps = [cap for cap in required_caps_raw if cap not in ignored_caps]
     needs_accessible = _needs_accessible_venue(provision.provisions)
-    needs_separate = _needs_separate_room(provision.provisions)
-    needs_computer = _needs_computer(provision.provisions)
+    needs_separate = "separate_room_on_own" in required_caps_raw
+    needs_computer = _needs_computer(provision.provisions) or _exam_requires_computer(
+        getattr(provision.exam, "exam_type", None)
+    )
     allowed_types = _allowed_venue_types(needs_computer, needs_separate)
 
     matches_needs = False
