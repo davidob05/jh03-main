@@ -1153,7 +1153,7 @@ class UploadProcessorTests(TestCase):
                     exam_school="Computing",
                     school_contact="",
                 )
-                base_start = timezone.make_aware(datetime(2025, 8, 30 + idx, 10, 0))
+                base_start = timezone.make_aware(datetime(2025, 9, idx, 10, 0))
                 ExamVenue.objects.create(
                     exam=exam,
                     venue=core_venue,
