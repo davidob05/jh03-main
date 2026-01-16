@@ -19,7 +19,7 @@ import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 
-type SlotCode = "MORNING" | "AFTERNOON" | "EVENING";
+type SlotCode = "MORNING" | "EVENING";
 
 type AvailabilityEntry = {
   date: string;
@@ -41,11 +41,10 @@ type AvailabilityResponse = {
 
 const slotLabels: Record<SlotCode, string> = {
   MORNING: "Morning",
-  AFTERNOON: "Afternoon",
   EVENING: "Evening",
 };
 
-const slotOrder: SlotCode[] = ["MORNING", "AFTERNOON", "EVENING"];
+const slotOrder: SlotCode[] = ["MORNING", "EVENING"];
 
 export const InvigilatorRestrictions: React.FC = () => {
   const queryClient = useQueryClient();
@@ -81,7 +80,10 @@ export const InvigilatorRestrictions: React.FC = () => {
   const buildDays = (data: AvailabilityResponse) => {
     const entries = data.availabilities || [];
     const byDate: Record<string, Record<SlotCode, boolean>> = {};
+    const isKnownSlot = (slot: string): slot is SlotCode => slot === "MORNING" || slot === "EVENING";
+
     entries.forEach((e) => {
+      if (!isKnownSlot(e.slot)) return;
       if (!byDate[e.date]) byDate[e.date] = {} as Record<SlotCode, boolean>;
       byDate[e.date][e.slot] = e.available;
     });

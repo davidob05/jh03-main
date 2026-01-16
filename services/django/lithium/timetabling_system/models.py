@@ -70,7 +70,6 @@ class DietChoices(models.TextChoices):
 
 class SlotChoices(models.TextChoices):
     MORNING = 'MORNING', 'Morning (AM)'
-    AFTERNOON = 'AFTERNOON', 'Afternoon (Noon)'
     EVENING = 'EVENING', 'Evening (PM)'
 
 

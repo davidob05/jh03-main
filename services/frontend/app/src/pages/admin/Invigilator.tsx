@@ -88,9 +88,9 @@ interface InvigilatorAssignment {
 
 const slotLabelMap: Record<string, string> = {
   MORNING: "Morning",
-  AFTERNOON: "Afternoon",
   EVENING: "Evening",
 };
+const allowedSlots = new Set(Object.keys(slotLabelMap));
 
 export const AdminInvigilatorProfile: React.FC = () => {
   const [availabilityView, setAvailabilityView] = useState<"list" | "calendar">("list");
@@ -130,6 +130,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
   }, [diets]);
 
   const groupedAvailability = (data?.availabilities || []).reduce<Record<string, InvigilatorAvailability[]>>((acc, slot) => {
+    if (!allowedSlots.has(slot.slot)) return acc;
     if (!acc[slot.date]) acc[slot.date] = [];
     acc[slot.date].push(slot);
     return acc;

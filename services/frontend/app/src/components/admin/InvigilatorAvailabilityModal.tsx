@@ -64,12 +64,12 @@ export const InvigilatorAvailabilityModal: React.FC<Props> = ({
 
   const dateStr = date.format("YYYY-MM-DD");
 
+  const allowedSlots = new Set(["MORNING", "EVENING"]);
+
   const slotLabel = (slot: string) => {
     switch (slot) {
       case "MORNING":
         return "Morning";
-      case "AFTERNOON":
-        return "Afternoon";
       case "EVENING":
         return "Evening";
       default:
@@ -106,7 +106,7 @@ export const InvigilatorAvailabilityModal: React.FC<Props> = ({
             {available.map((i) => {
               const slotsOnDate =
                 i.availabilities
-                  ?.filter((a) => a.available && a.date === dateStr)
+                  ?.filter((a) => a.available && a.date === dateStr && allowedSlots.has(a.slot))
                   .map((a) => slotLabel(a.slot)) ||
                 i.availableSlots
                   ?.filter((slot) => slot.startsWith(dateStr))
