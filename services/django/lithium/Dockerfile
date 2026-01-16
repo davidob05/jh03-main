@@ -1,4 +1,4 @@
-ARG BASE_IMAGE_REGISTRY=public.ecr.aws/docker/library
+ARG BASE_IMAGE_REGISTRY=docker.io/library
 # First, build the application in the `/app` directory.
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 ENV UV_COMPILE_BYTECODE=1

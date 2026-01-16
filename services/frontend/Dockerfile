@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-ARG BASE_IMAGE_REGISTRY=public.ecr.aws/docker/library
+ARG BASE_IMAGE_REGISTRY=docker.io/library
 FROM ${BASE_IMAGE_REGISTRY}/node:20-bullseye-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
