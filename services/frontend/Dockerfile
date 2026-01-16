@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
-FROM public.ecr.aws/docker/library/node:20-bullseye-slim
+ARG DEP_PROXY_PREFIX=public.ecr.aws/docker/library
+FROM ${DEP_PROXY_PREFIX}/node:20-bullseye-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
 

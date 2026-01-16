@@ -18,8 +18,17 @@ build_with_kaniko:
     GHCR_NAMESPACE="$GHCR_USERNAME"
 
     mkdir -p /kaniko/.docker
-    printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}\n' \
-      "$GHCR_HOST" "$GHCR_USERNAME" "$GHCR_TOKEN" > /kaniko/.docker/config.json
+    auth_entries=$(printf '"%s":{"username":"%s","password":"%s"}' \
+      "$GHCR_HOST" "$GHCR_USERNAME" "$GHCR_TOKEN")
+    if [ -n "${CI_DEPENDENCY_PROXY_SERVER:-}" ] && [ -n "${CI_DEPENDENCY_PROXY_USER:-}" ] && [ -n "${CI_DEPENDENCY_PROXY_PASSWORD:-}" ]; then
+      auth_entries="$auth_entries, \"${CI_DEPENDENCY_PROXY_SERVER}\":{\"username\":\"${CI_DEPENDENCY_PROXY_USER}\",\"password\":\"${CI_DEPENDENCY_PROXY_PASSWORD}\"}"
+    fi
+    printf '{"auths":{%s}}\n' "$auth_entries" > /kaniko/.docker/config.json
+
+    DEP_PROXY_PREFIX="public.ecr.aws/docker/library"
+    if [ -n "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX:-}" ]; then
+      DEP_PROXY_PREFIX="${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/library"
+    fi
 
     echo "Scanning services/* for Dockerfile(s)…"
     found=0
@@ -34,6 +43,7 @@ build_with_kaniko:
         --dockerfile "$CI_PROJECT_DIR/$d/Dockerfile" \
         --destination "$dest_base:$IMAGE_TAG" \
         --destination "$dest_base:latest" \
+        --build-arg DEP_PROXY_PREFIX="$DEP_PROXY_PREFIX" \
         --cache \
         --cache-repo "$GHCR_HOST/$GHCR_NAMESPACE/cache"
       found=1
