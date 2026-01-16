@@ -50,6 +50,7 @@ from .serializers import (
     VenueWriteSerializer,
     NotificationSerializer,
     AnnouncementSerializer,
+    DietSerializer,
 )
 
 
@@ -632,6 +633,13 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=_get_request_user(self, serializer))
+
+
+class DietViewSet(viewsets.ModelViewSet):
+    queryset = Diet.objects.all().order_by("-is_active", "-start_date", "code")
+    serializer_class = DietSerializer
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []
 
 
 class StudentProvisionListView(APIView):
