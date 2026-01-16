@@ -1,6 +1,5 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { UploadFile } from "@/components/admin/UploadFile";
 import { apiFetch, apiBaseUrl } from "@/utils/api";
 
@@ -26,6 +25,9 @@ vi.mock("@/utils/api", () => ({
 
 describe("Components - UploadFile", () => {
   const mockFile = new File(["test"], "test.csv", { type: "text/csv" });
+  const uploadWithFireEvent = (input: HTMLInputElement, file: File) => {
+    fireEvent.change(input, { target: { files: [file] } });
+  };
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -55,7 +57,7 @@ describe("Components - UploadFile", () => {
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "provisions" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
-    await userEvent.upload(input, mockFile);
+    uploadWithFireEvent(input, mockFile);
 
     expect(screen.getByText("test.csv")).toBeInTheDocument();
   });
@@ -69,7 +71,7 @@ describe("Components - UploadFile", () => {
     expect(uploadButton).toBeDisabled();
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
-    await userEvent.upload(input, mockFile);
+    uploadWithFireEvent(input, mockFile);
     expect(uploadButton).not.toBeDisabled();
   });
 
@@ -83,9 +85,9 @@ describe("Components - UploadFile", () => {
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
-    await userEvent.upload(input, mockFile);
+    uploadWithFireEvent(input, mockFile);
 
-    await userEvent.click(screen.getByRole("button", { name: /upload/i }));
+    fireEvent.click(screen.getByRole("button", { name: /upload/i }));
 
     expect(await screen.findByText((content) =>
       content.includes("Upload complete: Exam timetable (test.csv). Added 5, Updated 2, Deleted 1.")
@@ -104,9 +106,9 @@ describe("Components - UploadFile", () => {
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
-    await userEvent.upload(input, mockFile);
+    uploadWithFireEvent(input, mockFile);
 
-    await userEvent.click(screen.getByRole("button", { name: /upload/i }));
+    fireEvent.click(screen.getByRole("button", { name: /upload/i }));
 
     expect(await screen.findByText("Upload failed")).toBeInTheDocument();
   });
@@ -118,9 +120,9 @@ describe("Components - UploadFile", () => {
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
-    await userEvent.upload(input, mockFile);
+    uploadWithFireEvent(input, mockFile);
 
-    await userEvent.click(screen.getByRole("button", { name: /upload/i }));
+    fireEvent.click(screen.getByRole("button", { name: /upload/i }));
 
     expect(await screen.findByText("Network error")).toBeInTheDocument();
   });
@@ -135,10 +137,10 @@ describe("Components - UploadFile", () => {
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
-    await userEvent.upload(input, mockFile);
+    uploadWithFireEvent(input, mockFile);
 
     const uploadButton = screen.getByRole("button", { name: /upload/i });
-    await userEvent.click(uploadButton);
+    fireEvent.click(uploadButton);
 
     // Button shows uploading spinner
     expect(screen.getByText("Uploading...")).toBeInTheDocument();
@@ -163,9 +165,9 @@ describe("Components - UploadFile", () => {
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
-    await userEvent.upload(input, mockFile);
+    uploadWithFireEvent(input, mockFile);
 
-    await userEvent.click(screen.getByRole("button", { name: /upload/i }));
+    fireEvent.click(screen.getByRole("button", { name: /upload/i }));
 
     await waitFor(() => expect(input.value).toBe(""));
   });
@@ -181,9 +183,9 @@ describe("Components - UploadFile", () => {
 
     const zeroByteFile = new File([""], "empty.csv", { type: "text/csv" });
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
-    await userEvent.upload(input, zeroByteFile);
+    uploadWithFireEvent(input, zeroByteFile);
 
-    await userEvent.click(screen.getByRole("button", { name: /upload/i }));
+    fireEvent.click(screen.getByRole("button", { name: /upload/i }));
 
     expect(await screen.findByText((content) =>
       content.includes("Upload complete: Exam timetable (empty.csv). Added 0, Updated 0")
