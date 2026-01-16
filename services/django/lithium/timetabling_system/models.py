@@ -68,6 +68,22 @@ class DietChoices(models.TextChoices):
     # Add more as needed
 
 
+class Diet(models.Model):
+    code = models.CharField(max_length=30, unique=True)
+    name = models.CharField(max_length=100)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-start_date", "code"]
+
+    def __str__(self):
+        return f"{self.name} ({self.code})" if self.name else self.code
+
+
 class SlotChoices(models.TextChoices):
     MORNING = 'MORNING', 'Morning (AM)'
     EVENING = 'EVENING', 'Evening (PM)'
