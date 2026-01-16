@@ -46,6 +46,7 @@ class VenueType(models.TextChoices):
     COMPUTER_CLUSTER = 'computer_cluster', 'Computer Cluster'
     SEPARATE_ROOM = 'separate_room', 'Separate Room'
     SCHOOL_TO_SORT = 'school_to_sort', 'School To Sort'
+    CORE_EXAM_VENUE = 'core_exam_venue', 'Core Exam Venue'
     KELVIN_HALL = 'kelvin_hall', 'Kelvin Hall'
     DETACHED_DUTY = 'detached_duty', 'Detached Duty'
     VET_SCHOOL = 'vet_school', 'Vet School'

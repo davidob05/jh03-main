@@ -887,7 +887,7 @@ def _create_exam_venue_links(
 
         defaults = {
             "capacity": 0,
-            "venuetype": VenueType.SCHOOL_TO_SORT,
+            "venuetype": VenueType.CORE_EXAM_VENUE,
             "is_accessible": True,
             "qualifications": [],
         }

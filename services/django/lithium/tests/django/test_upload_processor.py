@@ -59,6 +59,7 @@ class UploadProcessorTests(TestCase):
         self.assertEqual(UploadLog.objects.count(), 1)
         # Venue + ExamVenue created
         venue = Venue.objects.get(venue_name="Main Hall")
+        self.assertEqual(venue.venuetype, VenueType.CORE_EXAM_VENUE)
         self.assertTrue(ExamVenue.objects.filter(exam=exam, venue=venue).exists())
         exam_venue = ExamVenue.objects.get(exam=exam, venue=venue)
         self.assertEqual(exam_venue.exam_length, 120)
