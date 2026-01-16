@@ -1,19 +1,4 @@
 ## Summary
-A brief description of what features/fixes have been included in this merge request. Default is a list of commits.
-
-## Issues Resolved
-List the issues resolved. Use the format '#<issue_number>'
-
-
-## Testing
-- [] All existing automated tests are passing
-- [] New tests have been added for new features and fixes
-
-
-## Any Additional Notes
-Any other relevant information or context
-
-## Summary
 <!-- What changed? Why? Any key decisions? -->
 -
 
@@ -46,6 +31,9 @@ Any other relevant information or context
 <!-- Optional: paste commit summaries if you want extra context -->
 <!-- Paste output of: git log --oneline <target-branch>..HEAD -->
 - 
+
+## Issues Resolved
+<!-- List the issues resolved. Use the format '#<issue_number>' -->
 
 ## Checklist
 - [ ] I rebased/merged latest target branch
