@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { Box, Button, TextField, Typography, Paper, CircularProgress, Alert } from "@mui/material";
+import { Box, TextField, Typography, CircularProgress, Alert, Stack } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiBaseUrl, getAuthToken, getStoredRole, setAuthSession } from "../utils/api";
+import { Panel } from "../components/Panel";
+import { PillButton } from "../components/PillButton";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -77,62 +79,101 @@ export default function Login() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        p: 2,
-        backgroundColor: "#f5f5f5",
+        p: { xs: 2, sm: 4 },
+        background:
+          "radial-gradient(circle at 15% 25%, rgba(79,70,229,0.16), transparent 35%), radial-gradient(circle at 80% 10%, rgba(14,165,233,0.18), transparent 32%), radial-gradient(circle at 70% 80%, rgba(16,185,129,0.12), transparent 34%), linear-gradient(135deg, #f8fafc 0%, #eef2ff 45%, #f1f5f9 100%)",
       }}
     >
-      <Paper
-        elevation={6}
+      <Panel
         sx={{
-          width: 400,
-          p: 4,
-          borderRadius: 3,
+          width: "100%",
+          maxWidth: 480,
+          p: { xs: 3, sm: 4 },
+          borderRadius: 4,
+          backdropFilter: "blur(6px)",
         }}
+        disableDivider
       >
-        <Typography variant="h4" fontWeight={600} textAlign="center" mb={3}>
-          Sign in
-        </Typography>
+        <Stack spacing={3} alignItems="center" textAlign="center">
+          <Stack spacing={0.5}>
+            <Typography variant="h4" fontWeight={700}>
+              Sign in
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Use your account credentials to access your dashboard.
+            </Typography>
+          </Stack>
 
-        {errorMsg && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {errorMsg}
-          </Alert>
-        )}
+          {errorMsg && (
+            <Alert severity="error" sx={{ width: "100%" }}>
+              {errorMsg}
+            </Alert>
+          )}
 
-        <form onSubmit={handleLogin}>
-          <TextField
-            fullWidth
-            label="Email or Username"
-            variant="outlined"
-            margin="normal"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
+          <Box component="form" onSubmit={handleLogin} sx={{ width: "100%" }}>
+            <Stack spacing={1.5}>
+              <TextField
+                fullWidth
+                label="Username"
+                variant="outlined"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "999px",
+                    height: 48,
+                    "& .MuiInputBase-input": {
+                      py: 0,
+                      display: "flex",
+                      alignItems: "center",
+                    },
+                  },
+                  "& .MuiInputLabel-root": {
+                    top: -3,
+                  },
+                }}
+              />
 
-          <TextField
-            fullWidth
-            label="Password"
-            variant="outlined"
-            margin="normal"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            required
-          />
+              <TextField
+                fullWidth
+                label="Password"
+                variant="outlined"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                required
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "999px",
+                    height: 48,
+                    "& .MuiInputBase-input": {
+                      py: 0,
+                      display: "flex",
+                      alignItems: "center",
+                    },
+                  },
+                  "& .MuiInputLabel-root": {
+                    top: -3,
+                  },
+                }}
+              />
 
-          <Button
-            fullWidth
-            variant="contained"
-            color="primary"
-            type="submit"
-            sx={{ mt: 3, py: 1.2 }}
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} color="inherit" /> : "Log in"}
-          </Button>
-        </form>
-      </Paper>
+              <PillButton
+                fullWidth
+                variant="contained"
+                color="primary"
+                type="submit"
+                size="large"
+                sx={{ py: 1.3, mt: 1 }}
+                disabled={loading}
+              >
+                {loading ? <CircularProgress size={22} color="inherit" /> : "Log in"}
+              </PillButton>
+            </Stack>
+          </Box>
+        </Stack>
+      </Panel>
     </Box>
   );
 }
