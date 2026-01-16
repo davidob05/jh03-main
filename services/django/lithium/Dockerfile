@@ -1,4 +1,4 @@
-ARG DEP_PROXY_PREFIX=public.ecr.aws/docker/library
+ARG BASE_IMAGE_REGISTRY=public.ecr.aws/docker/library
 # First, build the application in the `/app` directory.
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 ENV UV_COMPILE_BYTECODE=1
@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
 # Then, use a final image without uv
-FROM ${DEP_PROXY_PREFIX}/python:3.12-slim-bookworm
+FROM ${BASE_IMAGE_REGISTRY}/python:3.12-slim-bookworm
 
 # Copy the application from the builder
 COPY --from=builder --chown=app:app /app /app
