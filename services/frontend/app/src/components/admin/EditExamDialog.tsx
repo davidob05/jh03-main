@@ -47,6 +47,8 @@ type VenueOption = {
   venue_name: string;
   is_accessible: boolean;
   provision_capabilities: string[];
+  availability?: string[];
+  exam_venues?: ExamVenue[];
   venuetype?: string;
 };
 
@@ -164,22 +166,58 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
           (p) => p !== "separate_room_on_own" && p !== "separate_room_not_on_own"
         );
         const suffix = visibleCaps.length ? ` (${visibleCaps.map(formatProvisionLabel).join(", ")})` : "";
-        return { value: v.venue_name, label: `${v.venue_name}${suffix}`, caps: provs, type: v.venuetype };
+        return {
+          value: v.venue_name,
+          label: `${v.venue_name}${suffix}`,
+          caps: provs,
+          type: v.venuetype,
+          availability: v.availability || [],
+          examVenues: v.exam_venues || [],
+        };
       }),
     [venues]
   );
 
-  const filteredVenueOptions = (requiredCaps: string[]) => {
-    if (!requiredCaps.length) return venueOptions;
-    const needsSeparateRoom = requiredCaps.some(
-      (cap) => cap === "separate_room_on_own" || cap === "separate_room_not_on_own"
-    );
+  const hasTimingClash = (existing: ExamVenue[] | undefined, startValue: string, lengthMinutes: number | null) => {
+    if (!existing || existing.length === 0 || !startValue || lengthMinutes === null) return false;
+    const start = new Date(toIsoString(startValue));
+    if (Number.isNaN(start.getTime())) return false;
+    const endMs = start.getTime() + lengthMinutes * 60000;
+    return existing.some((ev) => {
+      if (examId && ev.exam === examId) return false;
+      if (!ev.start_time || ev.exam_length == null) return false;
+      const evStart = new Date(ev.start_time);
+      if (Number.isNaN(evStart.getTime())) return false;
+      const evEndMs = evStart.getTime() + ev.exam_length * 60000;
+      return start.getTime() < evEndMs && evStart.getTime() < endMs;
+    });
+  };
+
+  const filteredVenueOptions = (
+    requiredCaps: string[],
+    startTime?: string,
+    lengthMinutes?: number | null,
+    excludeMainHall: boolean = false
+  ) => {
+    const baseOptions = excludeMainHall ? venueOptions.filter((v) => (v.type || "") !== "main_hall") : venueOptions;
+    if (!requiredCaps.length) return baseOptions;
+    const needsSeparateRoomOnOwn = requiredCaps.includes("separate_room_on_own");
+    const needsSeparateRoom =
+      needsSeparateRoomOnOwn || requiredCaps.includes("separate_room_not_on_own");
     const remainingCaps = requiredCaps.filter(
       (cap) => cap !== "separate_room_on_own" && cap !== "separate_room_not_on_own"
     );
-    return venueOptions.filter((v) => {
+    return baseOptions.filter((v) => {
       const caps = v.caps || [];
-      if (needsSeparateRoom && v.type !== "separate_room") return false;
+      if (needsSeparateRoom) {
+        if (!excludeMainHall && (v.type || "") !== "separate_room") return false;
+        const lengthValue = typeof lengthMinutes === "number" ? lengthMinutes : null;
+        if (needsSeparateRoomOnOwn && hasTimingClash(v.examVenues, startTime || "", lengthValue)) {
+          return false;
+        }
+      } else {
+        if (excludeMainHall && (v.type || "") === "main_hall") return false;
+      }
       return remainingCaps.every((cap) => caps.includes(cap));
     });
   };
@@ -215,7 +253,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
       ...prev,
       {
         id: `new-${Date.now()}`,
-        venue_name: "",
+        venue_name: coreVenue?.venue_name || "",
         start_time: mainStart || "",
         exam_length: typeof mainLength === "number" ? mainLength : null,
         provision_capabilities: [],
@@ -229,6 +267,19 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
 
   const updateExtraVenue = <K extends keyof EditableVenue>(id: number | string, field: K, value: EditableVenue[K]) => {
     setExtraVenues((prev) => prev.map((v) => (v.id === id ? { ...v, [field]: value } : v)));
+  };
+
+  const lacksSeparateRoomCap = (caps: string[]) =>
+    !caps.includes("separate_room_on_own") && !caps.includes("separate_room_not_on_own");
+
+  const updateExtraProvisionCaps = (id: number | string, nextCaps: string[]) => {
+    setExtraVenues((prev) =>
+      prev.map((v) => {
+        if (v.id !== id) return v;
+        const defaultVenue = lacksSeparateRoomCap(nextCaps) ? coreVenue?.venue_name || v.venue_name : v.venue_name;
+        return { ...v, provision_capabilities: nextCaps, venue_name: defaultVenue };
+      })
+    );
   };
 
   const mutation = useMutation({
@@ -410,7 +461,12 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                   fullWidth
                   disabled={Boolean(coreVenue)}
                 >
-                  {filteredVenueOptions(mainProvisions).map((v) => (
+                  {filteredVenueOptions(
+                    mainProvisions,
+                    mainStart,
+                    typeof mainLength === "number" ? mainLength : null,
+                    false
+                  ).map((v) => (
                     <MenuItem key={v.value} value={v.value}>{v.label}</MenuItem>
                   ))}
                 </TextField>
@@ -458,9 +514,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                               label={p.label}
                               color={selected ? "primary" : "default"}
                               variant={selected ? "filled" : "outlined"}
-                              onClick={() =>
-                                updateExtraVenue(v.id, "provision_capabilities", toggleProvision(v.provision_capabilities, p.value))
-                              }
+                              onClick={() => updateExtraProvisionCaps(v.id, toggleProvision(v.provision_capabilities, p.value))}
                               sx={{ cursor: "pointer" }}
                             />
                           );
@@ -476,7 +530,12 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                         fullWidth
                         sx={{ minWidth: { sm: 220, xs: "100%" } }}
                       >
-                        {filteredVenueOptions(v.provision_capabilities).map((opt) => (
+                        {filteredVenueOptions(
+                          v.provision_capabilities,
+                          v.start_time,
+                          v.exam_length,
+                          true
+                        ).map((opt) => (
                           <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
                         ))}
                       </TextField>
