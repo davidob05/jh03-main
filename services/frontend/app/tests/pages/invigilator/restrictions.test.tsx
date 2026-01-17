@@ -3,6 +3,7 @@ import { render, screen, waitFor, within, fireEvent } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { InvigilatorRestrictions } from "@/pages/invigilator/Restrictions";
+import dayjs from "dayjs";
 
 const apiFetchMock = vi.fn();
 
@@ -157,6 +158,33 @@ describe("Page - Invigilator Restrictions", () => {
     await waitFor(() => expect(screen.getByText(/Unable to load restrictions/i)).toBeInTheDocument());
   });
 
+  it("disables submission when cutoff reached and shows warning", async () => {
+    const cutoffDate = dayjs().subtract(1, "day").format("YYYY-MM-DD");
+    const cutoffResp = {
+      ...sampleResponse,
+      diet: "DEC_2025",
+      diet_name: "December 2025",
+      restriction_cutoff: cutoffDate,
+      diets: [{ code: "DEC_2025", name: "December 2025", start_date: "2025-12-01", end_date: "2025-12-19", restriction_cutoff: cutoffDate }],
+    };
+    apiFetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      const method = (options?.method || "GET").toUpperCase();
+      if (method === "GET") {
+        return Promise.resolve({ ok: true, json: async () => cutoffResp, text: async () => "" });
+      }
+      if (method === "PUT") {
+        return Promise.resolve({ ok: true, json: async () => cutoffResp, text: async () => "" });
+      }
+      return Promise.resolve({ ok: false, json: async () => ({}), text: async () => "Unexpected" });
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/Restrictions are closed/i)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /submit restrictions/i })).toBeDisabled();
+    await waitFor(() => {
+      const slotButtons = screen.getAllByRole("button", { name: /morning/i });
+      expect(slotButtons[0]).toBeDisabled();
+    });
+  });
   it.skip("shows error snackbar when update fails", async () => {
     apiFetchMock
       .mockImplementationOnce((url: string, options?: RequestInit) => {
