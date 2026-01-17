@@ -29,6 +29,7 @@ export interface Diet {
   name: string;
   start_date: string | null;
   end_date: string | null;
+  restriction_cutoff: string | null;
   is_active: boolean;
 }
 
@@ -39,6 +40,7 @@ const emptyDraft: DraftDiet = {
   name: "",
   start_date: "",
   end_date: "",
+  restriction_cutoff: "",
   is_active: true,
 };
 
@@ -69,6 +71,7 @@ export const DietManager: React.FC = () => {
         name: payload.name.trim(),
         start_date: payload.start_date || null,
         end_date: payload.end_date || null,
+        restriction_cutoff: payload.restriction_cutoff || null,
         is_active: payload.is_active,
       };
       const res = await apiFetch(url, {
@@ -196,6 +199,11 @@ export const DietManager: React.FC = () => {
                     ? `${diet.start_date} → ${diet.end_date}`
                     : "No date range set"}
                 </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {diet.restriction_cutoff
+                    ? `Restriction cutoff: ${diet.restriction_cutoff}`
+                    : "Restriction cutoff: Not set"}
+                </Typography>
                 <Typography variant="caption" color={diet.is_active ? "success.main" : "text.secondary"}>
                   {diet.is_active ? "Active" : "Inactive"}
                 </Typography>
@@ -262,6 +270,15 @@ export const DietManager: React.FC = () => {
                 fullWidth
               />
             </Stack>
+            <TextField
+              label="Restriction cutoff"
+              type="date"
+              value={draft.restriction_cutoff || ""}
+              onChange={(e) => setDraft((d) => ({ ...d, restriction_cutoff: e.target.value }))}
+              InputLabelProps={{ shrink: true }}
+              helperText="Last date invigilators can submit restrictions for this diet"
+              fullWidth
+            />
             <FormControlLabel
               control={
                 <Checkbox
