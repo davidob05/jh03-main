@@ -1,9 +1,11 @@
 from datetime import date, timedelta
 from unittest import mock
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from timetabling_system.api import views as api_views
 from timetabling_system.api.serializers import (
@@ -258,6 +260,9 @@ class ApiViewHelpersTests(TestCase):
 
 class ApiViewActionTests(TestCase):
     def setUp(self):
+        self.factory = APIRequestFactory()
+        self.user = get_user_model().objects.create_user(username="casey", password="pass")
+        self.other_user = get_user_model().objects.create_user(username="alex", password="pass")
         self.exam = Exam.objects.create(
             exam_name="Physics",
             course_code="PHYS100",
@@ -285,7 +290,16 @@ class ApiViewActionTests(TestCase):
             exam_length=90,
             core=False,
         )
-        self.invigilator = Invigilator.objects.create(preferred_name="Casey", full_name="Casey Invigilator")
+        self.invigilator = Invigilator.objects.create(
+            preferred_name="Casey",
+            full_name="Casey Invigilator",
+            user=self.user,
+        )
+        self.other_invigilator = Invigilator.objects.create(
+            preferred_name="Alex",
+            full_name="Alex Invigilator",
+            user=self.other_user,
+        )
         self.assignment = InvigilatorAssignment.objects.create(
             invigilator=self.invigilator,
             exam_venue=self.examvenue,
@@ -357,3 +371,105 @@ class ApiViewActionTests(TestCase):
             assign_view.perform_create(assign_serializer)
             assign_view.perform_destroy(self.assignment)
         self.assertEqual(log_assign.call_count, 2)
+
+    def test_available_covers_filters_conflicts(self):
+        now = timezone.now()
+        exam_conflict = Exam.objects.create(
+            exam_name="Maths",
+            course_code="MATH100",
+            exam_type="Written",
+            no_students=60,
+            exam_school="Science",
+            school_contact="Dr. M",
+        )
+        exam_conflict_venue = ExamVenue.objects.create(
+            exam=exam_conflict,
+            venue=self.venue,
+            start_time=now + timedelta(hours=2),
+            exam_length=120,
+            core=False,
+        )
+        conflicting_cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=exam_conflict_venue,
+            role="lead",
+            assigned_start=now + timedelta(hours=2),
+            assigned_end=now + timedelta(hours=4),
+            cancel=True,
+        )
+        exam_safe = Exam.objects.create(
+            exam_name="Chemistry",
+            course_code="CHEM100",
+            exam_type="Written",
+            no_students=30,
+            exam_school="Science",
+            school_contact="Dr. A",
+        )
+        exam_safe_venue = ExamVenue.objects.create(
+            exam=exam_safe,
+            venue=self.venue,
+            start_time=now + timedelta(hours=6),
+            exam_length=90,
+            core=False,
+        )
+        available_cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=exam_safe_venue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=6),
+            assigned_end=now + timedelta(hours=8),
+            cancel=True,
+        )
+        InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=exam_conflict_venue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=3),
+            assigned_end=now + timedelta(hours=3, minutes=30),
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"get": "available_covers"})
+        request = self.factory.get("/invigilator/assignments/available-covers/")
+        force_authenticate(request, user=self.user)
+        response = view(request)
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {item["id"] for item in response.data}
+        self.assertIn(available_cancelled.id, returned_ids)
+        self.assertNotIn(conflicting_cancelled.id, returned_ids)
+
+    def test_pickup_creates_cover_assignment(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Biology",
+            course_code="BIO100",
+            exam_type="Written",
+            no_students=40,
+            exam_school="Science",
+            school_contact="Dr. B",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=5),
+            exam_length=120,
+            core=False,
+        )
+        cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=5),
+            assigned_end=now + timedelta(hours=7),
+            cancel=True,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "pickup"})
+        request = self.factory.post(f"/invigilator/assignments/{cancelled.pk}/pickup/")
+        force_authenticate(request, user=self.user)
+        response = view(request, pk=cancelled.pk)
+        self.assertEqual(response.status_code, 201)
+
+        replacement = InvigilatorAssignment.objects.exclude(pk=cancelled.pk).get(cover_for=cancelled)
+        self.assertTrue(replacement.cover)
+        self.assertEqual(replacement.invigilator, self.invigilator)
+        self.assertEqual(replacement.role, cancelled.role)
