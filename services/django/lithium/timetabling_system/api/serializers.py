@@ -219,6 +219,11 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
             "role",
             "assigned_start",
             "assigned_end",
+            "break_time_minutes",
+            "cancel",
+            "cancel_cause",
+            "cover",
+            "cover_for",
             "confirmed",
             "notes",
         )
