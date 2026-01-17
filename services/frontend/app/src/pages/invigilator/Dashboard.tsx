@@ -420,7 +420,7 @@ export const InvigilatorDashboard: React.FC = () => {
                 </Typography>
                 <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
                   {statsError
-                    ? "â€”"
+                    ? "—"
                     : statsLoading || !stats
                     ? "..."
                     : (stats?.[item.key] ?? 0).toString()}
@@ -472,3 +472,5 @@ export const InvigilatorDashboard: React.FC = () => {
     </Box>
   );
 };
+
+
