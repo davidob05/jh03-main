@@ -775,6 +775,7 @@ class InvigilatorAvailabilityView(APIView):
                 "name": d.name,
                 "start_date": str(d.start_date) if d.start_date else None,
                 "end_date": str(d.end_date) if d.end_date else None,
+                "restriction_cutoff": str(d.restriction_cutoff) if d.restriction_cutoff else None,
             }
             for d in diet_qs
         ]
@@ -805,6 +806,8 @@ class InvigilatorAvailabilityView(APIView):
         return Response(
             {
                 "diet": diet,
+                "diet_name": diet_obj.name,
+                "restriction_cutoff": str(diet_obj.restriction_cutoff) if diet_obj.restriction_cutoff else None,
                 "start_date": str(start_date) if start_date else None,
                 "end_date": str(end_date) if end_date else None,
                 "diets": available_diets,
@@ -822,6 +825,16 @@ class InvigilatorAvailabilityView(APIView):
         diet_obj = self._validate_diet(payload.get("diet"))
         diet = diet_obj.code
         unavailable = payload.get("unavailable") or []
+
+        cutoff_date = diet_obj.restriction_cutoff
+        today = timezone.localdate()
+        if cutoff_date and today >= cutoff_date:
+            return Response(
+                {
+                    "detail": f"Restrictions for {diet_obj.name or diet} closed on {cutoff_date}. Please contact admin to request changes."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         start_date = diet_obj.start_date
         end_date = diet_obj.end_date
