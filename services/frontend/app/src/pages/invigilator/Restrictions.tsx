@@ -29,9 +29,11 @@ type AvailabilityEntry = {
 
 type AvailabilityResponse = {
   diet: string;
+  diet_name?: string | null;
   start_date: string | null;
   end_date: string | null;
-  diets: { code: string; start_date: string; end_date: string }[];
+  restriction_cutoff?: string | null;
+  diets: { code: string; name?: string; start_date: string; end_date: string; restriction_cutoff?: string | null }[];
   days: {
     date: string;
     slots: { slot: SlotCode; available: boolean }[];
@@ -132,7 +134,8 @@ export const InvigilatorRestrictions: React.FC = () => {
   const diets = useMemo(() => {
     return (availabilityQuery.data?.diets || []).map((d) => ({
       code: d.code,
-      label: d.code.replace(/_/g, " "),
+      label: d.name || d.code.replace(/_/g, " "),
+      restriction_cutoff: d.restriction_cutoff,
     }));
   }, [availabilityQuery.data?.diets]);
 
@@ -196,53 +199,65 @@ export const InvigilatorRestrictions: React.FC = () => {
 
   const startDate = availabilityQuery.data?.start_date;
   const endDate = availabilityQuery.data?.end_date;
+  const selectedDietLabel =
+    diets.find((d) => d.code === selectedDiet)?.label || availabilityQuery.data?.diet_name || selectedDiet || "";
+  const selectedDietCutoff =
+    diets.find((d) => d.code === selectedDiet)?.restriction_cutoff ||
+    availabilityQuery.data?.restriction_cutoff ||
+    null;
+  const cutoffReached =
+    selectedDietCutoff && dayjs().isSame(dayjs(selectedDietCutoff), "day")
+      ? true
+      : selectedDietCutoff
+      ? dayjs().isAfter(dayjs(selectedDietCutoff), "day")
+      : false;
 
   return (
     <Box sx={{ p: 3 }}>
       <Stack spacing={2.5}>
-        <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }} spacing={1.5}>
-          <Stack spacing={0.5}>
-            <Typography variant="h4" fontWeight={700}>
-              Restrictions
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Deselect the slots you cannot work for the selected exam diet, then submit your restrictions.
-            </Typography>
+          <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }} spacing={1.5}>
+            <Stack spacing={0.5}>
+              <Typography variant="h4" fontWeight={700}>
+                Restrictions
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Deselect the slots you cannot work for the selected exam diet, then submit your restrictions.
+              </Typography>
+            </Stack>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Typography variant="body2" color="text.secondary">
+                Exam diet
+              </Typography>
+              <Select
+                size="small"
+                value={selectedDiet || ""}
+                onChange={(e) => handleDietChange(e.target.value)}
+                sx={{ minWidth: 200 }}
+              >
+                {diets.map((d) => (
+                  <MenuItem key={d.code} value={d.code}>
+                    {d.label}
+                  </MenuItem>
+                ))}
+              </Select>
+              <PillButton
+                variant="outlined"
+                onClick={() => availabilityQuery.refetch()}
+                disabled={availabilityQuery.isFetching}
+                size="small"
+              >
+                Refresh
+              </PillButton>
+              <PillButton
+                variant="contained"
+                onClick={() => mutation.mutate()}
+                disabled={cutoffReached || availabilityQuery.isLoading || mutation.isLoading || days.length === 0}
+                size="small"
+              >
+                Submit restrictions
+              </PillButton>
+            </Stack>
           </Stack>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-            <Typography variant="body2" color="text.secondary">
-              Exam diet
-            </Typography>
-            <Select
-              size="small"
-              value={selectedDiet || ""}
-              onChange={(e) => handleDietChange(e.target.value)}
-              sx={{ minWidth: 200 }}
-            >
-              {diets.map((d) => (
-                <MenuItem key={d.code} value={d.code}>
-                  {d.label}
-                </MenuItem>
-              ))}
-            </Select>
-            <PillButton
-              variant="outlined"
-              onClick={() => availabilityQuery.refetch()}
-              disabled={availabilityQuery.isFetching}
-              size="small"
-            >
-              Refresh
-            </PillButton>
-            <PillButton
-              variant="contained"
-              onClick={() => mutation.mutate()}
-              disabled={availabilityQuery.isLoading || mutation.isLoading || days.length === 0}
-              size="small"
-            >
-              Submit restrictions
-            </PillButton>
-          </Stack>
-        </Stack>
 
         <Panel
           disableDivider
@@ -261,11 +276,16 @@ export const InvigilatorRestrictions: React.FC = () => {
             boxShadow: "0 12px 35px rgba(79, 70, 229, 0.08)",
           }}
         >
-          <Typography color="text.secondary">
+          <Typography color="text.secondary" sx={{ mb: 1 }}>
             Find the dates and times you are unavailable to invigilate and deselect the corresponding slots.
-            <br />
-            Edit them as needed and submit your restrictions when you are done.
           </Typography>
+          {selectedDietCutoff && (
+            <Alert severity={cutoffReached ? "warning" : "info"} sx={{ mt: 1 }}>
+              {cutoffReached
+                ? "Restrictions are closed for this diet. Please email admin to request changes."
+                : `Restrictions remain open until ${dayjs(selectedDietCutoff).format("D MMM YYYY")}.`}
+            </Alert>
+          )}
         </Panel>
 
         <Panel sx={{ p: 3 }}>
@@ -315,7 +335,8 @@ export const InvigilatorRestrictions: React.FC = () => {
                                 variant={available ? "contained" : "outlined"}
                                 color="success"
                                 size="medium"
-                                onClick={() => toggleSlot(day.date, slot.slot)}
+                                onClick={() => !cutoffReached && toggleSlot(day.date, slot.slot)}
+                                disabled={cutoffReached}
                                 sx={{
                                   borderRadius: 10,
                                   minWidth: 120,
@@ -324,8 +345,13 @@ export const InvigilatorRestrictions: React.FC = () => {
                                   borderColor: available ? "success.main" : "success.main",
                                   backgroundColor: available ? "success.main" : "transparent",
                                   color: available ? "#fff" : "success.dark",
+                                  opacity: cutoffReached ? 0.6 : 1,
                                   "&:hover": {
-                                    backgroundColor: available ? "success.dark" : "success.light",
+                                    backgroundColor: cutoffReached
+                                      ? undefined
+                                      : available
+                                      ? "success.dark"
+                                      : "success.light",
                                     color: available ? "#fff" : "success.dark",
                                     borderColor: "success.dark",
                                   },

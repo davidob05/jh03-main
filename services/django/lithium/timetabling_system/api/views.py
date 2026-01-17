@@ -23,8 +23,8 @@ from timetabling_system.models import (
     Notification,
     Announcement,
     SlotChoices,
+    Diet,
 )
-from timetabling_system.constants import DIET_DATE_RANGES
 from timetabling_system.services import ingest_upload_result
 from timetabling_system.services.venue_matching import venue_supports_caps
 from timetabling_system.services.upload_processor import (
@@ -46,6 +46,7 @@ from .serializers import (
     VenueWriteSerializer,
     NotificationSerializer,
     AnnouncementSerializer,
+    DietSerializer,
 )
 
 
@@ -569,6 +570,13 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=_get_request_user(self, serializer))
 
 
+class DietViewSet(viewsets.ModelViewSet):
+    queryset = Diet.objects.all().order_by("-is_active", "-start_date", "code")
+    serializer_class = DietSerializer
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []
+
+
 class StudentProvisionListView(APIView):
     """
     Return provision records for students, optionally filtered to those
@@ -677,11 +685,13 @@ class InvigilatorAvailabilityView(APIView):
             invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
         return invigilator
 
-    def _validate_diet(self, diet_code: str | None):
+    def _validate_diet(self, diet_code: str | None) -> Diet:
         if not diet_code:
             raise ValidationError({"diet": "Diet is required."})
-        # Allow diets outside DIET_DATE_RANGES so that legacy/new codes still work.
-        return diet_code
+        diet = Diet.objects.filter(code=diet_code).first()
+        if not diet:
+            raise ValidationError({"diet": f"Unknown diet '{diet_code}'."})
+        return diet
 
     def _ensure_availability_rows(self, invigilator, diet_code: str, start_date: date | None, end_date: date | None):
         if start_date is None or end_date is None:
@@ -755,19 +765,34 @@ class InvigilatorAvailabilityView(APIView):
         restriction_diets = list(
             InvigilatorRestriction.objects.filter(invigilator=invigilator).values_list("diet", flat=True)
         )
-        available_diets = []
-        for code, span in DIET_DATE_RANGES.items():
-            available_diets.append({"code": code, "start_date": str(span[0]), "end_date": str(span[1])})
-        for code in restriction_diets:
-            if not any(d["code"] == code for d in available_diets):
-                available_diets.append({"code": code, "start_date": None, "end_date": None})
+        diet_qs = list(Diet.objects.all().order_by("-is_active", "-start_date", "code"))
+        if not diet_qs:
+            return Response({"detail": "No diets are configured."}, status=status.HTTP_400_BAD_REQUEST)
 
-        diet = request.query_params.get("diet") or (available_diets[0]["code"] if available_diets else None)
-        self._validate_diet(diet)
+        available_diets = [
+            {
+                "code": d.code,
+                "name": d.name,
+                "start_date": str(d.start_date) if d.start_date else None,
+                "end_date": str(d.end_date) if d.end_date else None,
+                "restriction_cutoff": str(d.restriction_cutoff) if d.restriction_cutoff else None,
+            }
+            for d in diet_qs
+        ]
 
-        start_date = end_date = None
-        if diet in DIET_DATE_RANGES:
-            start_date, end_date = DIET_DATE_RANGES[diet]
+        requested_diet_code = request.query_params.get("diet")
+        diet_obj = None
+        if requested_diet_code:
+            diet_obj = self._validate_diet(requested_diet_code)
+        else:
+            diet_obj = next((d for d in diet_qs if d.is_active), diet_qs[0] if diet_qs else None)
+
+        if diet_obj is None:
+            return Response({"detail": "No diets are configured."}, status=status.HTTP_400_BAD_REQUEST)
+
+        diet = diet_obj.code
+        start_date = diet_obj.start_date
+        end_date = diet_obj.end_date
 
         self._ensure_availability_rows(invigilator, diet, start_date, end_date)
 
@@ -781,6 +806,8 @@ class InvigilatorAvailabilityView(APIView):
         return Response(
             {
                 "diet": diet,
+                "diet_name": diet_obj.name,
+                "restriction_cutoff": str(diet_obj.restriction_cutoff) if diet_obj.restriction_cutoff else None,
                 "start_date": str(start_date) if start_date else None,
                 "end_date": str(end_date) if end_date else None,
                 "diets": available_diets,
@@ -795,12 +822,22 @@ class InvigilatorAvailabilityView(APIView):
             return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
 
         payload = request.data or {}
-        diet = self._validate_diet(payload.get("diet"))
+        diet_obj = self._validate_diet(payload.get("diet"))
+        diet = diet_obj.code
         unavailable = payload.get("unavailable") or []
 
-        start_date = end_date = None
-        if diet in DIET_DATE_RANGES:
-            start_date, end_date = DIET_DATE_RANGES[diet]
+        cutoff_date = diet_obj.restriction_cutoff
+        today = timezone.localdate()
+        if cutoff_date and today >= cutoff_date:
+            return Response(
+                {
+                    "detail": f"Restrictions for {diet_obj.name or diet} closed on {cutoff_date}. Please contact admin to request changes."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        start_date = diet_obj.start_date
+        end_date = diet_obj.end_date
 
         self._ensure_availability_rows(invigilator, diet, start_date, end_date)
 
@@ -839,6 +876,7 @@ class InvigilatorAvailabilityView(APIView):
 
         # Prepare notification
         inv_name = invigilator.preferred_name or invigilator.full_name or "Invigilator"
+        diet_label = diet_obj.name or diet
         count_unavailable = len(unavailable_set)
 
         def _format_slot(slot: str) -> str:
@@ -867,11 +905,11 @@ class InvigilatorAvailabilityView(APIView):
             slot_word = "slot" if count_unavailable == 1 else "slots"
             summary = _summarize_unavailable()
             if summary:
-                message = f"{inv_name} updated availability for {diet}: unavailable on {summary} ({count_unavailable} {slot_word})"
+                message = f"{inv_name} updated availability for {diet_label}: unavailable on {summary} ({count_unavailable} {slot_word})"
             else:
-                message = f"{inv_name} updated availability for {diet}: {count_unavailable} {slot_word} unavailable"
+                message = f"{inv_name} updated availability for {diet_label}: {count_unavailable} {slot_word} unavailable"
         else:
-            message = f"{inv_name} set availability for {diet}: all slots available"
+            message = f"{inv_name} set availability for {diet_label}: all slots available"
         log_notification(Notification.NotificationType.AVAILABILITY, message, user=request.user)
 
         refreshed_qs = InvigilatorAvailability.objects.filter(invigilator=invigilator)
@@ -905,15 +943,19 @@ class InvigilatorStatsView(APIView):
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        invigilator = getattr(user, "invigilator_profile", None)
+        invigilator = getattr(user, "invigilator_profile", None) or _resolve_invigilator_for_user(user)
         if invigilator is None:
             return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
 
         now = timezone.now()
-        assignments = InvigilatorAssignment.objects.filter(invigilator=invigilator)
-        upcoming_qs = assignments.filter(assigned_start__gte=now, cancel=False)
+        assignments = InvigilatorAssignment.objects.select_related("exam_venue__exam", "exam_venue__venue").filter(
+            invigilator=invigilator
+        )
+        now_ts = timezone.now()
+        upcoming_qs = assignments.filter(cancel=False, assigned_start__gte=now_ts).order_by("assigned_start")
         cancelled_qs = assignments.filter(cancel=True)
-        next_assignment = upcoming_qs.order_by("assigned_start").first()
+
+        next_assignment = upcoming_qs.first()
 
         def _duration_hours(qs):
             total = 0.0

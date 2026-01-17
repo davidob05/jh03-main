@@ -33,11 +33,14 @@ import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmat
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 
-const baseDietOptions = [
-  { code: "DEC_2025", label: "December 2025" },
-  { code: "APR_MAY_2026", label: "April/May 2026" },
-  { code: "AUG_2026", label: "August 2026" },
-];
+const formatDietLabel = (diet: Diet | { code: string; label?: string }) => {
+  return (
+    (typeof (diet as Diet).name === "string" && (diet as Diet).name?.trim()) ||
+    (diet as any).label ||
+    diet.code ||
+    ""
+  );
+};
 
 const allQualifications: Record<string, string> = {
   SENIOR_INVIGILATOR: "Senior Invigilator",
@@ -59,6 +62,15 @@ interface InvigilatorRestriction {
 
 interface InvigilatorQualification {
   qualification: string;
+}
+
+interface Diet {
+  id: number;
+  code: string;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
 }
 
 interface InvigilatorData {
@@ -114,20 +126,31 @@ export const AdminInvigilatorProfile: React.FC = () => {
     enabled: Boolean(id),
   });
 
+  const { data: diets = [] } = useQuery<Diet[]>({
+    queryKey: ["diets"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/diets/`);
+      if (!res.ok) throw new Error("Unable to load diets");
+      return res.json();
+    },
+  });
+
   const restrictionsUnion = useMemo(() => {
     const set = new Set<string>();
     data?.restrictions?.forEach((r) => r.restrictions?.forEach((code) => set.add(code)));
     return set;
   }, [data]);
 
-  const diets = useMemo(() => data?.restrictions?.map((r) => r.diet) || [], [data]);
+  const dietsFromData = useMemo(() => data?.restrictions?.map((r) => r.diet) || [], [data]);
 
   const dietOptions = useMemo(() => {
-    const extras = diets
-      .filter((code) => !baseDietOptions.some((d) => d.code === code))
-      .map((code) => ({ code, label: code.replace(/_/g, " ") }));
-    return [...baseDietOptions, ...extras];
-  }, [diets]);
+    const base = diets.map((d) => ({ code: d.code, label: formatDietLabel(d) }));
+    const extras =
+      dietsFromData
+        .filter((code) => !base.some((d) => d.code === code))
+        .map((code) => ({ code, label: formatDietLabel({ code }) })) || [];
+    return [...base, ...extras];
+  }, [diets, dietsFromData]);
 
   const groupedAvailability = (data?.availabilities || []).reduce<Record<string, InvigilatorAvailability[]>>((acc, slot) => {
     if (!allowedSlots.has(slot.slot)) return acc;

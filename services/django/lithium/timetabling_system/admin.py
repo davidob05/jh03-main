@@ -20,6 +20,7 @@ from .models import (
     InvigilatorAssignment,
     InvigilatorRestrictionType,
     InvigilatorQualificationChoices,
+    Diet,
 )
 
 class VenueAdminForm(forms.ModelForm):
@@ -182,3 +183,11 @@ class AnnouncementAdmin(admin.ModelAdmin):
     list_filter = ("audience", "is_active")
     search_fields = ("title", "body")
     ordering = ("-priority", "-published_at")
+
+
+@admin.register(Diet)
+class DietAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "start_date", "end_date", "restriction_cutoff", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("code", "name")
+    ordering = ("-start_date", "code")

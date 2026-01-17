@@ -15,6 +15,7 @@ from timetabling_system.models import (
     Exam,
     ExamVenue,
     Invigilator,
+    Diet,
     InvigilatorAvailability,
     InvigilatorAssignment,
     InvigilatorQualificationChoices,
@@ -133,12 +134,15 @@ class ExamVenueSerializerTests(TestCase):
 
 class InvigilatorSerializerTests(TestCase):
     def setUp(self):
-        self.diet_range_patch = mock.patch(
-            "timetabling_system.api.serializers.DIET_DATE_RANGES",
-            {"DEC_2025": (date(2025, 1, 1), date(2025, 1, 1))},
+        self.diet, _ = Diet.objects.update_or_create(
+            code="DEC_2025",
+            defaults={
+                "name": "December 2025",
+                "start_date": date(2025, 1, 1),
+                "end_date": date(2025, 1, 1),
+                "is_active": True,
+            },
         )
-        self.diet_range_patch.start()
-        self.addCleanup(self.diet_range_patch.stop)
 
     def test_create_invigilator_generates_availability(self):
         serializer = InvigilatorSerializer(
@@ -176,19 +180,60 @@ class InvigilatorSerializerTests(TestCase):
         self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 2)
 
     def test_generate_availability_skips_unknown_diet_ranges(self):
-        with mock.patch("timetabling_system.api.serializers.DIET_DATE_RANGES", {}):
-            serializer = InvigilatorSerializer(
-                data={
-                    "preferred_name": "Lee",
-                    "full_name": "Lee Invigilator",
-                    "restrictions": [
-                        {"diet": "DEC_2025", "restrictions": [], "notes": ""},
-                    ],
-                }
-            )
-            self.assertTrue(serializer.is_valid(), serializer.errors)
-            invig = serializer.save()
-            self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 0)
+        self.diet.delete()
+        serializer = InvigilatorSerializer(
+            data={
+                "preferred_name": "Lee",
+                "full_name": "Lee Invigilator",
+                "restrictions": [
+                    {"diet": "DEC_2025", "restrictions": [], "notes": ""},
+                ],
+            }
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        invig = serializer.save()
+        self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 0)
+
+    def test_generate_availability_handles_multiple_diets(self):
+        # Use an existing DietChoices code for compatibility
+        diet2, _ = Diet.objects.update_or_create(
+            code="APR_MAY_2026",
+            defaults={
+                "name": "April/May 2026",
+                "start_date": date(2026, 4, 1),
+                "end_date": date(2026, 4, 2),
+                "is_active": True,
+            },
+        )
+        serializer = InvigilatorSerializer(
+            data={
+                "preferred_name": "Alex",
+                "full_name": "Alex Invig",
+                "restrictions": [
+                    {"diet": self.diet.code, "restrictions": [], "notes": ""},
+                    {"diet": diet2.code, "restrictions": [], "notes": ""},
+                ],
+            }
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        invig = serializer.save()
+        # self.diet is 1 day (2 slots), diet2 is 2 days (4 slots) -> total 6
+        self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 6)
+
+    def test_generate_availability_skips_diet_without_dates(self):
+        diet_no_dates, _ = Diet.objects.update_or_create(
+            code=self.diet.code, defaults={"name": self.diet.name, "start_date": None, "end_date": None}
+        )
+        serializer = InvigilatorSerializer(
+            data={
+                "preferred_name": "Jo",
+                "full_name": "Jo Invig",
+                "restrictions": [{"diet": diet_no_dates.code, "restrictions": [], "notes": ""}],
+            }
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        invig = serializer.save()
+        self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 0)
 
 
 class ApiViewHelpersTests(TestCase):

@@ -13,9 +13,13 @@ from timetabling_system.models import (
     InvigilatorAssignment,
     Notification,
     Announcement,
-    SlotChoices
+    SlotChoices,
+    Diet,
 )
-from timetabling_system.constants import DIET_DATE_RANGES
+
+# Backwards-compat attribute so older tests that patch DIET_DATE_RANGES don't crash.
+DIET_DATE_RANGES: dict = {}
+
 
 class ExamVenueSerializer(serializers.ModelSerializer):
     venue_name = serializers.SerializerMethodField()
@@ -246,6 +250,28 @@ class InvigilatorAvailabilitySerializer(serializers.ModelSerializer):
         fields = ("date", "slot", "available")
 
 
+class DietSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Diet
+        fields = (
+            "id",
+            "code",
+            "name",
+            "start_date",
+            "end_date",
+            "restriction_cutoff",
+            "is_active",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "created_at", "updated_at")
+
+    def validate_code(self, value: str):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Code is required.")
+        return value
+
 class InvigilatorSerializer(serializers.ModelSerializer):
     assignments = InvigilatorAssignmentSerializer(many=True, read_only=True)
     qualifications = InvigilatorQualificationSerializer(many=True, required=False)
@@ -329,18 +355,29 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             )
             diets.append(r["diet"])
 
-        self._generate_availability(invigilator, diets)
+        diet_map = self._get_diet_map(diets)
+        self._generate_availability(invigilator, diet_map)
 
         return invigilator
 
-    def _generate_availability(self, invigilator, diets):
+    def _get_diet_map(self, diet_codes: list[str]) -> dict[str, Diet]:
+        unique_codes = list({code for code in diet_codes if code})
+        if not unique_codes:
+            return {}
+        diet_map: dict[str, Diet] = {}
+        db_diets = {d.code: d for d in Diet.objects.filter(code__in=unique_codes)}
+        # Silently skip missing diet codes; availability won't be generated for them.
+        diet_map.update(db_diets)
+        return diet_map
+
+    def _generate_availability(self, invigilator, diet_map: dict[str, Diet]):
         availability_objects = []
 
-        for diet in diets:
-            if diet not in DIET_DATE_RANGES:
+        for diet in diet_map.values():
+            start_date = diet.start_date
+            end_date = diet.end_date
+            if not start_date or not end_date:
                 continue
-
-            start_date, end_date = DIET_DATE_RANGES[diet]
             current_date = start_date
 
             while current_date <= end_date:
@@ -382,6 +419,7 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             for r in restrictions_data:
                 InvigilatorRestriction.objects.create(invigilator=instance, **r)
                 diets.append(r["diet"])
-            self._generate_availability(instance, diets)
+            diet_map = self._get_diet_map(diets)
+            self._generate_availability(instance, diet_map)
 
         return instance

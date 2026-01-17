@@ -24,6 +24,7 @@ from .views import (
     TimetableUploadView,
     StudentProvisionListView,
     VenueViewSet,
+    DietViewSet,
 )
 
 router = DefaultRouter()
@@ -33,6 +34,7 @@ router.register("exam-venues", ExamVenueViewSet, basename="exam-venue")
 router.register("invigilators", InvigilatorViewSet, basename="invigilator")
 router.register("invigilator-assignments", InvigilatorAssignmentViewSet, basename="invigilator-assignment")
 router.register("announcements", AnnouncementViewSet, basename="announcement")
+router.register("diets", DietViewSet, basename="diet")
 
 urlpatterns = [
     path("auth/token/login/", ObtainAuthTokenView.as_view(), name="api-login"),
