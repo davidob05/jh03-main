@@ -863,6 +863,7 @@ class InvigilatorAvailabilityView(APIView):
 
         # Prepare notification
         inv_name = invigilator.preferred_name or invigilator.full_name or "Invigilator"
+        diet_label = diet_obj.name or diet
         count_unavailable = len(unavailable_set)
 
         def _format_slot(slot: str) -> str:
@@ -891,11 +892,11 @@ class InvigilatorAvailabilityView(APIView):
             slot_word = "slot" if count_unavailable == 1 else "slots"
             summary = _summarize_unavailable()
             if summary:
-                message = f"{inv_name} updated availability for {diet}: unavailable on {summary} ({count_unavailable} {slot_word})"
+                message = f"{inv_name} updated availability for {diet_label}: unavailable on {summary} ({count_unavailable} {slot_word})"
             else:
-                message = f"{inv_name} updated availability for {diet}: {count_unavailable} {slot_word} unavailable"
+                message = f"{inv_name} updated availability for {diet_label}: {count_unavailable} {slot_word} unavailable"
         else:
-            message = f"{inv_name} set availability for {diet}: all slots available"
+            message = f"{inv_name} set availability for {diet_label}: all slots available"
         log_notification(Notification.NotificationType.AVAILABILITY, message, user=request.user)
 
         refreshed_qs = InvigilatorAvailability.objects.filter(invigilator=invigilator)
