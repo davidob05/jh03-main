@@ -187,7 +187,7 @@ class AnnouncementAdmin(admin.ModelAdmin):
 
 @admin.register(Diet)
 class DietAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "start_date", "end_date", "is_active")
+    list_display = ("code", "name", "start_date", "end_date", "restriction_cutoff", "is_active")
     list_filter = ("is_active",)
     search_fields = ("code", "name")
     ordering = ("-start_date", "code")
