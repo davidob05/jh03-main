@@ -17,21 +17,16 @@ import {
   Tooltip,
   InputAdornment,
   Divider,
+  Typography,
 } from "@mui/material";
 import { Close, Visibility, VisibilityOff } from "@mui/icons-material";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
 import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 
 const STEPS = ["Personal Details", "Login Details", "Qualifications", "Restrictions", "Availability"];
-
-const DIET_CHOICES = [
-  { value: "DEC_2025", label: "December 2025" },
-  { value: "APR_MAY_2026", label: "April / May 2026" },
-  { value: "AUG_2026", label: "August 2026" },
-];
 
 const QUALIFICATION_CHOICES = [
   { value: "SENIOR_INVIGILATOR", label: "Senior Invigilator", help: "Can lead an exam room and supervise assistants" },
@@ -57,6 +52,19 @@ interface AddInvigilatorDialogProps {
   onClose: () => void;
   onSuccess?: (name: string) => void;
 }
+
+type Diet = {
+  id: number;
+  code: string;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+};
+
+const formatDietLabel = (diet: Diet) => {
+  return (diet.name && diet.name.trim()) || diet.code || "";
+};
 
 export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
   open,
@@ -87,6 +95,18 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
   const [restrictions, setRestrictions] = useState<string[]>([]);
   const [resigned, setResigned] = useState(false);
   const [availabilityDiets, setAvailabilityDiets] = useState<string[]>([]);
+  const dietsQuery = useQuery<Diet[]>({
+    queryKey: ["diets"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/diets/`);
+      if (!res.ok) throw new Error("Unable to load diets");
+      return res.json();
+    },
+  });
+  const activeDiets = React.useMemo(
+    () => (dietsQuery.data || []).filter((d) => d.is_active),
+    [dietsQuery.data]
+  );
 
   const toggleArrayValue = (
     value: string,
@@ -343,26 +363,32 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
       case 4:
         return (
           <Stack direction="row" spacing={1} flexWrap="wrap">
-            {DIET_CHOICES.map(diet => {
-              const selected = availabilityDiets.includes(diet.value);
+            {activeDiets.map(diet => {
+              const label = formatDietLabel(diet);
+              const selected = availabilityDiets.includes(diet.code);
               return (
-                <Tooltip key={diet.value} title={selected ? `Remove ${diet.label}` : `Add ${diet.label}`}>
+                <Tooltip key={diet.code} title={selected ? `Remove ${label}` : `Add ${label}`}>
                   <Chip
-                    label={diet.label}
+                    label={label}
                     clickable
                     color={selected ? "primary" : "default"}
                     variant={selected ? "filled" : "outlined"}
                     onClick={() =>
                       setAvailabilityDiets(prev =>
-                        prev.includes(diet.value)
-                          ? prev.filter(d => d !== diet.value)
-                          : [...prev, diet.value]
+                        prev.includes(diet.code)
+                          ? prev.filter(d => d !== diet.code)
+                          : [...prev, diet.code]
                       )
                     }
                   />
                 </Tooltip>
               );
             })}
+            {activeDiets.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                No diets available. Add diets first from the admin dashboard.
+              </Typography>
+            )}
           </Stack>
         );
 

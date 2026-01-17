@@ -16,6 +16,7 @@ import {
   IconButton,
   Tooltip,
   Alert,
+  Typography,
 } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,12 +26,6 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 
 const STEPS = ["Personal Details", "Qualifications", "Restrictions", "Availability"];
-
-const DIET_CHOICES = [
-  { value: "DEC_2025", label: "December 2025" },
-  { value: "APR_MAY_2026", label: "April / May 2026" },
-  { value: "AUG_2026", label: "August 2026" },
-];
 
 const QUALIFICATION_CHOICES = [
   { value: "SENIOR_INVIGILATOR", label: "Senior Invigilator", help: "Can lead an exam room and supervise assistants" },
@@ -66,6 +61,24 @@ interface InvigilatorRestriction {
 interface InvigilatorQualification {
   qualification: string;
 }
+
+type Diet = {
+  id: number;
+  code: string;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+};
+
+const formatDietLabel = (diet: Diet | { code: string; label?: string }) => {
+  return (
+    (typeof (diet as Diet).name === "string" && (diet as Diet).name?.trim()) ||
+    (diet as any).label ||
+    diet.code ||
+    ""
+  );
+};
 
 interface InvigilatorData {
   id: number;
@@ -110,6 +123,7 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
   const [restrictions, setRestrictions] = useState<string[]>([]);
   const [resigned, setResigned] = useState(false);
   const [availabilityDiets, setAvailabilityDiets] = useState<string[]>([]);
+  const [dietOptions, setDietOptions] = useState<{ code: string; label: string; is_active?: boolean }[]>([]);
 
   const toggleArrayValue = (
     value: string,
@@ -129,6 +143,28 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
     },
     enabled: open && invigilatorId != null,
   });
+
+  const { data: diets = [] } = useQuery<Diet[]>({
+    queryKey: ["diets"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/diets/`);
+      if (!res.ok) throw new Error("Unable to load diets");
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    const base = (diets || []).map((d) => ({
+      code: d.code,
+      label: formatDietLabel(d),
+      is_active: d.is_active,
+    }));
+    const extras =
+      data?.restrictions
+        ?.map((r) => ({ code: r.diet, label: r.diet.replace(/_/g, " "), is_active: true }))
+        .filter((r) => !base.some((b) => b.code === r.code)) || [];
+    setDietOptions([...base, ...extras]);
+  }, [diets, data?.restrictions]);
 
   useEffect(() => {
     if (!data) return;
@@ -316,10 +352,10 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
       case 3:
         return (
           <Stack direction="row" spacing={1} flexWrap="wrap">
-            {DIET_CHOICES.map(diet => {
-              const selected = availabilityDiets.includes(diet.value);
+            {dietOptions.map(diet => {
+              const selected = availabilityDiets.includes(diet.code);
               return (
-                <Tooltip key={diet.value} title={selected ? `Remove ${diet.label}` : `Add ${diet.label}`}>
+                <Tooltip key={diet.code} title={selected ? `Remove ${diet.label}` : `Add ${diet.label}`}>
                   <Chip
                     label={diet.label}
                     clickable
@@ -327,15 +363,20 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
                     variant={selected ? "filled" : "outlined"}
                     onClick={() =>
                       setAvailabilityDiets(prev =>
-                        prev.includes(diet.value)
-                          ? prev.filter(d => d !== diet.value)
-                          : [...prev, diet.value]
+                        prev.includes(diet.code)
+                          ? prev.filter(d => d !== diet.code)
+                          : [...prev, diet.code]
                       )
                     }
                   />
                 </Tooltip>
               );
             })}
+            {dietOptions.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                No diets available. Add diets first from the admin dashboard.
+              </Typography>
+            )}
           </Stack>
         );
 

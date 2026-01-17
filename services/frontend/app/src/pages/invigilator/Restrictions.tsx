@@ -29,9 +29,10 @@ type AvailabilityEntry = {
 
 type AvailabilityResponse = {
   diet: string;
+  diet_name?: string | null;
   start_date: string | null;
   end_date: string | null;
-  diets: { code: string; start_date: string; end_date: string }[];
+  diets: { code: string; name?: string; start_date: string; end_date: string }[];
   days: {
     date: string;
     slots: { slot: SlotCode; available: boolean }[];
@@ -132,7 +133,7 @@ export const InvigilatorRestrictions: React.FC = () => {
   const diets = useMemo(() => {
     return (availabilityQuery.data?.diets || []).map((d) => ({
       code: d.code,
-      label: d.code.replace(/_/g, " "),
+      label: d.name || d.code.replace(/_/g, " "),
     }));
   }, [availabilityQuery.data?.diets]);
 
