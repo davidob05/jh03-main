@@ -134,7 +134,7 @@ class ExamVenueSerializerTests(TestCase):
 
 class InvigilatorSerializerTests(TestCase):
     def setUp(self):
-        self.diet, _ = Diet.objects.get_or_create(
+        self.diet, _ = Diet.objects.update_or_create(
             code="DEC_2025",
             defaults={
                 "name": "December 2025",

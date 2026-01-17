@@ -772,6 +772,7 @@ class InvigilatorAvailabilityView(APIView):
         available_diets = [
             {
                 "code": d.code,
+                "name": d.name,
                 "start_date": str(d.start_date) if d.start_date else None,
                 "end_date": str(d.end_date) if d.end_date else None,
             }
@@ -928,15 +929,19 @@ class InvigilatorStatsView(APIView):
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        invigilator = getattr(user, "invigilator_profile", None)
+        invigilator = getattr(user, "invigilator_profile", None) or _resolve_invigilator_for_user(user)
         if invigilator is None:
             return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
 
         now = timezone.now()
-        assignments = InvigilatorAssignment.objects.filter(invigilator=invigilator)
-        upcoming_qs = assignments.filter(assigned_start__gte=now, cancel=False)
+        assignments = InvigilatorAssignment.objects.select_related("exam_venue__exam", "exam_venue__venue").filter(
+            invigilator=invigilator
+        )
+        now_ts = timezone.now()
+        upcoming_qs = assignments.filter(cancel=False, assigned_start__gte=now_ts).order_by("assigned_start")
         cancelled_qs = assignments.filter(cancel=True)
-        next_assignment = upcoming_qs.order_by("assigned_start").first()
+
+        next_assignment = upcoming_qs.first()
 
         def _duration_hours(qs):
             total = 0.0

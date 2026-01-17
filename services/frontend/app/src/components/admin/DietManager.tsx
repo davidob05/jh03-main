@@ -234,7 +234,7 @@ export const DietManager: React.FC = () => {
               onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value }))}
               fullWidth
               required
-              helperText="Stable identifier, e.g. DEC_2025"
+              helperText="Stable identifier, e.g. DEC_2026"
             />
             <TextField
               label="Name"
