@@ -549,3 +549,357 @@ class ApiViewActionTests(TestCase):
         upcoming.refresh_from_db()
         self.assertTrue(upcoming.cancel)
         self.assertEqual(upcoming.cancel_cause, "Unavailable")
+
+    def test_undo_cancel_happy_path(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Stats",
+            course_code="STAT100",
+            exam_type="Written",
+            no_students=25,
+            exam_school="Science",
+            school_contact="Dr. S",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=6),
+            exam_length=120,
+            core=False,
+        )
+        cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=6),
+            assigned_end=now + timedelta(hours=8),
+            cancel=True,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "undo_cancel"})
+        request = self.factory.post(f"/invigilator-assignments/{cancelled.pk}/undo-cancel/", {"reason": "Still available"})
+        force_authenticate(request, user=self.user)
+        response = view(request, pk=cancelled.pk)
+        self.assertEqual(response.status_code, 200)
+        cancelled.refresh_from_db()
+        self.assertFalse(cancelled.cancel)
+        self.assertEqual(cancelled.cancel_cause, "Still available")
+
+    def test_undo_cancel_blocked_when_covered(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Law",
+            course_code="LAW100",
+            exam_type="Written",
+            no_students=30,
+            exam_school="Law",
+            school_contact="Dr. L",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=3),
+            exam_length=90,
+            core=False,
+        )
+        cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=3),
+            assigned_end=now + timedelta(hours=5),
+            cancel=True,
+        )
+        InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=cancelled.assigned_start,
+            assigned_end=cancelled.assigned_end,
+            cancel=False,
+            cover=True,
+            cover_for=cancelled,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "undo_cancel"})
+        request = self.factory.post(f"/invigilator-assignments/{cancelled.pk}/undo-cancel/", {"reason": "Changed mind"})
+        force_authenticate(request, user=self.user)
+        response = view(request, pk=cancelled.pk)
+        self.assertEqual(response.status_code, 400)
+        cancelled.refresh_from_db()
+        self.assertTrue(cancelled.cancel)
+
+    def test_undo_cancel_rejects_not_owner(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Philosophy",
+            course_code="PHIL100",
+            exam_type="Written",
+            no_students=20,
+            exam_school="Arts",
+            school_contact="Dr. P",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=2),
+            exam_length=90,
+            core=False,
+        )
+        cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=2),
+            assigned_end=now + timedelta(hours=4),
+            cancel=True,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "undo_cancel"})
+        request = self.factory.post(f"/invigilator-assignments/{cancelled.pk}/undo-cancel/", {"reason": "Not yours"})
+        force_authenticate(request, user=self.user)
+        response = view(request, pk=cancelled.pk)
+        self.assertEqual(response.status_code, 404)
+        cancelled.refresh_from_db()
+        self.assertTrue(cancelled.cancel)
+
+    def test_available_covers_excludes_own_and_includes_details(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Politics",
+            course_code="POL100",
+            exam_type="Written",
+            no_students=35,
+            exam_school="Social Science",
+            school_contact="Dr. P",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=2),
+            exam_length=90,
+            core=False,
+        )
+        own_cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=2),
+            assigned_end=now + timedelta(hours=4),
+            cancel=True,
+        )
+        other_cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=2),
+            assigned_end=now + timedelta(hours=4),
+            cancel=True,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"get": "available_covers"})
+        request = self.factory.get("/invigilator/assignments/available-covers/")
+        force_authenticate(request, user=self.user)
+        response = view(request)
+        self.assertEqual(response.status_code, 200)
+        ids = {item["id"] for item in response.data}
+        self.assertNotIn(own_cancelled.id, ids)
+        self.assertIn(other_cancelled.id, ids)
+
+    def test_available_covers_filters_time_conflicts(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Chem",
+            course_code="CHEM100",
+            exam_type="Written",
+            no_students=35,
+            exam_school="Science",
+            school_contact="Dr. C",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=4),
+            exam_length=120,
+            core=False,
+        )
+        conflicting = InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=4),
+            assigned_end=now + timedelta(hours=6),
+            cancel=True,
+        )
+        blocking_examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.alt_venue,
+            start_time=now + timedelta(hours=4, minutes=15),
+            exam_length=120,
+            core=False,
+        )
+        InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=blocking_examvenue,
+            role="assistant",
+            assigned_start=blocking_examvenue.start_time,
+            assigned_end=blocking_examvenue.start_time + timedelta(hours=2),
+            cancel=False,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"get": "available_covers"})
+        request = self.factory.get("/invigilator/assignments/available-covers/")
+        force_authenticate(request, user=self.user)
+        response = view(request)
+        self.assertEqual(response.status_code, 200)
+        ids = {item["id"] for item in response.data}
+        self.assertNotIn(conflicting.id, ids)
+
+    def test_pickup_returns_cover_filled(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Drama",
+            course_code="DRM100",
+            exam_type="Written",
+            no_students=20,
+            exam_school="Arts",
+            school_contact="Dr. D",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=3),
+            exam_length=120,
+            core=False,
+        )
+        cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=3),
+            assigned_end=now + timedelta(hours=5),
+            cancel=True,
+        )
+
+        pickup_view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "pickup"})
+        request = self.factory.post(f"/invigilator-assignments/{cancelled.pk}/pickup/")
+        force_authenticate(request, user=self.user)
+        response = pickup_view(request, pk=cancelled.pk)
+        self.assertEqual(response.status_code, 201)
+        data = response.data
+        self.assertIn("cover", data)
+        self.assertFalse(data.get("cover_filled"))
+
+    def test_pickup_rejects_when_already_have_assignment_for_examvenue(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Economics",
+            course_code="ECON100",
+            exam_type="Written",
+            no_students=20,
+            exam_school="Business",
+            school_contact="Dr. E",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=4),
+            exam_length=120,
+            core=False,
+        )
+        cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=4),
+            assigned_end=now + timedelta(hours=6),
+            cancel=True,
+        )
+        InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=4),
+            assigned_end=now + timedelta(hours=6),
+            cancel=False,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "pickup"})
+        request = self.factory.post(f"/invigilator-assignments/{cancelled.pk}/pickup/")
+        force_authenticate(request, user=self.user)
+        response = view(request, pk=cancelled.pk)
+        self.assertEqual(response.status_code, 400)
+
+    def test_pickup_rejects_when_already_covered(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Anthropology",
+            course_code="ANTH100",
+            exam_type="Written",
+            no_students=20,
+            exam_school="Social",
+            school_contact="Dr. A",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=5),
+            exam_length=120,
+            core=False,
+        )
+        cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.other_invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=5),
+            assigned_end=now + timedelta(hours=7),
+            cancel=True,
+        )
+        InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=cancelled.assigned_start,
+            assigned_end=cancelled.assigned_end,
+            cancel=False,
+            cover=True,
+            cover_for=cancelled,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "pickup"})
+        request = self.factory.post(f"/invigilator-assignments/{cancelled.pk}/pickup/")
+        force_authenticate(request, user=self.user)
+        response = view(request, pk=cancelled.pk)
+        self.assertEqual(response.status_code, 400)
+
+    def test_request_cancel_rejects_past_shift(self):
+        past = timezone.now() - timedelta(days=1)
+        exam = Exam.objects.create(
+            exam_name="Ancient History",
+            course_code="HIS200",
+            exam_type="Written",
+            no_students=10,
+            exam_school="Arts",
+            school_contact="Dr. AH",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=past,
+            exam_length=120,
+            core=False,
+        )
+        past_assignment = InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=past,
+            assigned_end=past + timedelta(hours=2),
+            cancel=False,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "request_cancel"})
+        request = self.factory.post(f"/invigilator-assignments/{past_assignment.pk}/request-cancel/", {"reason": "Too late"})
+        force_authenticate(request, user=self.user)
+        response = view(request, pk=past_assignment.pk)
+        self.assertEqual(response.status_code, 400)
