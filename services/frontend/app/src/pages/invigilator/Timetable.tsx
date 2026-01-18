@@ -678,6 +678,8 @@ export const InvigilatorTimetable: React.FC = () => {
                                         <IconButton
                                           size="small"
                                           color="error"
+                                          aria-label="Request cancellation"
+                                          data-testid={`request-cancel-${event.id}`}
                                           onClick={() =>
                                             correspondingAssignment && openDrawer(correspondingAssignment, "request")
                                           }
@@ -693,6 +695,8 @@ export const InvigilatorTimetable: React.FC = () => {
                                         <IconButton
                                           size="small"
                                           color="primary"
+                                          aria-label="Withdraw cancellation"
+                                          data-testid={`undo-cancel-${event.id}`}
                                           onClick={() =>
                                             correspondingAssignment && openDrawer(correspondingAssignment, "undo")
                                           }
