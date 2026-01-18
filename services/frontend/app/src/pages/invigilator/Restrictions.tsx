@@ -12,7 +12,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { EventAvailable } from "@mui/icons-material";
+import { FreeCancellation } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel } from "../../components/Panel";
@@ -263,7 +263,7 @@ export const InvigilatorRestrictions: React.FC = () => {
           disableDivider
           title={
             <Stack direction="row" spacing={1} alignItems="center">
-              <EventAvailable fontSize="small" />
+              <FreeCancellation fontSize="small" />
               <Typography variant="subtitle1" fontWeight={700}>
                 Update your restrictions
               </Typography>

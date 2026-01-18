@@ -32,6 +32,8 @@ interface Exam {
   start: string;
   end: string;
   date: string;
+  confirmed?: boolean;
+  cancel?: boolean;
 }
 
 interface InvigilatorAssignment {
@@ -47,6 +49,7 @@ interface InvigilatorAssignment {
   notes?: string | null;
   confirmed?: boolean | null;
   cancel?: boolean | null;
+  cover?: boolean | null;
 }
 
 const timeToMinutes = (time: string) => {
@@ -453,6 +456,31 @@ export const InvigilatorTimetable: React.FC = () => {
                       const arrivalTime = minutesToTime(arrival);
                       const totalDuration = duration + 30;
                       const isConfirmed = event.confirmed === true;
+                      const isCancelled = event.cancel === true;
+                      const statusChip = (() => {
+                        if (isCancelled) {
+                          return {
+                            label: isConfirmed ? "Cancelled" : "Cancellation requested",
+                            bg: "#ffebee",
+                            fg: "#b71c1c",
+                            icon: <CheckIcon fontSize="small" />,
+                          };
+                        }
+                        if (isConfirmed) {
+                          return {
+                            label: "Confirmed",
+                            bg: "#e8f5e9",
+                            fg: "#1b5e20",
+                            icon: <CheckIcon fontSize="small" />,
+                          };
+                        }
+                        return {
+                          label: "Pending confirmation",
+                          bg: "#fff4e5",
+                          fg: "#b45309",
+                          icon: <CheckIcon fontSize="small" />,
+                        };
+                      })();
 
                       return (
                         <Grid item xs={12} sm={6} key={event.id}>
@@ -526,20 +554,22 @@ export const InvigilatorTimetable: React.FC = () => {
                               <Stack direction="column" spacing={0.8} alignItems="flex-start">
                                 <Tooltip
                                   title={
-                                    isConfirmed
+                                    isCancelled
+                                      ? statusChip.label
+                                      : isConfirmed
                                       ? "This shift is confirmed"
                                       : "Awaiting confirmation"
                                   }
                                 >
                                   <Chip
                                     size="small"
-                                    label={isConfirmed ? "Confirmed" : "Pending confirmation"}
-                                    icon={<CheckIcon fontSize="small" />}
+                                    label={statusChip.label}
+                                    icon={statusChip.icon}
                                     sx={{
-                                      bgcolor: isConfirmed ? "#e8f5e9" : "#fff4e5",
-                                      color: isConfirmed ? "#1b5e20" : "#b45309",
+                                      bgcolor: statusChip.bg,
+                                      color: statusChip.fg,
                                       fontWeight: 700,
-                                      "& .MuiChip-icon": { color: isConfirmed ? "#1b5e20" : "#b45309" },
+                                      "& .MuiChip-icon": { color: statusChip.fg },
                                     }}
                                   />
                                 </Tooltip>
