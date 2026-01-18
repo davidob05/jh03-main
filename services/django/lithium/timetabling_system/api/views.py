@@ -8,7 +8,6 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
 from django.core.exceptions import ValidationError as DjangoValidationError
 from datetime import date, timedelta
@@ -34,9 +33,12 @@ from timetabling_system.services import ingest_upload_result
 from timetabling_system.services.venue_matching import venue_supports_caps
 from timetabling_system.services.upload_processor import (
     _allowed_venue_types,
+    _core_exam_timing,
+    _extra_time_minutes,
     _exam_requires_computer,
     _needs_accessible_venue,
     _needs_computer,
+    _needs_separate_room,
     _required_capabilities,
 )
 from timetabling_system.utils.excel_parser import parse_excel_file
@@ -655,6 +657,8 @@ def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
     needs_separate = _needs_separate_room(provision.provisions)
     needs_computer = _needs_computer(provision.provisions)
     allowed_types = _allowed_venue_types(needs_computer, needs_separate)
+    _base_start, base_length = _core_exam_timing(provision.exam)
+    extra_minutes_required = _extra_time_minutes(provision.provisions, base_length)
 
     matches_needs = False
     allocation_issue = None
@@ -671,7 +675,20 @@ def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
         elif required_caps and not venue_supports_caps(venue, required_caps):
             allocation_issue = "Venue is missing required provisions"
         else:
-            matches_needs = True
+            provided_length = getattr(exam_venue, "exam_length", None)
+            if extra_minutes_required and base_length is not None:
+                if provided_length is None:
+                    allocation_issue = "Exam slot duration is missing for extra time check"
+                else:
+                    provided_extra = max(provided_length - base_length, 0)
+                    if provided_extra < extra_minutes_required:
+                        allocation_issue = (
+                            f"Exam slot provides {provided_extra} extra minutes; student needs {extra_minutes_required}"
+                        )
+                    else:
+                        matches_needs = True
+            else:
+                matches_needs = True
 
     exam_caps = getattr(exam_venue, "provision_capabilities", []) or []
     filtered_exam_caps = [cap for cap in exam_caps if cap not in room_caps]
