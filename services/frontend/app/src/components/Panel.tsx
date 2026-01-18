@@ -1,5 +1,5 @@
 import React from "react";
-import { Paper, Stack, Typography, Divider, PaperProps } from "@mui/material";
+import { Paper, Stack, Typography, Divider, PaperProps, Box } from "@mui/material";
 import { SxProps, Theme } from "@mui/system";
 
 type PanelProps = PaperProps & {
@@ -30,11 +30,14 @@ export const Panel: React.FC<PanelProps> = ({
     <Paper sx={[baseSx, sx]} {...paperProps}>
       {hasHeader && (
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems="flex-start" mb={2} spacing={1}>
-          {title && (
-            <Typography variant="h6" fontWeight={700}>
-              {title}
-            </Typography>
-          )}
+          {title &&
+            (typeof title === "string" || typeof title === "number" ? (
+              <Typography variant="h6" fontWeight={700}>
+                {title}
+              </Typography>
+            ) : (
+              <Box>{title}</Box>
+            ))}
           {actions}
         </Stack>
       )}

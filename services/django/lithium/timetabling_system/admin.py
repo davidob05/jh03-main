@@ -155,13 +155,16 @@ class InvigilatorAssignmentAdmin(admin.ModelAdmin):
         "assigned_start",
         "assigned_end",
         "cancel",
+        "cover",
+        "cover_for",
     )
-    list_filter = ("role", "cancel")
+    list_filter = ("role", "cancel", "cover")
     search_fields = (
         "invigilator__preferred_name",
         "invigilator__full_name",
         "exam_venue__exam__exam_name",
     )
+    raw_id_fields = ("invigilator", "exam_venue", "cover_for")
 
 
 @admin.register(UploadLog)

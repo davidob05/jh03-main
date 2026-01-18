@@ -445,6 +445,15 @@ class InvigilatorAssignment(models.Model):
     confirmed = models.BooleanField(default=False)
     cancel = models.BooleanField(default=False)
     cancel_cause = models.TextField(blank=True)
+    cover = models.BooleanField(default=False)
+    cover_for = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cover_assignments",
+        help_text="If set, this assignment covers the referenced cancelled shift.",
+    )
 
     notes = models.TextField(blank=True, null=True)
 

@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from django.utils import timezone
 from django.db import models
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import models
 from datetime import date, timedelta
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -26,7 +27,9 @@ from timetabling_system.models import (
     Provisions,
     Notification,
     Announcement,
+    Announcement,
     SlotChoices,
+    Diet,
     Diet,
 )
 from timetabling_system.services import ingest_upload_result
@@ -52,6 +55,8 @@ from .serializers import (
     VenueSerializer,
     VenueWriteSerializer,
     NotificationSerializer,
+    AnnouncementSerializer,
+    DietSerializer,
     AnnouncementSerializer,
     DietSerializer,
 )
@@ -95,6 +100,26 @@ def _resolve_invigilator_for_user(user):
         or Invigilator.objects.filter(preferred_name__iexact=getattr(user, "first_name", "") or user.username).first()
         or Invigilator.objects.filter(full_name__icontains=getattr(user, "username", "")).first()
     )
+
+
+def _has_time_conflict(candidate, assignments):
+    """
+    Return True if the candidate assignment overlaps with any of the supplied assignments.
+    Only compares rows with valid start/end timestamps.
+    """
+    c_start = getattr(candidate, "assigned_start", None)
+    c_end = getattr(candidate, "assigned_end", None)
+    if not c_start or not c_end:
+        return False
+
+    for assignment in assignments:
+        a_start = getattr(assignment, "assigned_start", None)
+        a_end = getattr(assignment, "assigned_end", None)
+        if not a_start or not a_end:
+            continue
+        if c_start < a_end and a_start < c_end:
+            return True
+    return False
 
 
 class IsInvigilatorOrAdmin(permissions.BasePermission):
@@ -287,6 +312,8 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
     throttle_classes: list = []
 
     def get_permissions(self):
+        if getattr(self, "action", None) in {"available_covers", "pickup", "request_cancel", "undo_cancel"}:
+            return [IsInvigilatorOrAdmin()]
         if self.request.method in permissions.SAFE_METHODS:
             return [IsInvigilatorOrAdmin()]
         return [permissions.IsAdminUser()]
@@ -304,13 +331,217 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         if invigilator is None:
             return qs.none()
         return qs.filter(invigilator=invigilator)
-    throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
+
+    @action(detail=False, methods=["get"], url_path="available-covers", permission_classes=[IsInvigilatorOrAdmin])
+    def available_covers(self, request):
+        """
+        Return cancelled shifts that do not clash with the requesting invigilator
+        and have not already been covered.
+        """
+        invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        now = timezone.now()
+        base_qs = (
+            InvigilatorAssignment.objects.select_related("exam_venue__exam", "exam_venue__venue", "invigilator")
+            .filter(cancel=True, assigned_end__gte=now)
+            .exclude(invigilator=invigilator)
+            .annotate(has_cover=models.Exists(
+                InvigilatorAssignment.objects.filter(cover_for=models.OuterRef("pk"), cancel=False)
+            ))
+            .filter(has_cover=False)
+        )
+
+        current_assignments = list(
+            InvigilatorAssignment.objects.select_related("exam_venue__exam", "exam_venue__venue")
+            .filter(invigilator=invigilator, cancel=False)
+        )
+
+        available = [
+            a
+            for a in base_qs
+            if not _has_time_conflict(a, current_assignments)
+            and not any(ca.exam_venue_id == a.exam_venue_id for ca in current_assignments)
+        ]
+        serializer = self.get_serializer(available, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="pickup", permission_classes=[IsInvigilatorOrAdmin])
+    def pickup(self, request, pk=None):
+        """
+        Allow an invigilator to pick up a cancelled shift if no conflicts exist.
+        Creates a new assignment marked as a cover.
+        """
+        invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            candidate = InvigilatorAssignment.objects.select_related(
+                "exam_venue__exam", "exam_venue__venue", "invigilator"
+            ).get(pk=pk, cancel=True)
+        except InvigilatorAssignment.DoesNotExist:
+            return Response({"detail": "Cancelled shift not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if candidate.invigilator_id == invigilator.id:
+            return Response({"detail": "You cannot pick up your own cancelled shift."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if candidate.cover_assignments.filter(cancel=False).exists():
+            return Response({"detail": "Shift already covered."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if InvigilatorAssignment.objects.filter(invigilator=invigilator, exam_venue=candidate.exam_venue).exists():
+            return Response({"detail": "You already have an assignment for this exam slot."}, status=status.HTTP_400_BAD_REQUEST)
+
+        current_assignments = InvigilatorAssignment.objects.filter(invigilator=invigilator, cancel=False)
+        if _has_time_conflict(candidate, current_assignments):
+            return Response({"detail": "You already have a conflicting shift."}, status=status.HTTP_400_BAD_REQUEST)
+
+        new_assignment = InvigilatorAssignment.objects.create(
+            invigilator=invigilator,
+            exam_venue=candidate.exam_venue,
+            role=candidate.role,
+            assigned_start=candidate.assigned_start,
+            assigned_end=candidate.assigned_end,
+            break_time_minutes=candidate.break_time_minutes,
+            confirmed=False,
+            cancel=False,
+            cover=True,
+            cover_for=candidate,
+            notes=candidate.notes,
+        )
+
+        name = invigilator.preferred_name or invigilator.full_name or "Invigilator"
+        exam_name = candidate.exam_venue.exam.exam_name if candidate.exam_venue and candidate.exam_venue.exam else "an exam"
+        venue_name = candidate.exam_venue.venue.venue_name if candidate.exam_venue and candidate.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(candidate.assigned_start).strftime("%d %b %Y at %H:%M")
+            if candidate.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        original_invigilator = getattr(candidate.invigilator, "preferred_name", None) or getattr(candidate.invigilator, "full_name", None) or None
+        if original_invigilator:
+            details = f"{details} (covering for {original_invigilator})"
+        log_notification("shiftPickup", f"{name} picked up a shift for {details}.", user=request.user)
+
+        serializer = self.get_serializer(new_assignment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="request-cancel", permission_classes=[IsInvigilatorOrAdmin])
+    def request_cancel(self, request, pk=None):
+        """
+        Allow an invigilator to request cancellation of their own upcoming shift.
+        Marks cancel=True with an optional reason; does not delete the assignment.
+        """
+        invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment = InvigilatorAssignment.objects.select_related(
+                "invigilator", "exam_venue__exam", "exam_venue__venue"
+            ).get(pk=pk, invigilator=invigilator, cancel=False)
+        except InvigilatorAssignment.DoesNotExist:
+            return Response({"detail": "Shift not found or already cancelled."}, status=status.HTTP_404_NOT_FOUND)
+
+        if assignment.assigned_start and assignment.assigned_start < timezone.now():
+            return Response({"detail": "Past shifts cannot be cancelled."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = None
+        try:
+            payload = request.data or {}
+            reason = (payload.get("reason") or "").strip()
+        except Exception:
+            reason = None
+
+        assignment.cancel = True
+        if reason:
+            assignment.cancel_cause = reason
+        assignment.confirmed = False
+        assignment.save(update_fields=["cancel", "cancel_cause", "confirmed"])
+
+        name = assignment.invigilator.preferred_name or assignment.invigilator.full_name or "Invigilator"
+        exam_name = assignment.exam_venue.exam.exam_name if assignment.exam_venue and assignment.exam_venue.exam else "an exam"
+        venue_name = assignment.exam_venue.venue.venue_name if assignment.exam_venue and assignment.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(assignment.assigned_start).strftime("%d %b %Y at %H:%M")
+            if assignment.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        if reason:
+            details = f"{details} (reason: {reason})"
+        log_notification("cancellation", f"{name} requested cancellation for {details}.", user=request.user)
+
+        return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="undo-cancel", permission_classes=[IsInvigilatorOrAdmin])
+    def undo_cancel(self, request, pk=None):
+        """
+        Allow an invigilator to withdraw a cancellation request if it has not been covered.
+        """
+        invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment = InvigilatorAssignment.objects.select_related(
+                "invigilator", "exam_venue__exam", "exam_venue__venue"
+            ).get(pk=pk, invigilator=invigilator, cancel=True)
+        except InvigilatorAssignment.DoesNotExist:
+            return Response({"detail": "Cancelled shift not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if assignment.cover_assignments.filter(cancel=False).exists():
+            return Response({"detail": "This shift has already been covered and cannot be reinstated."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = None
+        try:
+            payload = request.data or {}
+            reason = (payload.get("reason") or "").strip()
+        except Exception:
+            reason = None
+
+        assignment.cancel = False
+        if reason:
+            assignment.cancel_cause = reason
+        assignment.save(update_fields=["cancel", "cancel_cause"])
+
+        name = assignment.invigilator.preferred_name or assignment.invigilator.full_name or "Invigilator"
+        exam_name = assignment.exam_venue.exam.exam_name if assignment.exam_venue and assignment.exam_venue.exam else "an exam"
+        venue_name = assignment.exam_venue.venue.venue_name if assignment.exam_venue and assignment.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(assignment.assigned_start).strftime("%d %b %Y at %H:%M")
+            if assignment.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        if reason:
+            details = f"{details} (undo reason: {reason})"
+        log_notification("cancellation", f"{name} withdrew cancellation for {details}.", user=request.user)
+
+        return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
         instance = serializer.save()
         name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
         exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
-        log_notification("shiftPickup", f"{name} picked up a shift for {exam_name}.", user=_get_request_user(self, serializer))
+        venue_name = instance.exam_venue.venue.venue_name if instance.exam_venue and instance.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(instance.assigned_start).strftime("%d %b %Y at %H:%M")
+            if instance.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        original_invigilator = None
+        try:
+            original_invigilator = (
+                instance.cover_for.invigilator.preferred_name
+                or instance.cover_for.invigilator.full_name
+                if instance.cover_for and instance.cover_for.invigilator
+                else None
+            )
+        except Exception:
+            original_invigilator = None
+        if original_invigilator:
+            details = f"{details} (covering for {original_invigilator})"
+        log_notification("shiftPickup", f"{name} picked up a shift for {details}.", user=_get_request_user(self, serializer))
         return instance
 
     def perform_destroy(self, instance):
@@ -537,6 +768,52 @@ class NotificationsView(APIView):
             status=status.HTTP_200_OK,
         )
         
+
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for announcements shown on dashboards.
+    Admin-only for mutations; authenticated invigilators/admins can read.
+    """
+
+    queryset = Announcement.objects.all()
+    serializer_class = AnnouncementSerializer
+    throttle_classes: list = []
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [IsInvigilatorOrAdmin()]
+        return [permissions.IsAdminUser()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+
+        audience = self.request.query_params.get("audience")
+        if audience:
+            qs = qs.filter(audience=audience)
+
+        active_flag = self.request.query_params.get("active")
+        if active_flag is not None:
+            should_be_active = str(active_flag).lower() in {"1", "true", "yes"}
+            if should_be_active:
+                now = timezone.now()
+                qs = qs.filter(is_active=True).filter(
+                    models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now)
+                )
+            else:
+                qs = qs.filter(is_active=False)
+
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=_get_request_user(self, serializer))
+
+
+class DietViewSet(viewsets.ModelViewSet):
+    queryset = Diet.objects.all().order_by("-is_active", "-start_date", "code")
+    serializer_class = DietSerializer
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []
+
         
 def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
     student_exam = student_exam or StudentExam(student=provision.student, exam=provision.exam, exam_venue=None)
