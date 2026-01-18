@@ -204,6 +204,7 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
     venue_name = serializers.SerializerMethodField()
     exam_start = serializers.DateTimeField(source="exam_venue.start_time", read_only=True)
     exam_length = serializers.IntegerField(source="exam_venue.exam_length", read_only=True)
+    cover_filled = serializers.SerializerMethodField()
 
     class Meta:
         model = InvigilatorAssignment
@@ -219,6 +220,12 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
             "role",
             "assigned_start",
             "assigned_end",
+            "break_time_minutes",
+            "cancel",
+            "cancel_cause",
+            "cover",
+            "cover_for",
+            "cover_filled",
             "confirmed",
             "notes",
         )
@@ -230,6 +237,9 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
     def get_venue_name(self, obj):
         venue = getattr(obj.exam_venue, "venue", None)
         return venue.venue_name if venue else None
+
+    def get_cover_filled(self, obj):
+        return obj.cover_assignments.filter(cancel=False).exists()
 
 
 class InvigilatorQualificationSerializer(serializers.ModelSerializer):

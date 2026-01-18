@@ -11,8 +11,13 @@ import {
   Stack,
   Typography,
   Tooltip,
+  Drawer,
+  IconButton,
+  TextField,
+  Alert,
+  Snackbar,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import ArrowBack from "@mui/icons-material/ArrowBack";
 import ArrowForward from "@mui/icons-material/ArrowForward";
 import Today from "@mui/icons-material/Today";
@@ -20,6 +25,10 @@ import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined
 import AvTimerIcon from "@mui/icons-material/AvTimer";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CheckIcon from "@mui/icons-material/Check";
+import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
+import CloseIcon from "@mui/icons-material/Close";
+import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
@@ -32,6 +41,8 @@ interface Exam {
   start: string;
   end: string;
   date: string;
+  confirmed?: boolean;
+  cancel?: boolean;
 }
 
 interface InvigilatorAssignment {
@@ -47,6 +58,9 @@ interface InvigilatorAssignment {
   notes?: string | null;
   confirmed?: boolean | null;
   cancel?: boolean | null;
+  cover?: boolean | null;
+  cancel_cause?: string | null;
+  cover_filled?: boolean | null;
 }
 
 const timeToMinutes = (time: string) => {
@@ -68,6 +82,7 @@ export const InvigilatorTimetable: React.FC = () => {
     isLoading,
     isError,
     error,
+    refetch,
   } = useQuery<InvigilatorAssignment[]>({
     queryKey: ["invigilator-assignments"],
     queryFn: async () => {
@@ -113,6 +128,58 @@ export const InvigilatorTimetable: React.FC = () => {
     [assignments]
   );
 
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerAssignment, setDrawerAssignment] = useState<InvigilatorAssignment | null>(null);
+  const [cancelNote, setCancelNote] = useState("");
+  const [drawerMode, setDrawerMode] = useState<"request" | "undo">("request");
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  const requestCancelMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilator-assignments/${id}/request-cancel/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Unable to request cancellation");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetch();
+      setDrawerOpen(false);
+      setCancelNote("");
+      setSnackbar({ open: true, message: "Cancellation requested.", severity: "success" });
+    },
+  });
+
+  const undoCancelMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilator-assignments/${id}/undo-cancel/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Unable to undo cancellation");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetch();
+      setDrawerOpen(false);
+      setCancelNote("");
+      setSnackbar({ open: true, message: "Cancellation withdrawn.", severity: "success" });
+    },
+  });
+
   const selectedDayKey = selectedDate?.format("YYYY-MM-DD");
 
   const examsForSelectedDay = selectedDayKey
@@ -151,6 +218,18 @@ export const InvigilatorTimetable: React.FC = () => {
     ? selectedDate.format("dddd, D MMMM")
     : "Pick a day to see exams";
   const headerDate = (selectedDate ?? month).format("dddd, D MMMM YYYY");
+
+  const openDrawer = (assignment: InvigilatorAssignment, mode: "request" | "undo" = "request") => {
+    setDrawerAssignment(assignment);
+    setCancelNote("");
+    setDrawerMode(mode);
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setCancelNote("");
+  };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -453,6 +532,53 @@ export const InvigilatorTimetable: React.FC = () => {
                       const arrivalTime = minutesToTime(arrival);
                       const totalDuration = duration + 30;
                       const isConfirmed = event.confirmed === true;
+                      const isCancelled = event.cancel === true;
+                      const statusChip = (() => {
+                        if (isCancelled) {
+                          return {
+                            label: isConfirmed ? "Cancelled" : "Cancellation requested",
+                            bg: "#ffebee",
+                            fg: "#b71c1c",
+                            icon: (
+                              <CloseIcon
+                                fontSize="small"
+                                sx={{ color: "#b71c1c !important" }}
+                              />
+                            ),
+                          };
+                        }
+                        if (isConfirmed) {
+                          return {
+                            label: "Confirmed",
+                            bg: "#e8f5e9",
+                            fg: "#1b5e20",
+                            icon: (
+                              <CheckIcon
+                                fontSize="small"
+                                sx={{ color: "#1b5e20 !important" }}
+                              />
+                            ),
+                          };
+                        }
+                        return {
+                          label: "Pending confirmation",
+                          bg: "#fff4e5",
+                          fg: "#b45309",
+                          icon: (
+                            <HourglassEmptyIcon
+                              fontSize="small"
+                              sx={{ color: "#b45309 !important" }}
+                            />
+                          ),
+                        };
+                      })();
+                      const correspondingAssignment = assignments.find((a) => String(a.id) === event.id) || null;
+                      const coverFilled = correspondingAssignment?.cover_filled === true;
+                      const canRequestCancel =
+                        !isCancelled &&
+                        correspondingAssignment?.assigned_start &&
+                        dayjs(correspondingAssignment.assigned_start).isAfter(dayjs());
+                      const canUndoCancel = isCancelled && !coverFilled;
 
                       return (
                         <Grid item xs={12} sm={6} key={event.id}>
@@ -524,30 +650,68 @@ export const InvigilatorTimetable: React.FC = () => {
                               </Stack>
                               <Divider sx={{ width: "100%", my: 0.5 }} />
                               <Stack direction="column" spacing={0.8} alignItems="flex-start">
-                                <Tooltip
-                                  title={
-                                    isConfirmed
-                                      ? "This shift is confirmed"
-                                      : "Awaiting confirmation"
-                                  }
-                                >
-                                  <Chip
-                                    size="small"
-                                    label={isConfirmed ? "Confirmed" : "Pending confirmation"}
-                                    icon={<CheckIcon fontSize="small" />}
-                                    sx={{
-                                      bgcolor: isConfirmed ? "#e8f5e9" : "#fff4e5",
-                                      color: isConfirmed ? "#1b5e20" : "#b45309",
-                                      fontWeight: 700,
-                                      "& .MuiChip-icon": { color: isConfirmed ? "#1b5e20" : "#b45309" },
-                                    }}
-                                  />
-                                </Tooltip>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Tooltip
+                                    title={
+                                      isCancelled
+                                        ? statusChip.label
+                                        : isConfirmed
+                                        ? "This shift is confirmed"
+                                        : "Awaiting confirmation"
+                                    }
+                                  >
+                                    <Chip
+                                      size="small"
+                                      label={statusChip.label}
+                                      icon={statusChip.icon}
+                                      sx={{
+                                        bgcolor: statusChip.bg,
+                                        color: statusChip.fg,
+                                        fontWeight: 700,
+                                        "& .MuiChip-icon": { color: statusChip.fg },
+                                      }}
+                                    />
+                                  </Tooltip>
+                                  {canRequestCancel && (
+                                    <Tooltip title="Request cancellation">
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          color="error"
+                                          aria-label="Request cancellation"
+                                          data-testid={`request-cancel-${event.id}`}
+                                          onClick={() =>
+                                            correspondingAssignment && openDrawer(correspondingAssignment, "request")
+                                          }
+                                        >
+                                          <EventBusyOutlinedIcon fontSize="small" />
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  )}
+                                  {!canRequestCancel && canUndoCancel && (
+                                    <Tooltip title="Withdraw cancellation request">
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          color="primary"
+                                          aria-label="Withdraw cancellation"
+                                          data-testid={`undo-cancel-${event.id}`}
+                                          onClick={() =>
+                                            correspondingAssignment && openDrawer(correspondingAssignment, "undo")
+                                          }
+                                        >
+                                          <UndoOutlinedIcon fontSize="small" />
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  )}
+                                </Stack>
                                 <Tooltip title="Total duration including required early arrival">
                                   <Chip
                                     size="small"
                                     label={`${totalDuration} minutes`}
-                                    icon={<AccessTimeIcon fontSize="small" />}
+                                    icon={<AccessTimeIcon fontSize="small" sx={{ color: "#42307d !important" }} />}
                                     sx={{
                                       bgcolor: "#ede9fe",
                                       color: "#42307d",
@@ -558,7 +722,7 @@ export const InvigilatorTimetable: React.FC = () => {
                                 </Tooltip>
                                 <Tooltip title="Arrive 30 minutes before the exam starts">
                                   <Chip
-                                    icon={<AvTimerIcon fontSize="small" />}
+                                    icon={<AvTimerIcon fontSize="small" sx={{ color: "#b45309 !important" }} />}
                                     label={`Arrive by ${arrivalTime}`}
                                     size="small"
                                     sx={{
@@ -582,6 +746,105 @@ export const InvigilatorTimetable: React.FC = () => {
           </Box>
         </Stack>
       </Box>
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={closeDrawer}
+        PaperProps={{ sx: { width: { xs: "100%", sm: 420 }, p: 3 } }}
+      >
+        {drawerAssignment ? (
+          <Stack spacing={2}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="h6" fontWeight={700}>
+                {drawerMode === "undo" ? "Withdraw cancellation" : "Request cancellation"}
+              </Typography>
+              <IconButton onClick={closeDrawer} aria-label="Close">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+
+            <Stack spacing={0.5}>
+              <Typography fontWeight={700}>{drawerAssignment.exam_name || "Exam"}</Typography>
+              <Typography color="text.secondary">
+                {dayjs(drawerAssignment.assigned_start).format("ddd, D MMM YYYY @ HH:mm")} - 
+                {dayjs(drawerAssignment.assigned_end).format("HH:mm")}
+              </Typography>
+              <Typography color="text.secondary">
+                {drawerAssignment.venue_name || "Venue TBC"}
+              </Typography>
+            </Stack>
+
+            <TextField
+              label="Reason (optional)"
+              multiline
+              minRows={3}
+              value={cancelNote}
+              onChange={(e) => setCancelNote(e.target.value)}
+            />
+
+            {(drawerMode === "request" ? requestCancelMutation.isError : undoCancelMutation.isError) && (
+              <Alert severity="error">
+                {((drawerMode === "request" ? requestCancelMutation.error : undoCancelMutation.error) as Error)
+                  ?.message || "Unable to submit request."}
+              </Alert>
+            )}
+
+            <Stack direction="row" spacing={1} justifyContent="flex-end">
+              <PillButton
+                variant="contained"
+                color={drawerMode === "undo" ? "primary" : "error"}
+                fullWidth
+                onClick={() =>
+                  drawerAssignment &&
+                  (drawerMode === "undo"
+                    ? undoCancelMutation.mutate({ id: drawerAssignment.id, reason: cancelNote.trim() })
+                    : requestCancelMutation.mutate({ id: drawerAssignment.id, reason: cancelNote.trim() }))
+                }
+                disabled={
+                  drawerMode === "undo" ? undoCancelMutation.isPending : requestCancelMutation.isPending
+                }
+              >
+                {drawerMode === "undo"
+                  ? undoCancelMutation.isPending
+                    ? "Submitting..."
+                    : "Withdraw cancellation"
+                  : requestCancelMutation.isPending
+                  ? "Requesting..."
+                  : "Submit request"}
+              </PillButton>
+            </Stack>
+          </Stack>
+        ) : (
+          <Typography>No shift selected.</Typography>
+        )}
+      </Drawer>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={
+            snackbar.severity === "success"
+              ? {
+                  backgroundColor: "#d4edda",
+                  color: "#155724",
+                  border: "1px solid #155724",
+                  borderRadius: "50px",
+                  fontWeight: 500,
+                }
+              : undefined
+          }
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </LocalizationProvider>
   );
 };
+
+export default InvigilatorTimetable;

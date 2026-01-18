@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -12,7 +12,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { EventAvailable } from "@mui/icons-material";
+import { FreeCancellation } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel } from "../../components/Panel";
@@ -52,6 +52,7 @@ export const InvigilatorRestrictions: React.FC = () => {
   const queryClient = useQueryClient();
   const [selectedDiet, setSelectedDiet] = useState<string | null>(null);
   const [days, setDays] = useState<AvailabilityResponse["days"]>([]);
+  const daysRef = useRef<AvailabilityResponse["days"]>([]);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
     open: false,
     message: "",
@@ -67,16 +68,18 @@ export const InvigilatorRestrictions: React.FC = () => {
         const text = await res.text();
         throw new Error(text || "Unable to load restrictions");
       }
-      return res.json();
+      const data = await res.json();
+      return data as AvailabilityResponse;
     },
     staleTime: 0,
-    keepPreviousData: true,
   });
 
   useEffect(() => {
     if (!availabilityQuery.data) return;
     if (!selectedDiet) setSelectedDiet(availabilityQuery.data.diet);
-    setDays(buildDays(availabilityQuery.data));
+    const built = buildDays(availabilityQuery.data);
+    daysRef.current = built;
+    setDays(built);
   }, [availabilityQuery.data, selectedDiet]);
 
   const buildDays = (data: AvailabilityResponse) => {
@@ -147,17 +150,17 @@ export const InvigilatorRestrictions: React.FC = () => {
 
   const toggleSlot = (date: string, slot: SlotCode) => {
     setDays((prev) =>
-      prev.map((day) =>
-        day.date === date
-          ? {
-              ...day,
-              slots: day.slots.map((s) =>
-                s.slot === slot ? { ...s, available: !s.available } : s
-              ),
-            }
-          : day
-      )
+      prev.map((day) => {
+        if (day.date !== date) return day;
+        const nextSlots = day.slots.map((s) => (s.slot === slot ? { ...s, available: !s.available } : s));
+        return { ...day, slots: nextSlots };
+      })
     );
+    daysRef.current = daysRef.current.map((day) => {
+      if (day.date !== date) return day;
+      const nextSlots = day.slots.map((s) => (s.slot === slot ? { ...s, available: !s.available } : s));
+      return { ...day, slots: nextSlots };
+    });
   };
 
   const mutation = useMutation({
@@ -165,7 +168,7 @@ export const InvigilatorRestrictions: React.FC = () => {
       if (!selectedDiet) throw new Error("Select a diet first");
       const payload = {
         diet: selectedDiet,
-        unavailable: days
+        unavailable: (daysRef.current || days)
           .flatMap((day) =>
             day.slots
               .filter((s) => !s.available)
@@ -251,7 +254,7 @@ export const InvigilatorRestrictions: React.FC = () => {
               <PillButton
                 variant="contained"
                 onClick={() => mutation.mutate()}
-                disabled={cutoffReached || availabilityQuery.isLoading || mutation.isLoading || days.length === 0}
+                disabled={cutoffReached || availabilityQuery.isPending || mutation.isPending || days.length === 0}
                 size="small"
               >
                 Submit restrictions
@@ -263,7 +266,7 @@ export const InvigilatorRestrictions: React.FC = () => {
           disableDivider
           title={
             <Stack direction="row" spacing={1} alignItems="center">
-              <EventAvailable fontSize="small" />
+              <FreeCancellation fontSize="small" />
               <Typography variant="subtitle1" fontWeight={700}>
                 Update your restrictions
               </Typography>
@@ -290,7 +293,7 @@ export const InvigilatorRestrictions: React.FC = () => {
 
         <Panel sx={{ p: 3 }}>
           <Stack spacing={2}>
-            {availabilityQuery.isLoading && (
+            {availabilityQuery.isPending && (
               <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                 <CircularProgress />
               </Box>
@@ -302,7 +305,7 @@ export const InvigilatorRestrictions: React.FC = () => {
               </Alert>
             )}
 
-            {!availabilityQuery.isLoading && !availabilityQuery.isError && days.length === 0 && (
+            {!availabilityQuery.isPending && !availabilityQuery.isError && days.length === 0 && (
               <Alert severity="info">No availability data found for this diet.</Alert>
             )}
 
