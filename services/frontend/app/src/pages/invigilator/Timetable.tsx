@@ -539,7 +539,12 @@ export const InvigilatorTimetable: React.FC = () => {
                             label: isConfirmed ? "Cancelled" : "Cancellation requested",
                             bg: "#ffebee",
                             fg: "#b71c1c",
-                            icon: isConfirmed ? <CloseIcon fontSize="small" /> : <HourglassEmptyIcon fontSize="small" />,
+                            icon: (
+                              <CloseIcon
+                                fontSize="small"
+                                sx={{ color: "#b71c1c !important" }}
+                              />
+                            ),
                           };
                         }
                         if (isConfirmed) {
@@ -547,14 +552,24 @@ export const InvigilatorTimetable: React.FC = () => {
                             label: "Confirmed",
                             bg: "#e8f5e9",
                             fg: "#1b5e20",
-                            icon: <CheckIcon fontSize="small" />,
+                            icon: (
+                              <CheckIcon
+                                fontSize="small"
+                                sx={{ color: "#1b5e20 !important" }}
+                              />
+                            ),
                           };
                         }
                         return {
                           label: "Pending confirmation",
                           bg: "#fff4e5",
                           fg: "#b45309",
-                          icon: <HourglassEmptyIcon fontSize="small" />,
+                          icon: (
+                            <HourglassEmptyIcon
+                              fontSize="small"
+                              sx={{ color: "#b45309 !important" }}
+                            />
+                          ),
                         };
                       })();
                       const correspondingAssignment = assignments.find((a) => String(a.id) === event.id) || null;
@@ -692,7 +707,7 @@ export const InvigilatorTimetable: React.FC = () => {
                                   <Chip
                                     size="small"
                                     label={`${totalDuration} minutes`}
-                                    icon={<AccessTimeIcon fontSize="small" />}
+                                    icon={<AccessTimeIcon fontSize="small" sx={{ color: "#42307d !important" }} />}
                                     sx={{
                                       bgcolor: "#ede9fe",
                                       color: "#42307d",
@@ -703,7 +718,7 @@ export const InvigilatorTimetable: React.FC = () => {
                                 </Tooltip>
                                 <Tooltip title="Arrive 30 minutes before the exam starts">
                                   <Chip
-                                    icon={<AvTimerIcon fontSize="small" />}
+                                    icon={<AvTimerIcon fontSize="small" sx={{ color: "#b45309 !important" }} />}
                                     label={`Arrive by ${arrivalTime}`}
                                     size="small"
                                     sx={{

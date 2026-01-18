@@ -16,7 +16,8 @@ import WorkHistoryIcon from "@mui/icons-material/WorkHistory";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import CheckIcon from "@mui/icons-material/Check";
+import AssignmentIndOutlinedIcon from "@mui/icons-material/AssignmentIndOutlined";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
@@ -228,14 +229,14 @@ export const InvigilatorShifts: React.FC = () => {
 
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                       <Chip
-                        icon={<AccessTimeIcon fontSize="small" />}
+                        icon={<AccessTimeIcon fontSize="small" sx={{ color: "#42307d !important" }} />}
                         label={`${startLabel} – ${endLabel}`}
                         size="small"
                         sx={{ bgcolor: "#ede9fe", color: "#42307d", fontWeight: 700 }}
                       />
                       {durationMinutes != null && (
                         <Chip
-                          icon={<AccessTimeIcon fontSize="small" />}
+                          icon={<HourglassEmptyIcon fontSize="small" sx={{ color: "#0d47a1 !important" }} />}
                           label={`${durationMinutes} minutes`}
                           size="small"
                           sx={{ bgcolor: "#e3f2fd", color: "#0d47a1", fontWeight: 700 }}
@@ -243,14 +244,29 @@ export const InvigilatorShifts: React.FC = () => {
                       )}
                       {shift.role && (
                         <Chip
-                          icon={<CheckIcon fontSize="small" />}
-                          label={shift.role}
+                          icon={
+                            <AssignmentIndOutlinedIcon fontSize="small" sx={{ color: "#166534 !important" }} />
+                          }
+                          label={
+                            shift.role === "lead"
+                              ? "Lead invigilator"
+                              : shift.role === "assistant"
+                              ? "Assistant invigilator"
+                              : shift.role === "support"
+                              ? "Support invigilator"
+                              : shift.role
+                          }
                           size="small"
-                          sx={{ bgcolor: "#f0fdf4", color: "#166534", fontWeight: 700 }}
+                          sx={{
+                            bgcolor: "#f0fdf4",
+                            color: "#166534",
+                            fontWeight: 700,
+                            "& .MuiChip-icon": { color: "#166534" },
+                          }}
                         />
                       )}
                       <Chip
-                        icon={<PersonOutlineIcon fontSize="small" />}
+                        icon={<PersonOutlineIcon fontSize="small" sx={{ color: "#b45309 !important" }} />}
                         label={`Originally: ${invigilatorLabel}`}
                         size="small"
                         sx={{ bgcolor: "#fff4e5", color: "#b45309", fontWeight: 700 }}
@@ -296,6 +312,17 @@ export const InvigilatorShifts: React.FC = () => {
           onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
           severity={snackbar.severity}
           variant="filled"
+          sx={
+            snackbar.severity === "success"
+              ? {
+                  backgroundColor: "#d4edda",
+                  color: "#155724",
+                  border: "1px solid #155724",
+                  borderRadius: "50px",
+                  fontWeight: 500,
+                }
+              : undefined
+          }
         >
           {snackbar.message}
         </Alert>
@@ -305,3 +332,4 @@ export const InvigilatorShifts: React.FC = () => {
 };
 
 export default InvigilatorShifts;
+

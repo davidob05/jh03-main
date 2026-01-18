@@ -401,7 +401,16 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
 
         name = invigilator.preferred_name or invigilator.full_name or "Invigilator"
         exam_name = candidate.exam_venue.exam.exam_name if candidate.exam_venue and candidate.exam_venue.exam else "an exam"
-        log_notification("shiftPickup", f"{name} picked up a shift for {exam_name}.", user=request.user)
+        venue_name = candidate.exam_venue.venue.venue_name if candidate.exam_venue and candidate.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(candidate.assigned_start).strftime("%d %b %Y at %H:%M")
+            if candidate.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        original_invigilator = getattr(candidate.invigilator, "preferred_name", None) or getattr(candidate.invigilator, "full_name", None) or None
+        if original_invigilator:
+            details = f"{details} (covering for {original_invigilator})"
+        log_notification("shiftPickup", f"{name} picked up a shift for {details}.", user=request.user)
 
         serializer = self.get_serializer(new_assignment)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -502,7 +511,25 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
         exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
-        log_notification("shiftPickup", f"{name} picked up a shift for {exam_name}.", user=_get_request_user(self, serializer))
+        venue_name = instance.exam_venue.venue.venue_name if instance.exam_venue and instance.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(instance.assigned_start).strftime("%d %b %Y at %H:%M")
+            if instance.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        original_invigilator = None
+        try:
+            original_invigilator = (
+                instance.cover_for.invigilator.preferred_name
+                or instance.cover_for.invigilator.full_name
+                if instance.cover_for and instance.cover_for.invigilator
+                else None
+            )
+        except Exception:
+            original_invigilator = None
+        if original_invigilator:
+            details = f"{details} (covering for {original_invigilator})"
+        log_notification("shiftPickup", f"{name} picked up a shift for {details}.", user=_get_request_user(self, serializer))
         return instance
 
     def perform_destroy(self, instance):
