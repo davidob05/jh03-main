@@ -20,6 +20,7 @@ import AssignmentIndOutlinedIcon from "@mui/icons-material/AssignmentIndOutlined
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
+import { ShiftPickupDialog } from "../../components/invigilator/ShiftPickupDialog";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 type AvailableShift = {
@@ -48,6 +49,7 @@ export const InvigilatorShifts: React.FC = () => {
     message: "",
     severity: "success",
   });
+  const [dialogShift, setDialogShift] = useState<AvailableShift | null>(null);
 
   const {
     data: shifts = [],
@@ -84,6 +86,7 @@ export const InvigilatorShifts: React.FC = () => {
       setSnackbar({ open: true, message: "Shift picked up successfully!", severity: "success" });
       refetch();
       queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
+      setDialogShift(null);
     },
     onError: (err: any) => {
       setSnackbar({
@@ -91,6 +94,7 @@ export const InvigilatorShifts: React.FC = () => {
         message: err?.message || "Could not pick up this shift.",
         severity: "error",
       });
+      setDialogShift(null);
     },
   });
 
@@ -286,7 +290,7 @@ export const InvigilatorShifts: React.FC = () => {
                             variant="contained"
                             color="primary"
                             fullWidth
-                            onClick={() => pickupMutation.mutate(shift.id)}
+                            onClick={() => setDialogShift(shift)}
                             disabled={isPicking}
                           >
                             {isPicking ? "Picking up..." : "Pick up shift"}
@@ -301,6 +305,44 @@ export const InvigilatorShifts: React.FC = () => {
           </Grid>
         </Panel>
       </Stack>
+
+      <ShiftPickupDialog
+        open={Boolean(dialogShift)}
+        examName={dialogShift?.exam_name}
+        venueName={dialogShift?.venue_name}
+        durationLabel={
+          dialogShift?.start && dialogShift?.end
+            ? `${dialogShift.end.diff(dialogShift.start, "minute")} minutes`
+            : dialogShift?.exam_length
+            ? `${dialogShift.exam_length} minutes`
+            : undefined
+        }
+        roleLabel={
+          dialogShift?.role
+            ? dialogShift.role === "lead"
+              ? "Lead invigilator"
+              : dialogShift.role === "assistant"
+              ? "Assistant invigilator"
+              : dialogShift.role === "support"
+              ? "Support invigilator"
+              : dialogShift.role
+            : undefined
+        }
+        originalLabel={dialogShift?.invigilator_name || undefined}
+        startLabel={
+          dialogShift?.start?.isValid() ? dialogShift.start.format("ddd, D MMM @ HH:mm") : "Start time TBC"
+        }
+        endLabel={
+          dialogShift?.end?.isValid()
+            ? dialogShift.end.format("HH:mm")
+            : dialogShift?.exam_length
+            ? minutesToTime(dialogShift.exam_length)
+            : "End time TBC"
+        }
+        confirming={pickupMutation.isPending}
+        onClose={() => setDialogShift(null)}
+        onConfirm={() => dialogShift && pickupMutation.mutate(dialogShift.id)}
+      />
 
       <Snackbar
         open={snackbar.open}
