@@ -300,7 +300,7 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
     throttle_classes: list = []
 
     def get_permissions(self):
-        if getattr(self, "action", None) in {"available_covers", "pickup", "request_cancel"}:
+        if getattr(self, "action", None) in {"available_covers", "pickup", "request_cancel", "undo_cancel"}:
             return [IsInvigilatorOrAdmin()]
         if self.request.method in permissions.SAFE_METHODS:
             return [IsInvigilatorOrAdmin()]
@@ -441,7 +441,60 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
 
         name = assignment.invigilator.preferred_name or assignment.invigilator.full_name or "Invigilator"
         exam_name = assignment.exam_venue.exam.exam_name if assignment.exam_venue and assignment.exam_venue.exam else "an exam"
-        log_notification("cancellation", f"{name} requested cancellation for {exam_name}.", user=request.user)
+        venue_name = assignment.exam_venue.venue.venue_name if assignment.exam_venue and assignment.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(assignment.assigned_start).strftime("%d %b %Y at %H:%M")
+            if assignment.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        if reason:
+            details = f"{details} (reason: {reason})"
+        log_notification("cancellation", f"{name} requested cancellation for {details}.", user=request.user)
+
+        return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="undo-cancel", permission_classes=[IsInvigilatorOrAdmin])
+    def undo_cancel(self, request, pk=None):
+        """
+        Allow an invigilator to withdraw a cancellation request if it has not been covered.
+        """
+        invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment = InvigilatorAssignment.objects.select_related(
+                "invigilator", "exam_venue__exam", "exam_venue__venue"
+            ).get(pk=pk, invigilator=invigilator, cancel=True)
+        except InvigilatorAssignment.DoesNotExist:
+            return Response({"detail": "Cancelled shift not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if assignment.cover_assignments.filter(cancel=False).exists():
+            return Response({"detail": "This shift has already been covered and cannot be reinstated."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = None
+        try:
+            payload = request.data or {}
+            reason = (payload.get("reason") or "").strip()
+        except Exception:
+            reason = None
+
+        assignment.cancel = False
+        if reason:
+            assignment.cancel_cause = reason
+        assignment.save(update_fields=["cancel", "cancel_cause"])
+
+        name = assignment.invigilator.preferred_name or assignment.invigilator.full_name or "Invigilator"
+        exam_name = assignment.exam_venue.exam.exam_name if assignment.exam_venue and assignment.exam_venue.exam else "an exam"
+        venue_name = assignment.exam_venue.venue.venue_name if assignment.exam_venue and assignment.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(assignment.assigned_start).strftime("%d %b %Y at %H:%M")
+            if assignment.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        if reason:
+            details = f"{details} (undo reason: {reason})"
+        log_notification("cancellation", f"{name} withdrew cancellation for {details}.", user=request.user)
 
         return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
 

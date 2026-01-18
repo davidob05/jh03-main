@@ -15,6 +15,7 @@ import {
   IconButton,
   TextField,
   Alert,
+  Snackbar,
 } from "@mui/material";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import ArrowBack from "@mui/icons-material/ArrowBack";
@@ -25,7 +26,9 @@ import AvTimerIcon from "@mui/icons-material/AvTimer";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CheckIcon from "@mui/icons-material/Check";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import CloseIcon from "@mui/icons-material/Close";
+import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
@@ -57,6 +60,7 @@ interface InvigilatorAssignment {
   cancel?: boolean | null;
   cover?: boolean | null;
   cancel_cause?: string | null;
+  cover_filled?: boolean | null;
 }
 
 const timeToMinutes = (time: string) => {
@@ -127,6 +131,12 @@ export const InvigilatorTimetable: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerAssignment, setDrawerAssignment] = useState<InvigilatorAssignment | null>(null);
   const [cancelNote, setCancelNote] = useState("");
+  const [drawerMode, setDrawerMode] = useState<"request" | "undo">("request");
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const requestCancelMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
@@ -145,6 +155,28 @@ export const InvigilatorTimetable: React.FC = () => {
       refetch();
       setDrawerOpen(false);
       setCancelNote("");
+      setSnackbar({ open: true, message: "Cancellation requested.", severity: "success" });
+    },
+  });
+
+  const undoCancelMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilator-assignments/${id}/undo-cancel/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Unable to undo cancellation");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetch();
+      setDrawerOpen(false);
+      setCancelNote("");
+      setSnackbar({ open: true, message: "Cancellation withdrawn.", severity: "success" });
     },
   });
 
@@ -187,9 +219,10 @@ export const InvigilatorTimetable: React.FC = () => {
     : "Pick a day to see exams";
   const headerDate = (selectedDate ?? month).format("dddd, D MMMM YYYY");
 
-  const openDrawer = (assignment: InvigilatorAssignment) => {
+  const openDrawer = (assignment: InvigilatorAssignment, mode: "request" | "undo" = "request") => {
     setDrawerAssignment(assignment);
     setCancelNote("");
+    setDrawerMode(mode);
     setDrawerOpen(true);
   };
 
@@ -506,7 +539,7 @@ export const InvigilatorTimetable: React.FC = () => {
                             label: isConfirmed ? "Cancelled" : "Cancellation requested",
                             bg: "#ffebee",
                             fg: "#b71c1c",
-                            icon: <CheckIcon fontSize="small" />,
+                            icon: isConfirmed ? <CloseIcon fontSize="small" /> : <HourglassEmptyIcon fontSize="small" />,
                           };
                         }
                         if (isConfirmed) {
@@ -521,14 +554,16 @@ export const InvigilatorTimetable: React.FC = () => {
                           label: "Pending confirmation",
                           bg: "#fff4e5",
                           fg: "#b45309",
-                          icon: <CheckIcon fontSize="small" />,
+                          icon: <HourglassEmptyIcon fontSize="small" />,
                         };
                       })();
                       const correspondingAssignment = assignments.find((a) => String(a.id) === event.id) || null;
+                      const coverFilled = correspondingAssignment?.cover_filled === true;
                       const canRequestCancel =
                         !isCancelled &&
                         correspondingAssignment?.assigned_start &&
                         dayjs(correspondingAssignment.assigned_start).isAfter(dayjs());
+                      const canUndoCancel = isCancelled && !coverFilled;
 
                       return (
                         <Grid item xs={12} sm={6} key={event.id}>
@@ -629,10 +664,25 @@ export const InvigilatorTimetable: React.FC = () => {
                                           size="small"
                                           color="error"
                                           onClick={() =>
-                                            correspondingAssignment && openDrawer(correspondingAssignment)
+                                            correspondingAssignment && openDrawer(correspondingAssignment, "request")
                                           }
                                         >
                                           <EventBusyOutlinedIcon fontSize="small" />
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  )}
+                                  {!canRequestCancel && canUndoCancel && (
+                                    <Tooltip title="Withdraw cancellation request">
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          color="primary"
+                                          onClick={() =>
+                                            correspondingAssignment && openDrawer(correspondingAssignment, "undo")
+                                          }
+                                        >
+                                          <UndoOutlinedIcon fontSize="small" />
                                         </IconButton>
                                       </span>
                                     </Tooltip>
@@ -687,7 +737,7 @@ export const InvigilatorTimetable: React.FC = () => {
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="h6" fontWeight={700}>
-                Request cancellation
+                {drawerMode === "undo" ? "Withdraw cancellation" : "Request cancellation"}
               </Typography>
               <IconButton onClick={closeDrawer} aria-label="Close">
                 <CloseIcon />
@@ -713,24 +763,35 @@ export const InvigilatorTimetable: React.FC = () => {
               onChange={(e) => setCancelNote(e.target.value)}
             />
 
-            {requestCancelMutation.isError && (
+            {(drawerMode === "request" ? requestCancelMutation.isError : undoCancelMutation.isError) && (
               <Alert severity="error">
-                {(requestCancelMutation.error as Error)?.message || "Unable to request cancellation."}
+                {((drawerMode === "request" ? requestCancelMutation.error : undoCancelMutation.error) as Error)
+                  ?.message || "Unable to submit request."}
               </Alert>
             )}
 
             <Stack direction="row" spacing={1} justifyContent="flex-end">
               <PillButton
                 variant="contained"
-                color="error"
+                color={drawerMode === "undo" ? "primary" : "error"}
                 fullWidth
                 onClick={() =>
                   drawerAssignment &&
-                  requestCancelMutation.mutate({ id: drawerAssignment.id, reason: cancelNote.trim() })
+                  (drawerMode === "undo"
+                    ? undoCancelMutation.mutate({ id: drawerAssignment.id, reason: cancelNote.trim() })
+                    : requestCancelMutation.mutate({ id: drawerAssignment.id, reason: cancelNote.trim() }))
                 }
-                disabled={requestCancelMutation.isPending}
+                disabled={
+                  drawerMode === "undo" ? undoCancelMutation.isPending : requestCancelMutation.isPending
+                }
               >
-                {requestCancelMutation.isPending ? "Requesting..." : "Submit request"}
+                {drawerMode === "undo"
+                  ? undoCancelMutation.isPending
+                    ? "Submitting..."
+                    : "Withdraw cancellation"
+                  : requestCancelMutation.isPending
+                  ? "Requesting..."
+                  : "Submit request"}
               </PillButton>
             </Stack>
           </Stack>
@@ -738,6 +799,31 @@ export const InvigilatorTimetable: React.FC = () => {
           <Typography>No shift selected.</Typography>
         )}
       </Drawer>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={
+            snackbar.severity === "success"
+              ? {
+                  backgroundColor: "#d4edda",
+                  color: "#155724",
+                  border: "1px solid #155724",
+                  borderRadius: "50px",
+                  fontWeight: 500,
+                }
+              : undefined
+          }
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </LocalizationProvider>
   );
 };
