@@ -67,10 +67,10 @@ export const InvigilatorRestrictions: React.FC = () => {
         const text = await res.text();
         throw new Error(text || "Unable to load restrictions");
       }
-      return res.json();
+      const data = await res.json();
+      return data as AvailabilityResponse;
     },
     staleTime: 0,
-    keepPreviousData: true,
   });
 
   useEffect(() => {
@@ -251,7 +251,7 @@ export const InvigilatorRestrictions: React.FC = () => {
               <PillButton
                 variant="contained"
                 onClick={() => mutation.mutate()}
-                disabled={cutoffReached || availabilityQuery.isLoading || mutation.isLoading || days.length === 0}
+                disabled={cutoffReached || availabilityQuery.isPending || mutation.isPending || days.length === 0}
                 size="small"
               >
                 Submit restrictions
@@ -290,7 +290,7 @@ export const InvigilatorRestrictions: React.FC = () => {
 
         <Panel sx={{ p: 3 }}>
           <Stack spacing={2}>
-            {availabilityQuery.isLoading && (
+            {availabilityQuery.isPending && (
               <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                 <CircularProgress />
               </Box>
@@ -302,7 +302,7 @@ export const InvigilatorRestrictions: React.FC = () => {
               </Alert>
             )}
 
-            {!availabilityQuery.isLoading && !availabilityQuery.isError && days.length === 0 && (
+            {!availabilityQuery.isPending && !availabilityQuery.isError && days.length === 0 && (
               <Alert severity="info">No availability data found for this diet.</Alert>
             )}
 
