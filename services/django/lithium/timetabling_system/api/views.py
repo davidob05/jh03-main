@@ -300,7 +300,7 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
     throttle_classes: list = []
 
     def get_permissions(self):
-        if getattr(self, "action", None) in {"available_covers", "pickup"}:
+        if getattr(self, "action", None) in {"available_covers", "pickup", "request_cancel"}:
             return [IsInvigilatorOrAdmin()]
         if self.request.method in permissions.SAFE_METHODS:
             return [IsInvigilatorOrAdmin()]
@@ -405,6 +405,45 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(new_assignment)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="request-cancel", permission_classes=[IsInvigilatorOrAdmin])
+    def request_cancel(self, request, pk=None):
+        """
+        Allow an invigilator to request cancellation of their own upcoming shift.
+        Marks cancel=True with an optional reason; does not delete the assignment.
+        """
+        invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        if invigilator is None:
+            return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment = InvigilatorAssignment.objects.select_related(
+                "invigilator", "exam_venue__exam", "exam_venue__venue"
+            ).get(pk=pk, invigilator=invigilator, cancel=False)
+        except InvigilatorAssignment.DoesNotExist:
+            return Response({"detail": "Shift not found or already cancelled."}, status=status.HTTP_404_NOT_FOUND)
+
+        if assignment.assigned_start and assignment.assigned_start < timezone.now():
+            return Response({"detail": "Past shifts cannot be cancelled."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = None
+        try:
+            payload = request.data or {}
+            reason = (payload.get("reason") or "").strip()
+        except Exception:
+            reason = None
+
+        assignment.cancel = True
+        if reason:
+            assignment.cancel_cause = reason
+        assignment.confirmed = False
+        assignment.save(update_fields=["cancel", "cancel_cause", "confirmed"])
+
+        name = assignment.invigilator.preferred_name or assignment.invigilator.full_name or "Invigilator"
+        exam_name = assignment.exam_venue.exam.exam_name if assignment.exam_venue and assignment.exam_venue.exam else "an exam"
+        log_notification("cancellation", f"{name} requested cancellation for {exam_name}.", user=request.user)
+
+        return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
         instance = serializer.save()

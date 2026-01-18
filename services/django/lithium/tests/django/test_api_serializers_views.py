@@ -514,3 +514,38 @@ class ApiViewActionTests(TestCase):
         pickup_response = pickup_view(pickup_request, pk=cancelled.pk)
         self.assertEqual(pickup_response.status_code, 400)
         self.assertIn("cannot pick up your own", pickup_response.data.get("detail", "").lower())
+
+    def test_request_cancel_marks_assignment(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="Geo",
+            course_code="GEO100",
+            exam_type="Written",
+            no_students=25,
+            exam_school="Science",
+            school_contact="Dr. G",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=4),
+            exam_length=90,
+            core=False,
+        )
+        upcoming = InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=4),
+            assigned_end=now + timedelta(hours=6),
+            cancel=False,
+        )
+
+        view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "request_cancel"})
+        request = self.factory.post(f"/invigilator-assignments/{upcoming.pk}/request-cancel/", {"reason": "Unavailable"})
+        force_authenticate(request, user=self.user)
+        response = view(request, pk=upcoming.pk)
+        self.assertEqual(response.status_code, 200)
+        upcoming.refresh_from_db()
+        self.assertTrue(upcoming.cancel)
+        self.assertEqual(upcoming.cancel_cause, "Unavailable")
