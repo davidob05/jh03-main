@@ -164,17 +164,7 @@ export const InvigilatorRestrictions: React.FC = () => {
   };
 
   const mutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedDiet) throw new Error("Select a diet first");
-      const payload = {
-        diet: selectedDiet,
-        unavailable: (daysRef.current || days)
-          .flatMap((day) =>
-            day.slots
-              .filter((s) => !s.available)
-              .map((s) => ({ date: day.date, slot: s.slot }))
-          ),
-      };
+    mutationFn: async (payload: { diet: string; unavailable: { date: string; slot: SlotCode }[] }) => {
       const res = await apiFetch(`${apiBaseUrl}/invigilator/availability/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -253,7 +243,16 @@ export const InvigilatorRestrictions: React.FC = () => {
               </PillButton>
               <PillButton
                 variant="contained"
-                onClick={() => mutation.mutate()}
+                onClick={() => {
+                  if (!selectedDiet) return;
+                  const unavailable = days
+                    .flatMap((day) =>
+                      day.slots
+                        .filter((s) => !s.available)
+                        .map((s) => ({ date: day.date, slot: s.slot }))
+                    );
+                  mutation.mutate({ diet: selectedDiet, unavailable });
+                }}
                 disabled={cutoffReached || availabilityQuery.isPending || mutation.isPending || days.length === 0}
                 size="small"
               >
