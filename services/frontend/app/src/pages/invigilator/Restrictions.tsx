@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -52,6 +52,7 @@ export const InvigilatorRestrictions: React.FC = () => {
   const queryClient = useQueryClient();
   const [selectedDiet, setSelectedDiet] = useState<string | null>(null);
   const [days, setDays] = useState<AvailabilityResponse["days"]>([]);
+  const daysRef = useRef<AvailabilityResponse["days"]>([]);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
     open: false,
     message: "",
@@ -76,7 +77,9 @@ export const InvigilatorRestrictions: React.FC = () => {
   useEffect(() => {
     if (!availabilityQuery.data) return;
     if (!selectedDiet) setSelectedDiet(availabilityQuery.data.diet);
-    setDays(buildDays(availabilityQuery.data));
+    const built = buildDays(availabilityQuery.data);
+    daysRef.current = built;
+    setDays(built);
   }, [availabilityQuery.data, selectedDiet]);
 
   const buildDays = (data: AvailabilityResponse) => {
@@ -147,17 +150,17 @@ export const InvigilatorRestrictions: React.FC = () => {
 
   const toggleSlot = (date: string, slot: SlotCode) => {
     setDays((prev) =>
-      prev.map((day) =>
-        day.date === date
-          ? {
-              ...day,
-              slots: day.slots.map((s) =>
-                s.slot === slot ? { ...s, available: !s.available } : s
-              ),
-            }
-          : day
-      )
+      prev.map((day) => {
+        if (day.date !== date) return day;
+        const nextSlots = day.slots.map((s) => (s.slot === slot ? { ...s, available: !s.available } : s));
+        return { ...day, slots: nextSlots };
+      })
     );
+    daysRef.current = daysRef.current.map((day) => {
+      if (day.date !== date) return day;
+      const nextSlots = day.slots.map((s) => (s.slot === slot ? { ...s, available: !s.available } : s));
+      return { ...day, slots: nextSlots };
+    });
   };
 
   const mutation = useMutation({
@@ -165,7 +168,7 @@ export const InvigilatorRestrictions: React.FC = () => {
       if (!selectedDiet) throw new Error("Select a diet first");
       const payload = {
         diet: selectedDiet,
-        unavailable: days
+        unavailable: (daysRef.current || days)
           .flatMap((day) =>
             day.slots
               .filter((s) => !s.available)

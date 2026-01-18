@@ -334,6 +334,7 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         base_qs = (
             InvigilatorAssignment.objects.select_related("exam_venue__exam", "exam_venue__venue", "invigilator")
             .filter(cancel=True, assigned_end__gte=now)
+            .exclude(invigilator=invigilator)
             .annotate(has_cover=models.Exists(
                 InvigilatorAssignment.objects.filter(cover_for=models.OuterRef("pk"), cancel=False)
             ))
@@ -370,6 +371,9 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
             ).get(pk=pk, cancel=True)
         except InvigilatorAssignment.DoesNotExist:
             return Response({"detail": "Cancelled shift not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if candidate.invigilator_id == invigilator.id:
+            return Response({"detail": "You cannot pick up your own cancelled shift."}, status=status.HTTP_400_BAD_REQUEST)
 
         if candidate.cover_assignments.filter(cancel=False).exists():
             return Response({"detail": "Shift already covered."}, status=status.HTTP_400_BAD_REQUEST)

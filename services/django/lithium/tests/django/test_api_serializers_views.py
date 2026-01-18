@@ -473,3 +473,44 @@ class ApiViewActionTests(TestCase):
         self.assertTrue(replacement.cover)
         self.assertEqual(replacement.invigilator, self.invigilator)
         self.assertEqual(replacement.role, cancelled.role)
+
+    def test_own_cancelled_shift_not_pickable(self):
+        now = timezone.now()
+        exam = Exam.objects.create(
+            exam_name="History",
+            course_code="HIST100",
+            exam_type="Written",
+            no_students=25,
+            exam_school="Humanities",
+            school_contact="Dr. H",
+        )
+        examvenue = ExamVenue.objects.create(
+            exam=exam,
+            venue=self.venue,
+            start_time=now + timedelta(hours=2),
+            exam_length=90,
+            core=False,
+        )
+        cancelled = InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=examvenue,
+            role="assistant",
+            assigned_start=now + timedelta(hours=2),
+            assigned_end=now + timedelta(hours=4),
+            cancel=True,
+        )
+
+        list_view = api_views.InvigilatorAssignmentViewSet.as_view({"get": "available_covers"})
+        list_request = self.factory.get("/invigilator-assignments/available-covers/")
+        force_authenticate(list_request, user=self.user)
+        list_response = list_view(list_request)
+        self.assertEqual(list_response.status_code, 200)
+        ids_returned = {item["id"] for item in list_response.data}
+        self.assertNotIn(cancelled.id, ids_returned)
+
+        pickup_view = api_views.InvigilatorAssignmentViewSet.as_view({"post": "pickup"})
+        pickup_request = self.factory.post(f"/invigilator-assignments/{cancelled.pk}/pickup/")
+        force_authenticate(pickup_request, user=self.user)
+        pickup_response = pickup_view(pickup_request, pk=cancelled.pk)
+        self.assertEqual(pickup_response.status_code, 400)
+        self.assertIn("cannot pick up your own", pickup_response.data.get("detail", "").lower())
