@@ -16,6 +16,7 @@ build_with_kaniko:
     : "${GHCR_TOKEN:?Set GHCR_TOKEN (GitHub PAT with write:packages)}"
 
     GHCR_NAMESPACE="$GHCR_USERNAME"
+    BASE_IMAGE_REGISTRY="$GHCR_HOST/$GHCR_NAMESPACE"
 
     mkdir -p /kaniko/.docker
     printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}\n' \
@@ -34,6 +35,7 @@ build_with_kaniko:
         --dockerfile "$CI_PROJECT_DIR/$d/Dockerfile" \
         --destination "$dest_base:$IMAGE_TAG" \
         --destination "$dest_base:latest" \
+        --build-arg BASE_IMAGE_REGISTRY="$BASE_IMAGE_REGISTRY" \
         --cache \
         --cache-repo "$GHCR_HOST/$GHCR_NAMESPACE/cache"
       found=1
@@ -46,10 +48,35 @@ build_with_kaniko:
 
     echo "✅ Build job finished"
 
+mirror_base_images:
+  stage: build
+  image:
+    name: gcr.io/go-containerregistry/crane:debug
+    entrypoint: ["/busybox/sh", "-c"]
+  variables:
+    GIT_STRATEGY: none
+  script: |
+    set -eu
+
+    : "${GHCR_USERNAME:?Set GHCR_USERNAME to your GitHub username}"
+    : "${GHCR_TOKEN:?Set GHCR_TOKEN (GitHub PAT with write:packages)}"
+
+    GHCR_NAMESPACE="$GHCR_USERNAME"
+    crane auth login "$GHCR_HOST" -u "$GHCR_USERNAME" -p "$GHCR_TOKEN"
+    crane copy \
+      docker.io/library/node:20-bullseye-slim \
+      "$GHCR_HOST/$GHCR_NAMESPACE/node:20-bullseye-slim"
+    crane copy \
+      docker.io/library/python:3.12-slim-bookworm \
+      "$GHCR_HOST/$GHCR_NAMESPACE/python:3.12-slim-bookworm"
+  rules:
+    - when: manual
+  allow_failure: true
+
 .test_job_template:
   stage: test
-  # Use the Amazon ECR Public mirror of the official Node images (reliable from GitLab runners)
-  image: public.ecr.aws/docker/library/node:20-alpine
+  # Use the Docker Hub official Node image to avoid ECR public rate limits.
+  image: docker.io/library/node:20-alpine
   script:
     - set -eu
     - cd "$SERVICE_PATH"
@@ -64,10 +91,10 @@ test_frontend:
 
 .django_test_template:
   stage: test
-  # Mirror of the official Python image hosted on Amazon ECR Public
-  image: public.ecr.aws/docker/library/python:3.12-slim
+  # Use the Docker Hub official Python image to avoid ECR public rate limits.
+  image: docker.io/library/python:3.12-slim
   services:
-    - name: public.ecr.aws/docker/library/postgres:16-alpine
+    - name: docker.io/library/postgres:16-alpine
       alias: postgres
   variables:
     DJANGO_DB_NAME: postgres

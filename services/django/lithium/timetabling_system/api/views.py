@@ -1,3 +1,5 @@
+from typing import Optional
+
 from rest_framework import permissions, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
@@ -7,12 +9,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 from django.db import models
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import models
 from datetime import date, timedelta
 from django.conf import settings
 from django.core.mail import EmailMessage
 from timetabling_system.models import (
     Exam,
     ExamVenue,
+    ExamVenueProvisionType,
     Invigilator,
     InvigilatorAssignment,
     InvigilatorAvailability,
@@ -22,13 +27,18 @@ from timetabling_system.models import (
     Provisions,
     Notification,
     Announcement,
+    Announcement,
     SlotChoices,
+    Diet,
     Diet,
 )
 from timetabling_system.services import ingest_upload_result
 from timetabling_system.services.venue_matching import venue_supports_caps
 from timetabling_system.services.upload_processor import (
     _allowed_venue_types,
+    _core_exam_timing,
+    _extra_time_minutes,
+    _exam_requires_computer,
     _needs_accessible_venue,
     _needs_computer,
     _needs_separate_room,
@@ -45,6 +55,8 @@ from .serializers import (
     VenueSerializer,
     VenueWriteSerializer,
     NotificationSerializer,
+    AnnouncementSerializer,
+    DietSerializer,
     AnnouncementSerializer,
     DietSerializer,
 )
@@ -755,7 +767,7 @@ class NotificationsView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
+        
 
 class AnnouncementViewSet(viewsets.ModelViewSet):
     """
@@ -802,6 +814,182 @@ class DietViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAdminUser]
     throttle_classes: list = []
 
+        
+def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
+    student_exam = student_exam or StudentExam(student=provision.student, exam=provision.exam, exam_venue=None)
+    exam_venue = getattr(student_exam, "exam_venue", None)
+    venue = getattr(exam_venue, "venue", None)
+
+    room_caps = {
+        ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN,
+        ExamVenueProvisionType.SEPARATE_ROOM_NOT_ON_OWN,
+    }
+    ignored_caps = set(room_caps)
+    ignored_caps.add(ExamVenueProvisionType.USE_COMPUTER)
+    required_caps_raw = _required_capabilities(provision.provisions)
+    required_caps = [cap for cap in required_caps_raw if cap not in ignored_caps]
+    needs_accessible = _needs_accessible_venue(provision.provisions)
+    needs_separate = ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN in required_caps_raw
+    needs_computer = (
+        _needs_computer(provision.provisions)
+        or _exam_requires_computer(getattr(provision.exam, "exam_type", None))
+    )
+    allowed_types = _allowed_venue_types(needs_computer, needs_separate)
+
+    matches_needs = False
+    allocation_issue = None
+
+    if not exam_venue:
+        allocation_issue = "No exam venue assigned"
+    elif not venue:
+        allocation_issue = "No physical venue allocated"
+    else:
+        if allowed_types is not None and venue.venuetype not in allowed_types:
+            allocation_issue = "Venue type does not satisfy requirements"
+        elif needs_accessible and not venue.is_accessible:
+            allocation_issue = "Venue is not marked accessible"
+        elif required_caps and not venue_supports_caps(venue, required_caps):
+            allocation_issue = "Venue is missing required provisions"
+        else:
+            matches_needs = True
+
+    exam_caps = getattr(exam_venue, "provision_capabilities", []) or []
+    filtered_exam_caps = [cap for cap in exam_caps if cap not in room_caps]
+
+    return {
+        "student_id": provision.student.student_id,
+        "student_name": provision.student.student_name,
+        "exam_id": provision.exam.exam_id,
+        "exam_name": provision.exam.exam_name,
+        "course_code": provision.exam.course_code,
+        "provisions": provision.provisions,
+        "notes": provision.notes,
+        "exam_venue_id": exam_venue.pk if exam_venue else None,
+        "exam_venue_caps": filtered_exam_caps,
+        "venue_name": venue.venue_name if venue else None,
+        "venue_type": venue.venuetype if venue else None,
+        "venue_accessible": venue.is_accessible if venue else None,
+        "required_capabilities": required_caps,
+        "allowed_venue_types": sorted(list(allowed_types)) if allowed_types else [],
+        "matches_needs": matches_needs,
+        "allocation_issue": allocation_issue,
+        "student_exam_id": student_exam.pk if student_exam else None,
+    }
+    
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for announcements shown on dashboards.
+    Admin-only for mutations; authenticated invigilators/admins can read.
+    """
+
+    queryset = Announcement.objects.all()
+    serializer_class = AnnouncementSerializer
+    throttle_classes: list = []
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [IsInvigilatorOrAdmin()]
+        return [permissions.IsAdminUser()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+
+        audience = self.request.query_params.get("audience")
+        if audience:
+            qs = qs.filter(audience=audience)
+
+        active_flag = self.request.query_params.get("active")
+        if active_flag is not None:
+            should_be_active = str(active_flag).lower() in {"1", "true", "yes"}
+            if should_be_active:
+                now = timezone.now()
+                qs = qs.filter(is_active=True).filter(
+                    models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now)
+                )
+            else:
+                qs = qs.filter(is_active=False)
+
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=_get_request_user(self, serializer))
+
+
+class DietViewSet(viewsets.ModelViewSet):
+    queryset = Diet.objects.all().order_by("-is_active", "-start_date", "code")
+    serializer_class = DietSerializer
+    permission_classes = [permissions.IsAdminUser]
+    throttle_classes: list = []
+    
+    
+def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
+    student_exam = student_exam or StudentExam(student=provision.student, exam=provision.exam, exam_venue=None)
+    exam_venue = getattr(student_exam, "exam_venue", None)
+    venue = getattr(exam_venue, "venue", None)
+
+    room_caps = {"separate_room_on_own", "separate_room_not_on_own"}
+    required_caps_raw = _required_capabilities(provision.provisions)
+    required_caps = [cap for cap in required_caps_raw if cap not in room_caps]
+    needs_accessible = _needs_accessible_venue(provision.provisions)
+    needs_separate = _needs_separate_room(provision.provisions)
+    needs_computer = _needs_computer(provision.provisions)
+    allowed_types = _allowed_venue_types(needs_computer, needs_separate)
+    _base_start, base_length = _core_exam_timing(provision.exam)
+    extra_minutes_required = _extra_time_minutes(provision.provisions, base_length)
+
+    matches_needs = False
+    allocation_issue = None
+
+    if not exam_venue:
+        allocation_issue = "No exam venue assigned"
+    elif not venue:
+        allocation_issue = "No physical venue allocated"
+    else:
+        if allowed_types is not None and venue.venuetype not in allowed_types:
+            allocation_issue = "Venue type does not satisfy requirements"
+        elif needs_accessible and not venue.is_accessible:
+            allocation_issue = "Venue is not marked accessible"
+        elif required_caps and not venue_supports_caps(venue, required_caps):
+            allocation_issue = "Venue is missing required provisions"
+        else:
+            provided_length = getattr(exam_venue, "exam_length", None)
+            if extra_minutes_required and base_length is not None:
+                if provided_length is None:
+                    allocation_issue = "Exam slot duration is missing for extra time check"
+                else:
+                    provided_extra = max(provided_length - base_length, 0)
+                    if provided_extra < extra_minutes_required:
+                        allocation_issue = (
+                            f"Exam slot provides {provided_extra} extra minutes; student needs {extra_minutes_required}"
+                        )
+                    else:
+                        matches_needs = True
+            else:
+                matches_needs = True
+
+    exam_caps = getattr(exam_venue, "provision_capabilities", []) or []
+    filtered_exam_caps = [cap for cap in exam_caps if cap not in room_caps]
+
+    return {
+        "student_id": provision.student.student_id,
+        "student_name": provision.student.student_name,
+        "exam_id": provision.exam.exam_id,
+        "exam_name": provision.exam.exam_name,
+        "course_code": provision.exam.course_code,
+        "provisions": provision.provisions,
+        "notes": provision.notes,
+        "exam_venue_id": exam_venue.pk if exam_venue else None,
+        "exam_venue_caps": filtered_exam_caps,
+        "venue_name": venue.venue_name if venue else None,
+        "venue_type": venue.venuetype if venue else None,
+        "venue_accessible": venue.is_accessible if venue else None,
+        "required_capabilities": required_caps,
+        "allowed_venue_types": sorted(list(allowed_types)) if allowed_types else [],
+        "matches_needs": matches_needs,
+        "allocation_issue": allocation_issue,
+        "student_exam_id": student_exam.pk if student_exam else None,
+    }
+
 
 class StudentProvisionListView(APIView):
     """
@@ -828,59 +1016,81 @@ class StudentProvisionListView(APIView):
         rows = []
         for provision in provisions:
             student_exam = student_exam_map.get((provision.student_id, provision.exam_id))
-            exam_venue = getattr(student_exam, "exam_venue", None)
-            venue = getattr(exam_venue, "venue", None)
+            row = _provision_row(provision, student_exam)
 
-            required_caps = _required_capabilities(provision.provisions)
-            needs_accessible = _needs_accessible_venue(provision.provisions)
-            needs_separate_room = _needs_separate_room(provision.provisions)
-            needs_computer = _needs_computer(provision.provisions)
-            allowed_types = _allowed_venue_types(needs_computer, needs_separate_room)
-
-            matches_needs = False
-            allocation_issue = None
-
-            if not exam_venue:
-                allocation_issue = "No exam venue assigned"
-            elif not venue:
-                allocation_issue = "No physical venue allocated"
-            else:
-                if allowed_types is not None and venue.venuetype not in allowed_types:
-                    allocation_issue = "Venue type does not satisfy requirements"
-                elif needs_accessible and not venue.is_accessible:
-                    allocation_issue = "Venue is not marked accessible"
-                elif required_caps and not venue_supports_caps(venue, required_caps):
-                    allocation_issue = "Venue is missing required provisions"
-                else:
-                    matches_needs = True
-
-            if unallocated_only and matches_needs:
+            if unallocated_only and row["matches_needs"]:
                 continue
 
-            rows.append(
-                {
-                    "student_id": provision.student.student_id,
-                    "student_name": provision.student.student_name,
-                    "exam_id": provision.exam.exam_id,
-                    "exam_name": provision.exam.exam_name,
-                    "course_code": provision.exam.course_code,
-                    "provisions": provision.provisions,
-                    "notes": provision.notes,
-                    "exam_venue_id": exam_venue.pk if exam_venue else None,
-                    "exam_venue_caps": getattr(exam_venue, "provision_capabilities", []) or [],
-                    "venue_name": venue.venue_name if venue else None,
-                    "venue_type": venue.venuetype if venue else None,
-                    "venue_accessible": venue.is_accessible if venue else None,
-                    "required_capabilities": required_caps,
-                    "allowed_venue_types": sorted(list(allowed_types)) if allowed_types else [],
-                    "matches_needs": matches_needs,
-                    "allocation_issue": allocation_issue,
-                    "student_exam_id": student_exam.pk if student_exam else None,
-                }
-            )
+            rows.append(row)
 
         rows.sort(key=lambda r: (r.get("student_name") or "", r.get("course_code") or ""))
         return Response(rows)
+
+    def patch(self, request, *args, **kwargs):
+        data = request.data if isinstance(request.data, dict) else {}
+        student_exam_id = data.get("student_exam_id")
+        if student_exam_id in (None, ""):
+            return Response({"detail": "student_exam_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            student_exam_id = int(student_exam_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "Invalid student_exam_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            student_exam = StudentExam.objects.select_related("student", "exam", "exam_venue__venue").get(
+                pk=student_exam_id
+            )
+        except StudentExam.DoesNotExist:
+            return Response({"detail": "Student exam not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        exam_venue_id = data.get("exam_venue_id", None)
+        new_exam_venue = None
+        if exam_venue_id not in (None, ""):
+            try:
+                exam_venue_id = int(exam_venue_id)
+            except (TypeError, ValueError):
+                return Response({"detail": "Invalid exam_venue_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                new_exam_venue = ExamVenue.objects.select_related("exam", "venue").get(pk=exam_venue_id)
+            except ExamVenue.DoesNotExist:
+                return Response({"detail": "Exam venue not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            if new_exam_venue.exam_id != student_exam.exam_id:
+                return Response(
+                    {"detail": "Exam venue does not belong to this exam."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        student_exam.exam_venue = new_exam_venue
+        try:
+            student_exam.save(update_fields=["exam_venue"])
+        except DjangoValidationError as exc:
+            message = "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+
+        provision = Provisions.objects.filter(student=student_exam.student, exam=student_exam.exam).first()
+        if provision is None:
+            return Response(
+                {"detail": "Provision record not found for the student and exam."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        row = _provision_row(provision, student_exam)
+        venue_name = (
+            new_exam_venue.venue.venue_name
+            if new_exam_venue and new_exam_venue.venue
+            else "Unassigned"
+        )
+        exam_name = getattr(student_exam.exam, "exam_name", "Exam")
+        student_name = getattr(student_exam.student, "student_name", "Student")
+        log_notification(
+            "venueChange",
+            f"{student_name} moved to {venue_name} for {exam_name}.",
+            user=getattr(request, "user", None),
+        )
+
+        return Response(row, status=status.HTTP_200_OK)
 
 
 class InvigilatorNotificationsView(APIView):

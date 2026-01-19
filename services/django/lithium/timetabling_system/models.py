@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 
 # ---------- ENUM TYPES ----------
@@ -45,6 +46,7 @@ class VenueType(models.TextChoices):
     COMPUTER_CLUSTER = 'computer_cluster', 'Computer Cluster'
     SEPARATE_ROOM = 'separate_room', 'Separate Room'
     SCHOOL_TO_SORT = 'school_to_sort', 'School To Sort'
+    CORE_EXAM_VENUE = 'core_exam_venue', 'Core Exam Venue'
     KELVIN_HALL = 'kelvin_hall', 'Kelvin Hall'
     DETACHED_DUTY = 'detached_duty', 'Detached Duty'
     VET_SCHOOL = 'vet_school', 'Vet School'
@@ -193,6 +195,25 @@ class StudentExam(models.Model):
 
     def __str__(self):
         return f"{self.student} - {self.exam}"
+
+    def clean(self):
+        super().clean()
+        if not self.exam_venue:
+            return
+        caps = set(self.exam_venue.provision_capabilities or [])
+        if "separate_room_on_own" in caps:
+            clash_exists = (
+                StudentExam.objects.filter(exam_venue=self.exam_venue)
+                .exclude(pk=self.pk)
+                .exists()
+            )
+            if clash_exists:
+                raise ValidationError("This separate room (on own) is already allocated to another student.")
+
+    def save(self, *args, **kwargs):
+        # Ensure capacity rules are enforced for separate rooms.
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class Provisions(models.Model):

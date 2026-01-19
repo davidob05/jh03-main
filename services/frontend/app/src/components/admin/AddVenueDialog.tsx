@@ -20,25 +20,9 @@ import IconButton from "@mui/material/IconButton";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
-
-const VENUE_TYPES = [
-  { value: "main_hall", label: "Main Hall" },
-  { value: "purple_cluster", label: "Purple Cluster" },
-  { value: "computer_cluster", label: "Computer Cluster" },
-  { value: "separate_room", label: "Separate Room" },
-  { value: "school_to_sort", label: "School To Sort" },
-  { value: "kelvin_hall", label: "Kelvin Hall" },
-  { value: "detached_duty", label: "Detached Duty" },
-  { value: "vet_school", label: "Vet School" },
-  { value: "scottish_event_campus", label: "Scottish Event Campus" },
-  { value: "osce_exam", label: "OSCE Exam" },
-  { value: "pre_sessional_english", label: "Pre-Sessional English" },
-  { value: "admin", label: "Admin" },
-];
+import { VENUE_TYPES } from "./venueTypes";
 
 const PROVISION_CHOICES = [
-  { value: "separate_room_on_own", label: "Separate room on own" },
-  { value: "separate_room_not_on_own", label: "Separate room not on own" },
   { value: "use_computer", label: "Use of a computer" },
   { value: "accessible_hall", label: "Accessible hall" },
 ];
@@ -67,6 +51,7 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
 
   const addMutation = useMutation({
     mutationFn: async () => {
+      const allowedCaps = provisions.filter((p) => p === "use_computer" || p === "accessible_hall");
       const response = await apiFetch(`${apiBaseUrl}/venues/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,7 +60,7 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
           capacity: capacity ? Number(capacity) : 0,
           venuetype: venueType,
           is_accessible: isAccessible,
-          provision_capabilities: provisions,
+          provision_capabilities: allowedCaps,
           qualifications: [],
           availability: [],
         }),

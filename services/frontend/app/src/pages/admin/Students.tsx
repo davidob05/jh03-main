@@ -1,12 +1,21 @@
-import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useMemo, useState, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   InputBase,
+  Paper,
+  Radio,
+  Skeleton,
   Stack,
   Table,
   TableBody,
@@ -41,6 +50,26 @@ type StudentProvisionRow = {
   allowed_venue_types: string[];
   matches_needs: boolean;
   allocation_issue?: string | null;
+  student_exam_id: number | null;
+};
+
+type ExamVenueOption = {
+  examvenue_id: number;
+  exam: number;
+  venue_name: string | null;
+  start_time: string | null;
+  exam_length: number | null;
+  core: boolean;
+  provision_capabilities: string[];
+  venue_type?: string | null;
+  venue_accessible?: boolean | null;
+};
+
+type ExamDetailResponse = {
+  exam_id: number;
+  exam_name: string;
+  course_code: string;
+  exam_venues: ExamVenueOption[];
 };
 
 type Order = "asc" | "desc";
@@ -51,10 +80,53 @@ const formatLabel = (text?: string | null): string => {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
+const formatDateTime = (iso?: string | null): string => {
+  if (!iso) return "TBC";
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return "TBC";
+  return parsed.toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
+const formatDuration = (minutes?: number | null): string => {
+  if (minutes == null || Number.isNaN(minutes)) return "N/A";
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return [hrs ? `${hrs}h` : "", mins ? `${mins}m` : ""].filter(Boolean).join(" ") || "0m";
+};
+
+const formatTimeWindow = (start?: string | null, minutes?: number | null): string => {
+  if (!start) return "Time TBC";
+  const parsed = new Date(start);
+  if (Number.isNaN(parsed.getTime())) return "Time TBC";
+  const end = new Date(parsed.getTime() + ((minutes || 0) * 60 * 1000));
+  const startLabel = parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const endLabel = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `${startLabel} - ${endLabel}`;
+};
+
 const fetchStudentProvisions = async (unallocatedOnly = false): Promise<StudentProvisionRow[]> => {
   const suffix = unallocatedOnly ? "?unallocated=1" : "";
   const response = await apiFetch(`${apiBaseUrl}/students/provisions/${suffix}`);
   if (!response.ok) throw new Error("Unable to load student provisions");
+  return response.json();
+};
+
+const fetchExamVenues = async (examId: number): Promise<ExamDetailResponse> => {
+  const response = await apiFetch(`${apiBaseUrl}/exams/${examId}/`);
+  if (!response.ok) throw new Error("Unable to load exam venues");
+  return response.json();
+};
+
+const updateStudentExamVenue = async (studentExamId: number, examVenueId: number | null): Promise<StudentProvisionRow> => {
+  const response = await apiFetch(`${apiBaseUrl}/students/provisions/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_exam_id: studentExamId, exam_venue_id: examVenueId }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Failed to update student venue");
+  }
   return response.json();
 };
 
@@ -65,6 +137,155 @@ type SectionProps = {
   onSearchChange: (value: string) => void;
   query: ReturnType<typeof useQuery<StudentProvisionRow[], Error>>;
   emptyLabel: string;
+};
+
+type VenueDialogState = {
+  studentExamId: number;
+  examId: number;
+  currentExamVenueId: number | null;
+  studentName: string;
+  examName: string;
+};
+
+type ChangeVenueDialogProps = VenueDialogState & {
+  open: boolean;
+  onClose: () => void;
+};
+
+const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
+  open,
+  onClose,
+  studentExamId,
+  examId,
+  currentExamVenueId,
+  studentName,
+  examName,
+}) => {
+  const queryClient = useQueryClient();
+  const [selectedVenueId, setSelectedVenueId] = useState<number | null>(currentExamVenueId ?? null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const { data, isLoading, isError, error } = useQuery<ExamDetailResponse, Error>({
+    queryKey: ["exam-venues", examId],
+    queryFn: () => fetchExamVenues(examId),
+    enabled: open && Boolean(examId),
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const defaultVenue = currentExamVenueId ?? data?.exam_venues?.[0]?.examvenue_id ?? null;
+    setSelectedVenueId(defaultVenue);
+    setSaveError(null);
+  }, [open, currentExamVenueId, data]);
+
+  const mutation = useMutation<StudentProvisionRow, Error, number | null>({
+    mutationFn: (venueId: number | null) => updateStudentExamVenue(studentExamId, venueId),
+    onSuccess: (updatedRow) => {
+      const updateCache = (key: any[], filterAllocated = false) =>
+        queryClient.setQueryData<StudentProvisionRow[] | undefined>(key, (old) => {
+          if (!old) return old;
+          const exists = old.some((r) => r.student_exam_id === updatedRow.student_exam_id);
+          if (!exists) return old;
+          const mapped = old.map((r) => (r.student_exam_id === updatedRow.student_exam_id ? updatedRow : r));
+          return filterAllocated ? mapped.filter((r) => !r.matches_needs) : mapped;
+        });
+      updateCache(["student-provisions", "all"]);
+      updateCache(["student-provisions", "unallocated"], true);
+      onClose();
+    },
+    onError: (err: any) => setSaveError(err?.message || "Failed to update venue"),
+  });
+
+  const venues = data?.exam_venues || [];
+
+  const capabilityLabels = (caps: string[] = []) => Array.from(new Set(caps.map(formatLabel)));
+
+  const handleSave = () => {
+    setSaveError(null);
+    mutation.mutate(selectedVenueId);
+  };
+
+  const disableSave = selectedVenueId === currentExamVenueId || mutation.isLoading || !studentExamId;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        Change venue for {studentName}
+        <Typography variant="body2" color="text.secondary">{examName}</Typography>
+      </DialogTitle>
+      <DialogContent dividers>
+        {isLoading ? (
+          <Stack spacing={1.5}>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} variant="rounded" height={88} />
+            ))}
+          </Stack>
+        ) : isError ? (
+          <Alert severity="error">{error?.message || "Failed to load venues for this exam"}</Alert>
+        ) : venues.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No venues found for this exam.</Typography>
+        ) : (
+          <Stack spacing={1.5}>
+            {venues.map((v) => {
+              const selected = selectedVenueId === v.examvenue_id;
+              const badges = capabilityLabels(v.provision_capabilities);
+              return (
+                <Paper
+                  key={v.examvenue_id}
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderColor: selected ? "primary.main" : "divider",
+                    boxShadow: selected ? "0 0 0 1px rgba(25,118,210,0.2)" : "none",
+                  }}
+                >
+                  <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                    <Radio
+                      checked={selected}
+                      onChange={() => setSelectedVenueId(v.examvenue_id)}
+                      value={v.examvenue_id}
+                      inputProps={{ "aria-label": v.venue_name || "Unassigned venue" }}
+                    />
+                    <Box sx={{ flex: 1 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={0.5}>
+                        <Typography variant="subtitle1" fontWeight={700}>
+                          {v.venue_name || "Unassigned venue"}
+                        </Typography>
+                        {v.core ? <Chip size="small" label="Core" color="primary" variant="outlined" /> : null}
+                        {v.venue_type ? <Chip size="small" label={formatLabel(v.venue_type)} /> : null}
+                        {v.venue_accessible ? <Chip size="small" label="Accessible" color="success" variant="outlined" /> : null}
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary" mt={0.5}>
+                        {formatTimeWindow(v.start_time, v.exam_length)} • Duration: {formatDuration(v.exam_length)}
+                      </Typography>
+                      {badges.length ? (
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap mt={1}>
+                          {badges.map((cap) => (
+                            <Chip key={cap} label={cap} size="small" />
+                          ))}
+                        </Stack>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" mt={1}>
+                          No special capabilities recorded.
+                        </Typography>
+                      )}
+                    </Box>
+                  </Stack>
+                </Paper>
+              );
+            })}
+          </Stack>
+        )}
+        {saveError ? <Alert severity="error" sx={{ mt: 2 }}>{saveError}</Alert> : null}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={mutation.isLoading}>Cancel</Button>
+        <Button variant="contained" onClick={handleSave} disabled={disableSave}>
+          {mutation.isLoading ? "Saving..." : "Save"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 };
 
 const StudentTableSection: React.FC<SectionProps> = ({
@@ -79,6 +300,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
   const [order, setOrder] = useState<Order>("asc");
   const [orderBy, setOrderBy] = useState<keyof StudentProvisionRow>("student_name");
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
+  const [venueDialog, setVenueDialog] = useState<VenueDialogState | null>(null);
 
   const handleRequestSort = (_: React.MouseEvent<unknown>, property: keyof StudentProvisionRow) => {
     const isAsc = orderBy === property && order === "asc";
@@ -120,6 +342,17 @@ const StudentTableSection: React.FC<SectionProps> = ({
     };
     return [...filtered].sort(comparator);
   }, [filtered, order, orderBy]);
+
+  const openVenueDialogForRow = (row: StudentProvisionRow) => {
+    if (!row.student_exam_id) return;
+    setVenueDialog({
+      studentExamId: row.student_exam_id,
+      examId: row.exam_id,
+      currentExamVenueId: row.exam_venue_id,
+      studentName: row.student_name,
+      examName: `${row.course_code} • ${row.exam_name}`,
+    });
+  };
 
   return (
     <Panel disableDivider sx={{ p: 0, overflow: "hidden" }}>
@@ -274,11 +507,31 @@ const StudentTableSection: React.FC<SectionProps> = ({
                                   Issue: {row.allocation_issue}
                                 </Typography>
                               ) : null}
+                              {!row.matches_needs && row.allocation_issue === "Venue is missing required provisions" ? (() => {
+                                const missing = (row.required_capabilities || []).filter(
+                                  (cap) => !(row.exam_venue_caps || []).includes(cap)
+                                );
+                                return missing.length ? (
+                                  <Typography variant="body2" color="warning.dark" mt={0.5}>
+                                    Missing: {missing.map(formatLabel).join(", ")}
+                                  </Typography>
+                                ) : null;
+                              })() : null}
                               {row.exam_venue_caps?.length ? (
                                 <Typography variant="body2" color="text.secondary" mt={1}>
                                   Assigned venue supports: {row.exam_venue_caps.map(formatLabel).join(", ")}
                                 </Typography>
                               ) : null}
+                            </Box>
+                            <Box sx={{ gridColumn: { xs: "1", sm: "1 / -1" }, display: "flex", justifyContent: "flex-end" }}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => openVenueDialogForRow(row)}
+                                disabled={!row.student_exam_id}
+                              >
+                                Change venue
+                              </Button>
                             </Box>
                           </Box>
                         </Collapse>
@@ -298,6 +551,13 @@ const StudentTableSection: React.FC<SectionProps> = ({
           </Table>
         </TableContainer>
       )}
+      {venueDialog ? (
+        <ChangeVenueDialog
+          open
+          onClose={() => setVenueDialog(null)}
+          {...venueDialog}
+        />
+      ) : null}
     </Panel>
   );
 };
