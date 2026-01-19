@@ -360,10 +360,27 @@ def _import_exam_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             summary["errors"].append(f"Row {idx}: {exc}")
             continue
 
-        exam_obj, created = Exam.objects.update_or_create(
-            course_code=payload["course_code"],
-            defaults=payload["defaults"],
-        )
+        course_code = payload["course_code"]
+        defaults = payload["defaults"]
+        existing = list(Exam.objects.filter(course_code=course_code).order_by("exam_id")[:2])
+        if not existing:
+            exam_obj = Exam.objects.create(course_code=course_code, **defaults)
+            created = True
+        else:
+            exam_obj = existing[0]
+            if len(existing) > 1:
+                summary["errors"].append(
+                    f"Row {idx}: Multiple exams found for course_code '{course_code}'. "
+                    f"Updating exam_id={exam_obj.exam_id}."
+                )
+            updates = []
+            for field, value in defaults.items():
+                if getattr(exam_obj, field) != value:
+                    setattr(exam_obj, field, value)
+                    updates.append(field)
+            if updates:
+                exam_obj.save(update_fields=updates)
+            created = False
         if created:
             summary["created"] += 1
         else:
