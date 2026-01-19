@@ -465,7 +465,11 @@ def _match_extra_time_token(token: str) -> Optional[str]:
     return None
 
 
-def _normalize_provisions(value: Any) -> List[str]:
+def _normalize_provisions(
+    value: Any,
+    *,
+    unknown_tokens: Optional[List[str]] = None,
+) -> List[str]:
     if _is_missing(value):
         return []
     if isinstance(value, (list, tuple, set)):
@@ -492,14 +496,20 @@ def _normalize_provisions(value: Any) -> List[str]:
 
     normalized: List[str] = []
     seen = set()
+    unknown_seen = set()
     for token in tokens:
         slug = _slugify(token)
         mapped = PROVISION_SLUG_MAP.get(slug)
         if not mapped:
-            mapped = _match_extra_time_token(token)
+            mapped = _match_extra_time_token(token, slug)
         if mapped and mapped not in seen:
             normalized.append(mapped)
             seen.add(mapped)
+        elif not mapped and unknown_tokens is not None:
+            cleaned = _clean_string(token, max_length=60)
+            if cleaned and slug and slug not in unknown_seen:
+                unknown_seen.add(slug)
+                unknown_tokens.append(cleaned)
     return normalized
 
 
@@ -538,8 +548,20 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             },
         )
 
-        provisions = _normalize_provisions(raw.get("provisions"))
+        unknown_provisions: List[str] = []
+        provisions = _normalize_provisions(
+            raw.get("provisions"),
+            unknown_tokens=unknown_provisions,
+        )
         notes = _clean_string(raw.get("additional_info") or raw.get("notes"), max_length=200)
+        if unknown_provisions:
+            unknown_text = ", ".join(unknown_provisions)
+            suffix = f"Unrecognized provisions: {unknown_text}"
+            if notes:
+                notes = f"{notes}; {suffix}"
+            else:
+                notes = suffix
+            notes = _clean_string(notes, max_length=200)
 
         provision_obj, created = Provisions.objects.update_or_create(
             student=student,
