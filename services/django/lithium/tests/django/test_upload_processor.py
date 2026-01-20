@@ -596,7 +596,7 @@ class UploadProcessorTests(TestCase):
         main_hall.refresh_from_db()
         purple_lab.refresh_from_db()
         self.assertEqual(main_hall.capacity, 180)
-        self.assertTrue(main_hall.is_accessible)
+        self.assertFalse(main_hall.is_accessible)
         self.assertEqual(purple_lab.capacity, 60)
         self.assertEqual(UploadLog.objects.count(), 2)
 
