@@ -237,6 +237,40 @@ class UploadProcessorBranchTests(TestCase):
         self.assertEqual(summary["skipped"], 3)
         self.assertEqual(len(summary["errors"]), 3)
 
+    def test_import_provision_rows_appends_unknown_provisions_to_notes(self):
+        exam = Exam.objects.create(
+            exam_name="Unknown Notes",
+            course_code="UNK1",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Science",
+            school_contact="",
+        )
+        row = {
+            "student_id": "S900",
+            "student_name": "Unknown Provision",
+            "exam_code": exam.course_code,
+            "provisions": "Reader;Mystery Flag",
+            "additional_info": "Extra notes",
+        }
+
+        with mock.patch(
+            "timetabling_system.services.upload_processor._find_matching_exam_venue",
+            return_value=None,
+        ), mock.patch(
+            "timetabling_system.services.upload_processor._allocate_exam_venue",
+            return_value=None,
+        ):
+            summary = up._import_provision_rows([row])
+
+        self.assertEqual(summary["created"], 1)
+        provision = up.Provisions.objects.get(student__student_id="S900", exam=exam)
+        self.assertIn(ProvisionType.READER, provision.provisions)
+        self.assertEqual(
+            provision.notes,
+            "Extra notes; Unrecognized provisions: Mystery Flag",
+        )
+
     def test_import_provision_rows_updates_existing_exam_venue(self):
         core_start = timezone.make_aware(datetime(2025, 7, 16, 12, 0))
         exam = Exam.objects.create(
