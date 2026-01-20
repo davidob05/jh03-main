@@ -51,6 +51,7 @@ const slotOrder: SlotCode[] = ["MORNING", "EVENING"];
 export const InvigilatorRestrictions: React.FC = () => {
   const queryClient = useQueryClient();
   const [selectedDiet, setSelectedDiet] = useState<string | null>(null);
+  const [queryDiet, setQueryDiet] = useState<string | null>(null);
   const [days, setDays] = useState<AvailabilityResponse["days"]>([]);
   const daysRef = useRef<AvailabilityResponse["days"]>([]);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
@@ -59,10 +60,12 @@ export const InvigilatorRestrictions: React.FC = () => {
     severity: "success",
   });
 
+  const availabilityQueryKey = ["invigilator-availability", queryDiet || "default"] as const;
+
   const availabilityQuery = useQuery<AvailabilityResponse>({
-    queryKey: ["invigilator-availability", selectedDiet || "default"],
+    queryKey: availabilityQueryKey,
     queryFn: async () => {
-      const dietParam = selectedDiet ? `?diet=${encodeURIComponent(selectedDiet)}` : "";
+      const dietParam = queryDiet ? `?diet=${encodeURIComponent(queryDiet)}` : "";
       const res = await apiFetch(`${apiBaseUrl}/invigilator/availability/${dietParam}`);
       if (!res.ok) {
         const text = await res.text();
@@ -142,12 +145,6 @@ export const InvigilatorRestrictions: React.FC = () => {
     }));
   }, [availabilityQuery.data?.diets]);
 
-  useEffect(() => {
-    if (availabilityQuery.data?.diet && selectedDiet !== availabilityQuery.data.diet && !selectedDiet) {
-      setSelectedDiet(availabilityQuery.data.diet);
-    }
-  }, [availabilityQuery.data?.diet, selectedDiet]);
-
   const toggleSlot = (date: string, slot: SlotCode) => {
     setDays((prev) =>
       prev.map((day) => {
@@ -179,7 +176,7 @@ export const InvigilatorRestrictions: React.FC = () => {
     onSuccess: (data: AvailabilityResponse & { unavailable_count?: number }) => {
       setDays(buildDays(data));
       setSnackbar({ open: true, message: "Restrictions updated!", severity: "success" });
-      queryClient.invalidateQueries({ queryKey: ["invigilator-availability"] });
+      queryClient.setQueryData(availabilityQueryKey, data);
     },
     onError: (_err: any) => {
       setSnackbar({ open: true, message: "Failed to update restrictions", severity: "error" });
@@ -188,6 +185,7 @@ export const InvigilatorRestrictions: React.FC = () => {
 
   const handleDietChange = (diet: string) => {
     setSelectedDiet(diet);
+    setQueryDiet(diet);
   };
 
   const startDate = availabilityQuery.data?.start_date;
