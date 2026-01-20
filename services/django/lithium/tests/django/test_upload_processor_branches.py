@@ -64,6 +64,48 @@ class UploadProcessorBranchTests(TestCase):
         self.assertEqual(summary["skipped"], 1)
         self.assertEqual(summary["errors"][0].startswith("Row 1"), True)
 
+    def test_import_exam_rows_handles_duplicate_course_codes(self):
+        exam1 = Exam.objects.create(
+            exam_name="Old A",
+            course_code="DUP1",
+            exam_type="Written",
+            no_students=10,
+            exam_school="Science",
+            school_contact="Old A",
+        )
+        exam2 = Exam.objects.create(
+            exam_name="Old B",
+            course_code="DUP1",
+            exam_type="Written",
+            no_students=20,
+            exam_school="Arts",
+            school_contact="Old B",
+        )
+        row = {
+            "exam_code": "DUP1",
+            "exam_name": "New Name",
+            "exam_type": "Written",
+            "no_students": 42,
+            "school": "Engineering",
+            "school_contact": "New Contact",
+            "main_venue": "",
+        }
+
+        summary = up._import_exam_rows([row])
+
+        self.assertEqual(summary["created"], 0)
+        self.assertEqual(summary["updated"], 1)
+        self.assertEqual(len(summary["errors"]), 1)
+        self.assertIn("Multiple exams found for course_code 'DUP1'", summary["errors"][0])
+
+        exam1.refresh_from_db()
+        exam2.refresh_from_db()
+        self.assertEqual(exam1.exam_name, "New Name")
+        self.assertEqual(exam1.no_students, 42)
+        self.assertEqual(exam1.exam_school, "Engineering")
+        self.assertEqual(exam2.exam_name, "Old B")
+        self.assertEqual(exam2.no_students, 20)
+
     def test_import_venue_days_handles_empty(self):
         summary = up._import_venue_days([])
         self.assertEqual(summary["total_rows"], 0)
