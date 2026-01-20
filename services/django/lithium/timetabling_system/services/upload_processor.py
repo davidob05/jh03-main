@@ -1153,10 +1153,11 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             continue
 
         cap_val = _coerce_int(room.get("capacity"))
+        incoming_accessible = room.get("accessible", None)
         defaults = {
             "capacity": cap_val if cap_val is not None else 0,
             "venuetype": room.get("venuetype") or VenueType.SCHOOL_TO_SORT,
-            "is_accessible": bool(room.get("accessible", True)),
+            "is_accessible": True if incoming_accessible is None else bool(incoming_accessible),
             "qualifications": room.get("qualifications") or [],
             "availability": [],
         }
@@ -1171,10 +1172,15 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         )
 
         updated_fields = []
-        for field in ("venuetype", "is_accessible", "qualifications"):
+        for field in ("venuetype", "qualifications"):
             if getattr(venue_obj, field) != defaults[field]:
                 setattr(venue_obj, field, defaults[field])
                 updated_fields.append(field)
+        if incoming_accessible is not None:
+            merged_accessible = venue_obj.is_accessible and bool(incoming_accessible)
+            if venue_obj.is_accessible != merged_accessible:
+                venue_obj.is_accessible = merged_accessible
+                updated_fields.append("is_accessible")
         if cap_val is not None and venue_obj.capacity != cap_val:
             venue_obj.capacity = cap_val
             updated_fields.append("capacity")
