@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
