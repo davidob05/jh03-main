@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 from accounts.adapters import AccountAdapter
 from accounts.api import AuthTokenSerializer, _derive_role, CurrentUserView
 from accounts.admin import CustomUserAdmin
+from accounts.models import UserSession
 from timetabling_system.models import Invigilator
 
 migration_module = importlib.import_module("accounts.migrations.0002_create_default_admin")
@@ -158,6 +159,25 @@ class AuthApiEdgeTests(TestCase):
         response = self.client.patch(reverse("api-auth-me"), {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data["password_updated"])
+
+    def test_delete_account_rejected_for_non_admin(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.delete(reverse("api-auth-me"))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_delete_account_admin_removes_sessions_and_user(self):
+        self.user.is_staff = True
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_staff", "is_superuser"])
+        UserSession.objects.create(user=self.user, user_agent="ua", ip_address="127.0.0.1")
+        UserSession.objects.create(user=self.user)
+        user_id = self.user.id
+
+        self.client.force_authenticate(self.user)
+        response = self.client.delete(reverse("api-auth-me"))
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(get_user_model().objects.filter(pk=user_id).exists())
+        self.assertFalse(UserSession.objects.filter(user_id=user_id).exists())
 
     @mock.patch("accounts.api.Token.objects.create")
     @mock.patch("accounts.api.Token.objects.get_or_create")
