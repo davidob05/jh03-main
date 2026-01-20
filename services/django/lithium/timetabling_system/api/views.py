@@ -1434,6 +1434,8 @@ class InvigilatorAssignmentsView(APIView):
     def get(self, request, *args, **kwargs):
         invigilator = getattr(request.user, "invigilator_profile", None)
         if invigilator is None:
+            invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        if invigilator is None:
             return Response({"detail": "Invigilator profile not found."}, status=status.HTTP_404_NOT_FOUND)
 
         assignments = (
