@@ -1,5 +1,16 @@
-import React from "react";
-import { Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from "@mui/material";
+import React, { useState } from "react";
+import {
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  List,
+  ListItemButton,
+  ListItemText,
+  Radio,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { PillButton } from "../PillButton";
 
 type ExamVenue = {
@@ -52,10 +63,35 @@ export const AssignInvigilatorDialog: React.FC<AssignInvigilatorDialogProps> = (
   open,
   onClose,
   examVenue,
+  invigilators,
 }) => (
   <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
     <DialogTitle>Assign invigilator</DialogTitle>
     <DialogContent dividers>
+      <AssignInvigilatorDialogBody examVenue={examVenue} invigilators={invigilators} />
+    </DialogContent>
+    <DialogActions>
+      <PillButton variant="outlined" onClick={onClose}>
+        Close
+      </PillButton>
+    </DialogActions>
+  </Dialog>
+);
+
+export default AssignInvigilatorDialog;
+
+const displayName = (invigilator: Invigilator) =>
+  invigilator.preferred_name || invigilator.full_name || `Invigilator #${invigilator.id}`;
+
+const AssignInvigilatorDialogBody: React.FC<{
+  examVenue: ExamVenue | null;
+  invigilators: Invigilator[];
+}> = ({ examVenue, invigilators }) => {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const activeInvigilators = invigilators.filter((i) => !i.resigned);
+
+  return (
+    <Stack spacing={2}>
       {examVenue ? (
         <Stack spacing={0.75}>
           <Typography variant="subtitle2" color="text.secondary">Venue</Typography>
@@ -69,13 +105,26 @@ export const AssignInvigilatorDialog: React.FC<AssignInvigilatorDialogProps> = (
           No exam venue selected.
         </Typography>
       )}
-    </DialogContent>
-    <DialogActions>
-      <PillButton variant="outlined" onClick={onClose}>
-        Close
-      </PillButton>
-    </DialogActions>
-  </Dialog>
-);
 
-export default AssignInvigilatorDialog;
+      <Stack spacing={0.5}>
+        <Typography variant="subtitle2" color="text.secondary">Invigilators</Typography>
+        {activeInvigilators.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No invigilators available.</Typography>
+        ) : (
+          <List dense sx={{ border: "1px solid #e5e7eb", borderRadius: 1 }}>
+            {activeInvigilators.map((invigilator) => (
+              <ListItemButton
+                key={invigilator.id}
+                selected={selectedId === invigilator.id}
+                onClick={() => setSelectedId(invigilator.id)}
+              >
+                <Radio checked={selectedId === invigilator.id} />
+                <ListItemText primary={displayName(invigilator)} />
+              </ListItemButton>
+            ))}
+          </List>
+        )}
+      </Stack>
+    </Stack>
+  );
+};
