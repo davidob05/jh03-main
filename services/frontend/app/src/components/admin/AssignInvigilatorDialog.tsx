@@ -1,21 +1,24 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   Checkbox,
   FormControlLabel,
   InputAdornment,
+  InputBase,
+  Box,
+  Chip,
+  Collapse,
+  IconButton,
   TextField,
-  List,
-  ListItemButton,
-  ListItemText,
   Stack,
   Typography,
   Alert,
 } from "@mui/material";
-import { Search } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
+import { Close, ExpandMore, Search } from "@mui/icons-material";
+import { Link as RouterLink } from "react-router-dom";
 import dayjs from "dayjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../PillButton";
@@ -36,6 +39,7 @@ type Invigilator = {
   resigned: boolean;
   availabilities?: InvigilatorAvailability[];
   qualifications?: { qualification: string }[];
+  restrictions?: (string | { restrictions?: string[]; diet?: string })[];
 };
 
 type InvigilatorAvailability = {
@@ -87,8 +91,17 @@ export const AssignInvigilatorDialog: React.FC<AssignInvigilatorDialogProps> = (
   onAssigned,
 }) => (
   <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-    <DialogTitle>Assign invigilator</DialogTitle>
-    <DialogContent dividers>
+    <DialogTitle sx={{ pr: 6, pb: 1.5 }}>
+      Assign invigilator
+      <IconButton
+        aria-label="Close"
+        onClick={onClose}
+        sx={{ position: "absolute", right: 12, top: 10 }}
+      >
+        <Close />
+      </IconButton>
+    </DialogTitle>
+    <DialogContent sx={{ pt: 0.5 }}>
       <AssignInvigilatorDialogBody
         open={open}
         examVenue={examVenue}
@@ -98,9 +111,6 @@ export const AssignInvigilatorDialog: React.FC<AssignInvigilatorDialogProps> = (
         onClose={onClose}
       />
     </DialogContent>
-    <DialogActions>
-      <AssignInvigilatorDialogActions examVenue={examVenue} onClose={onClose} />
-    </DialogActions>
   </Dialog>
 );
 
@@ -114,8 +124,21 @@ const qualificationLabels: Record<string, string> = {
   AKT_TRAINED: "AKT Trained",
   CHECK_IN: "Check-In",
 };
+const restrictionLabels: Record<string, string> = {
+  accessibility_required: "Accessibility required",
+  separate_room_only: "Separate room only",
+  purple_cluster: "Purple cluster",
+  computer_cluster: "Computer cluster",
+  vet_school: "Vet School",
+  sec: "Scottish Event Campus",
+  osce_golden_jubilee: "OSCE - Golden Jubilee",
+  osce_wolfson: "OSCE - Wolfson",
+  osce_queen_elizabeth: "OSCE - Queen Elizabeth",
+  approved_exemption: "Approved exemption",
+};
 
 const formatQualification = (code: string) => qualificationLabels[code] || code;
+const formatRequirement = (code: string) => restrictionLabels[code] || code;
 
 const AssignInvigilatorDialogBody: React.FC<{
   open: boolean;
@@ -127,15 +150,18 @@ const AssignInvigilatorDialogBody: React.FC<{
 }> = ({ open, examVenue, invigilators, assignments, onAssigned, onClose }) => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [search, setSearch] = useState("");
-  const [showResigned, setShowResigned] = useState(false);
   const [onlyAvailable, setOnlyAvailable] = useState(true);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
   const assignedAssignments = useMemo(() => {
     if (!examVenue) return [];
     return assignments.filter((a) => a.exam_venue === examVenue.examvenue_id);
   }, [assignments, examVenue]);
+
   const assignedIds = useMemo(() => new Set(assignedAssignments.map((a) => a.invigilator)), [assignedAssignments]);
+
   const assignmentByInvigilator = useMemo(() => {
     const map = new Map<number, InvigilatorAssignment>();
     assignedAssignments.forEach((assignment) => {
@@ -143,6 +169,7 @@ const AssignInvigilatorDialogBody: React.FC<{
     });
     return map;
   }, [assignedAssignments]);
+
   const selectionDelta = useMemo(() => {
     const selectedSet = new Set(selectedIds);
     const toAdd = selectedIds.filter((id) => !assignedIds.has(id));
@@ -153,6 +180,7 @@ const AssignInvigilatorDialogBody: React.FC<{
       hasChanges: toAdd.length > 0 || toRemove.length > 0,
     };
   }, [assignedIds, selectedIds]);
+
   const slotInfo = useMemo(() => {
     if (!examVenue?.start_time) return null;
     const start = dayjs(examVenue.start_time);
@@ -160,17 +188,20 @@ const AssignInvigilatorDialogBody: React.FC<{
     const slot: SlotCode = start.hour() < 12 ? "MORNING" : "EVENING";
     return { slot, dateKey: start.format("YYYY-MM-DD") };
   }, [examVenue?.start_time]);
+
   const examWindow = useMemo(() => {
     if (!examVenue?.start_time || examVenue.exam_length == null) return null;
     const start = dayjs(examVenue.start_time);
     if (!start.isValid()) return null;
     return { start, end: start.add(examVenue.exam_length, "minute") };
   }, [examVenue?.start_time, examVenue?.exam_length]);
+
   useEffect(() => {
     if (!open) return;
     setSelectedIds(Array.from(new Set(assignedAssignments.map((a) => a.invigilator))));
     setError(null);
   }, [assignedAssignments, examVenue?.examvenue_id, open]);
+
   const hasConflict = (invigilatorId: number) => {
     if (!examWindow) return false;
     return assignments.some((assignment) => {
@@ -183,8 +214,9 @@ const AssignInvigilatorDialogBody: React.FC<{
       return start.isBefore(examWindow.end) && examWindow.start.isBefore(end);
     });
   };
+
   const filteredInvigilators = useMemo(() => {
-    const base = showResigned ? invigilators : invigilators.filter((i) => !i.resigned || assignedIds.has(i.id));
+    const base = invigilators.filter((i) => !i.resigned || assignedIds.has(i.id));
     const query = search.trim().toLowerCase();
     const searched = query ? base.filter((i) => displayName(i).toLowerCase().includes(query)) : base;
     if (!onlyAvailable || !slotInfo) return searched;
@@ -194,9 +226,10 @@ const AssignInvigilatorDialogBody: React.FC<{
         (a) => a.date === slotInfo.dateKey && a.slot === slotInfo.slot
       );
       if (hasConflict(invigilator.id)) return false;
-      return entry ? entry.available : true;
+      if (!entry) return false; // If no availability recorded for the exam slot, treat as unavailable
+      return entry.available;
     });
-  }, [assignedIds, invigilators, search, showResigned, onlyAvailable, slotInfo, examWindow, assignments]);
+  }, [assignedIds, invigilators, search, onlyAvailable, slotInfo, examWindow, assignments]);
 
   const assignMutation = useMutation({
     mutationFn: async () => {
@@ -269,19 +302,69 @@ const AssignInvigilatorDialogBody: React.FC<{
       setError(err instanceof Error ? err.message : "Failed to update invigilator assignments.");
     },
   });
+
   const canUpdate = Boolean(examVenue)
     && selectionDelta.hasChanges
     && (selectionDelta.toAdd.length === 0 || Boolean(examWindow));
+
   const toggleSelected = (id: number) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]));
   };
 
+  const toggleExpanded = (id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const requirementLabelsFor = (invigilator: Invigilator) => {
+    const raw = invigilator.restrictions || [];
+    const codes = raw.flatMap((entry) => {
+      if (!entry) return [];
+      if (typeof entry === "string") return [entry];
+      if (Array.isArray(entry.restrictions)) return entry.restrictions.filter(Boolean) as string[];
+      return [];
+    });
+    return Array.from(new Set(codes.map(formatRequirement))).filter(Boolean);
+  };
+
+  const toneStyles = (tone: "success" | "error" | "warning" | "info" | "default", solid?: boolean) => {
+    const palette: Record<typeof tone, { bg: string; fg: string; solidBg: string }> = {
+      success: { bg: alpha("#2e7d32", 0.12), fg: "#166534", solidBg: "#2e7d32" },
+      warning: { bg: alpha("#ed6c02", 0.12), fg: "#b45309", solidBg: "#ed6c02" },
+      info: { bg: "#e3f2fd", fg: "primary.main", solidBg: "#1d4ed8" },
+      error: { bg: alpha("#b91c1c", 0.12), fg: "#b91c1c", solidBg: "#dc2626" },
+      default: { bg: "#f5f5f5", fg: "#424242", solidBg: "#424242" },
+    };
+    const colors = palette[tone] || palette.default;
+    if (solid) {
+      return { bg: colors.solidBg, fg: "#fff" };
+    }
+    return { bg: colors.bg, fg: colors.fg };
+  };
+
+  const pluralize = (count: number, singular: string, plural?: string) =>
+    count === 1 ? singular : plural || `${singular}s`;
+
   return (
     <Stack spacing={2}>
       {examVenue ? (
-        <Stack spacing={0.75}>
-          <Typography variant="subtitle2" color="text.secondary">Venue</Typography>
-          <Typography variant="body1" fontWeight={600}>{examVenue.venue_name || "Unassigned"}</Typography>
+        <Stack spacing={0.25} sx={{ bgcolor: "grey.50", borderRadius: 2, p: 2, border: "1px solid", borderColor: "divider" }}>
+          <Typography
+            variant="overline"
+            sx={{
+              color: "text.secondary",
+              letterSpacing: 0.8,
+              lineHeight: 1.1,
+              mb: 0,
+            }}
+          >
+            Venue
+          </Typography>
+          <Typography variant="h6" fontWeight={700}>{examVenue.venue_name || "Unassigned"}</Typography>
           <Typography variant="body2" color="text.secondary">
             {formatDisplayDate(examVenue.start_time)} • {formatDuration(examVenue.exam_length)}
           </Typography>
@@ -292,36 +375,42 @@ const AssignInvigilatorDialogBody: React.FC<{
         </Typography>
       )}
 
-      <Stack spacing={0.5}>
-        <Typography variant="subtitle2" color="text.secondary">Invigilators</Typography>
-        <Typography variant="caption" color="text.secondary">
-          Select to assign. Deselect to unassign.
-        </Typography>
-        <TextField
-          size="small"
-          placeholder="Search invigilators"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search fontSize="small" />
-              </InputAdornment>
-            ),
+      <Stack spacing={0.75}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography variant="subtitle1" fontWeight={700}>Invigilators</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Select or deselect invigilators to assign or unassign to this exam.
+            </Typography>
+          </Box>
+          <FormControlLabel
+            control={<Checkbox checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} />}
+            label="Available"
+            sx={{ m: 0, "& .MuiFormControlLabel-label": { fontSize: 12, color: "text.secondary" } }}
+          />
+        </Stack>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            backgroundColor: "action.hover",
+            borderRadius: 1,
+            px: 2,
+            py: 0.75,
           }}
-        />
-        <FormControlLabel
-          control={<Checkbox checked={showResigned} onChange={(e) => setShowResigned(e.target.checked)} />}
-          label="Show resigned"
-        />
-        <FormControlLabel
-          control={<Checkbox checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} />}
-          label="Only show available"
-        />
+        >
+          <Search sx={{ color: "action.active", mr: 1 }} />
+          <InputBase
+            placeholder="Search invigilators..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ width: "100%" }}
+          />
+        </Box>
         {filteredInvigilators.length === 0 ? (
           <Typography variant="body2" color="text.secondary">No invigilators available.</Typography>
         ) : (
-          <List dense sx={{ border: "1px solid #e5e7eb", borderRadius: 1 }}>
+          <Stack spacing={1.25}>
             {filteredInvigilators.map((invigilator) => {
               const assigned = assignedIds.has(invigilator.id);
               const isSelected = selectedIds.includes(invigilator.id);
@@ -335,6 +424,9 @@ const AssignInvigilatorDialogBody: React.FC<{
                   availabilityLabel = entry.available ? "Available for this slot" : "Unavailable for this slot";
                 }
               }
+              if (!availabilityLabel && hasConflict(invigilator.id)) {
+                availabilityLabel = "Conflicts with another shift";
+              }
               let assignmentLabel: string | null = null;
               if (assigned && isSelected) assignmentLabel = "Assigned to this exam";
               if (assigned && !isSelected) assignmentLabel = "Will be unassigned";
@@ -346,34 +438,179 @@ const AssignInvigilatorDialogBody: React.FC<{
                     .filter(Boolean)
                 )
               );
-              const qualificationsLabel = `Qualifications: ${
-                qualificationNames.length ? qualificationNames.join(", ") : "None"
-              }`;
-              const secondaryParts = [
-                assignmentLabel,
-                conflict ? "Conflicts with existing shift" : null,
-                availabilityLabel,
-                qualificationsLabel,
+              const requirementNames = requirementLabelsFor(invigilator);
+              const summaryParts = [
+                qualificationNames.length ? `${qualificationNames.length} qualification${qualificationNames.length > 1 ? "s" : ""}` : null,
+                requirementNames.length ? `${requirementNames.length} requirement${requirementNames.length > 1 ? "s" : ""}` : null,
               ].filter(Boolean);
+              const statusChips: { label: string; tone: "success" | "error" | "warning" | "info" | "default"; solid?: boolean }[] = [];
+              if (assigned && isSelected) statusChips.push({ label: "Assigned", tone: "success", solid: true });
+              if (assigned && !isSelected) statusChips.push({ label: "Unassigning", tone: "error", solid: true });
+              if (!assigned && isSelected) statusChips.push({ label: "Assigning", tone: "success" });
+              if (conflict) statusChips.push({ label: "Has conflict", tone: "error", solid: true });
+              if (availabilityLabel) {
+                const available = availabilityLabel.toLowerCase().startsWith("available");
+                statusChips.push({ label: available ? "Available" : "Unavailable", tone: available ? "success" : "warning", solid: !available });
+              }
+              if (invigilator.resigned) statusChips.push({ label: "Resigned", tone: "default" });
+
               return (
-                <ListItemButton
+                <Box
                   key={invigilator.id}
-                  selected={selectedIds.includes(invigilator.id)}
-                  onClick={() => toggleSelected(invigilator.id)}
-                  disabled={!assigned && conflict}
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 1.5,
+                    overflow: "hidden",
+                    backgroundColor: "background.paper",
+                    boxShadow: "0 4px 12px rgba(18, 38, 63, 0.05)",
+                  }}
                 >
-                  <Checkbox checked={selectedIds.includes(invigilator.id)} />
-                  <ListItemText
-                    primary={displayName(invigilator)}
-                    secondary={secondaryParts.length ? secondaryParts.join(" • ") : undefined}
-                  />
-                </ListItemButton>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      px: 1.25,
+                      py: 1,
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Checkbox
+                      checked={selectedIds.includes(invigilator.id)}
+                      onChange={() => toggleSelected(invigilator.id)}
+                      disabled={!assigned && conflict}
+                    />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="subtitle1" fontWeight={700} noWrap title={displayName(invigilator)}>
+                        <RouterLink
+                          to={`/admin/invigilators/${invigilator.id}`}
+                          style={{ textDecoration: "none", color: "inherit" }}
+                        >
+                          <Box
+                            component="span"
+                            sx={{
+                              color: "primary.main",
+                              "&:hover": { textDecoration: "none" },
+                            }}
+                          >
+                            {displayName(invigilator)}
+                          </Box>
+                        </RouterLink>
+                      </Typography>
+                      <Stack direction="row" spacing={0.75} flexWrap="wrap" rowGap={0.75} sx={{ mt: 0.5 }}>
+                        {statusChips.map((chip) => {
+                          const tone = toneStyles(chip.tone, chip.solid);
+                          return (
+                            <Chip
+                              key={chip.label}
+                              label={chip.label}
+                              size="small"
+                              variant="outlined"
+                              sx={{
+                                fontWeight: 600,
+                                borderRadius: 999,
+                                px: 0.75,
+                                bgcolor: tone.bg,
+                                color: tone.fg,
+                                borderColor: "transparent",
+                              }}
+                            />
+                          );
+                        })}
+                      </Stack>
+                      {summaryParts.length > 0 && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                          {summaryParts.join(" / ")}
+                        </Typography>
+                      )}
+                      {assignmentLabel && (
+                        <Typography variant="caption" color="text.secondary">
+                          {assignmentLabel}
+                        </Typography>
+                      )}
+                    </Box>
+                    <IconButton
+                      onClick={() => toggleExpanded(invigilator.id)}
+                      size="small"
+                      aria-label="Toggle details"
+                      sx={{
+                        transform: expandedIds.has(invigilator.id) ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "transform 0.15s ease",
+                        color: "text.secondary",
+                      }}
+                    >
+                      <ExpandMore />
+                    </IconButton>
+                  </Box>
+                  <Collapse in={expandedIds.has(invigilator.id)} timeout="auto" unmountOnExit>
+                    <Box sx={{ px: 2, py: 1.5 }}>
+                      <Stack spacing={1}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={700}>Qualifications</Typography>
+                            {qualificationNames.length ? (
+                              <Stack direction="row" spacing={0.75} flexWrap="wrap" rowGap={0.75}>
+                                {qualificationNames.map((q) => (
+                                  <Chip
+                                    key={q}
+                                    label={q}
+                                    size="small"
+                                    variant="filled"
+                                    sx={{
+                                      borderRadius: 999,
+                                      bgcolor: "#e3f2fd",
+                                      color: "primary.main",
+                                      borderColor: "transparent",
+                                      fontWeight: 600,
+                                    }}
+                                  />
+                                ))}
+                              </Stack>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">None recorded.</Typography>
+                          )}
+                        </Stack>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={700}>Requirements</Typography>
+                            {requirementNames.length ? (
+                              <Stack direction="row" spacing={0.75} flexWrap="wrap" rowGap={0.75}>
+                                {requirementNames.map((r) => (
+                                  <Chip
+                                    key={r}
+                                    label={r}
+                                    size="small"
+                                    variant="filled"
+                                    sx={{
+                                      borderRadius: 999,
+                                      bgcolor: "#fff4e5",
+                                      color: "#b45309",
+                                      borderColor: "transparent",
+                                      fontWeight: 600,
+                                    }}
+                                  />
+                                ))}
+                              </Stack>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">No requirements recorded.</Typography>
+                          )}
+                        </Stack>
+                        {availabilityLabel && (
+                          <Typography variant="body2" color="text.secondary">
+                            {availabilityLabel}
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Box>
+                  </Collapse>
+                </Box>
               );
             })}
-          </List>
+          </Stack>
         )}
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
+      {/** Helper to keep singular/plural tidy */}      
       <PillButton
         variant="contained"
         onClick={() => assignMutation.mutate()}
@@ -384,27 +621,11 @@ const AssignInvigilatorDialogBody: React.FC<{
           : selectionDelta.toAdd.length && selectionDelta.toRemove.length
             ? "Update assignments"
             : selectionDelta.toAdd.length
-              ? `Assign ${selectionDelta.toAdd.length} invigilator(s)`
+              ? `Assign ${selectionDelta.toAdd.length} ${pluralize(selectionDelta.toAdd.length, "invigilator")}`
               : selectionDelta.toRemove.length
-                ? `Unassign ${selectionDelta.toRemove.length} invigilator(s)`
+                ? `Unassign ${selectionDelta.toRemove.length} ${pluralize(selectionDelta.toRemove.length, "invigilator")}`
                 : "Update assignments"}
       </PillButton>
     </Stack>
   );
 };
-
-const AssignInvigilatorDialogActions: React.FC<{
-  examVenue: ExamVenue | null;
-  onClose: () => void;
-}> = ({ examVenue, onClose }) => (
-  <>
-    {examVenue?.start_time ? null : (
-      <Typography variant="caption" color="text.secondary">
-        Exam time not set
-      </Typography>
-    )}
-    <PillButton variant="outlined" onClick={onClose}>
-      Close
-    </PillButton>
-  </>
-);
