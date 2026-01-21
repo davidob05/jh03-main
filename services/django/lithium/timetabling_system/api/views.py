@@ -8,9 +8,8 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
-from django.db import models
+from django.db import models, transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import models
 from datetime import date, timedelta
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -23,6 +22,7 @@ from timetabling_system.models import (
     InvigilatorAvailability,
     InvigilatorRestriction,
     Venue,
+    Student,
     StudentExam,
     Provisions,
     Notification,
@@ -1092,6 +1092,57 @@ class StudentProvisionListView(APIView):
         )
 
         return Response(row, status=status.HTTP_200_OK)
+
+    def delete(self, request, *args, **kwargs):
+        data = request.data if isinstance(request.data, dict) else {}
+        student_exam_id = data.get("student_exam_id")
+        student_id = data.get("student_id")
+        exam_id = data.get("exam_id")
+
+        if student_exam_id not in (None, ""):
+            try:
+                student_exam_id = int(student_exam_id)
+            except (TypeError, ValueError):
+                return Response({"detail": "Invalid student_exam_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                student_exam = StudentExam.objects.select_related("student", "exam").get(pk=student_exam_id)
+            except StudentExam.DoesNotExist:
+                return Response({"detail": "Student exam not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            student_id = student_exam.student_id
+            exam_id = student_exam.exam_id
+        else:
+            if student_id in (None, "") or exam_id in (None, ""):
+                return Response(
+                    {"detail": "student_exam_id or student_id and exam_id are required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                exam_id = int(exam_id)
+            except (TypeError, ValueError):
+                return Response({"detail": "Invalid exam_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+        provision_qs = Provisions.objects.filter(student_id=student_id, exam_id=exam_id)
+        if not provision_qs.exists():
+            return Response(
+                {"detail": "Provision record not found for the student and exam."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        with transaction.atomic():
+            deleted_count, _ = provision_qs.delete()
+            StudentExam.objects.filter(student_id=student_id, exam_id=exam_id).delete()
+            if student_id:
+                has_remaining = (
+                    Provisions.objects.filter(student_id=student_id).exists()
+                    or StudentExam.objects.filter(student_id=student_id).exists()
+                )
+                if not has_remaining:
+                    Student.objects.filter(student_id=student_id).delete()
+
+        return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
 
 
 class InvigilatorNotificationsView(APIView):
