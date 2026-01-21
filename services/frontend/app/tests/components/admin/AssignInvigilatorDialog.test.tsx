@@ -53,4 +53,26 @@ describe("Components - AssignInvigilatorDialog", () => {
     expect(screen.getByText("Alex")).toBeInTheDocument();
     expect(screen.queryByText("Brooke")).not.toBeInTheDocument();
   });
+
+  it("disables invigilators already assigned to the exam venue", () => {
+    renderDialog({
+      invigilators: [
+        { id: 1, preferred_name: "Alex", full_name: "Alex Smith", resigned: false },
+        { id: 2, preferred_name: "Brooke", full_name: "Brooke Lee", resigned: false },
+      ],
+      assignments: [
+        {
+          id: 10,
+          invigilator: 2,
+          exam_venue: 1,
+          assigned_start: "2025-12-01T09:00:00",
+          assigned_end: "2025-12-01T11:00:00",
+        },
+      ],
+    });
+
+    const brookeRow = screen.getByText("Brooke").closest("button");
+    expect(brookeRow).toBeDisabled();
+    expect(screen.getByText(/already assigned/i)).toBeInTheDocument();
+  });
 });
