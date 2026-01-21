@@ -54,7 +54,7 @@ describe("Components - AssignInvigilatorDialog", () => {
     expect(screen.queryByText("Brooke")).not.toBeInTheDocument();
   });
 
-  it("disables invigilators already assigned to the exam venue", () => {
+  it("marks invigilators already assigned to the exam venue and allows unassigning", () => {
     renderDialog({
       invigilators: [
         { id: 1, preferred_name: "Alex", full_name: "Alex Smith", resigned: false },
@@ -72,8 +72,10 @@ describe("Components - AssignInvigilatorDialog", () => {
     });
 
     const brookeRow = screen.getByRole("button", { name: /brooke/i });
-    expect(brookeRow).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByText(/already assigned/i)).toBeInTheDocument();
+    expect(brookeRow).not.toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText(/assigned to this exam/i)).toBeInTheDocument();
+    fireEvent.click(brookeRow);
+    expect(screen.getByText(/will be unassigned/i)).toBeInTheDocument();
   });
 
   it("disables invigilators with overlapping assignments", () => {
