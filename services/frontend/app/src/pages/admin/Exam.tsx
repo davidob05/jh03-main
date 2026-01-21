@@ -165,9 +165,16 @@ export const AdminExamDetails: React.FC = () => {
   const assignedInvigilators = assignments.filter(
     (assignment) => examVenueIds.has(assignment.exam_venue) && !assignment.cancel
   ).length;
-  const requiredInvigilators = Math.ceil((data.no_students || 0) / 100);
+  const totalStudents = data.no_students || 0;
+  const studentsPerInvigilator = 50;
+  const requiredInvigilators = Math.ceil(totalStudents / studentsPerInvigilator);
   const remainingInvigilators = Math.max(requiredInvigilators - assignedInvigilators, 0);
   const ratioMet = assignedInvigilators >= requiredInvigilators;
+  const currentRatio =
+    totalStudents > 0 && assignedInvigilators > 0
+      ? Math.round(totalStudents / assignedInvigilators)
+      : null;
+  const ratioLabel = currentRatio ? `1:${currentRatio}` : "N/A";
 
   const coreVenue = data.exam_venues.find((ev) => ev.core) || data.exam_venues[0];
   const extraVenues = data.exam_venues.filter((ev) => !coreVenue || ev.examvenue_id !== coreVenue.examvenue_id);
@@ -193,8 +200,8 @@ export const AdminExamDetails: React.FC = () => {
           <Chip
             label={
               ratioMet
-                ? `Invigilators: ${assignedInvigilators} / ${requiredInvigilators}`
-                : `Invigilators: ${assignedInvigilators} / ${requiredInvigilators} (${remainingInvigilators} more needed)`
+                ? `Invigilators: ${assignedInvigilators} / ${requiredInvigilators} (ratio ${ratioLabel})`
+                : `Invigilators: ${assignedInvigilators} / ${requiredInvigilators} (${remainingInvigilators} more needed, ratio ${ratioLabel})`
             }
             size="medium"
             color={ratioMet ? "success" : "warning"}
