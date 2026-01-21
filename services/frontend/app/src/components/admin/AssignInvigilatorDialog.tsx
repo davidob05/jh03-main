@@ -127,6 +127,12 @@ const AssignInvigilatorDialogBody: React.FC<{
     const slot: SlotCode = start.hour() < 12 ? "MORNING" : "EVENING";
     return { slot, dateKey: start.format("YYYY-MM-DD") };
   }, [examVenue?.start_time]);
+  const examWindow = useMemo(() => {
+    if (!examVenue?.start_time || examVenue.exam_length == null) return null;
+    const start = dayjs(examVenue.start_time);
+    if (!start.isValid()) return null;
+    return { start, end: start.add(examVenue.exam_length, "minute") };
+  }, [examVenue?.start_time, examVenue?.exam_length]);
   const assignedIds = useMemo(() => {
     if (!examVenue) return new Set<number>();
     return new Set(
@@ -135,6 +141,18 @@ const AssignInvigilatorDialogBody: React.FC<{
         .map((a) => a.invigilator)
     );
   }, [assignments, examVenue]);
+  const hasConflict = (invigilatorId: number) => {
+    if (!examWindow) return false;
+    return assignments.some((assignment) => {
+      if (assignment.invigilator !== invigilatorId) return false;
+      if (assignment.cancel) return false;
+      if (examVenue && assignment.exam_venue === examVenue.examvenue_id) return false;
+      const start = dayjs(assignment.assigned_start);
+      const end = dayjs(assignment.assigned_end);
+      if (!start.isValid() || !end.isValid()) return false;
+      return start.isBefore(examWindow.end) && examWindow.start.isBefore(end);
+    });
+  };
   const filteredInvigilators = useMemo(() => {
     const base = showResigned ? invigilators : invigilators.filter((i) => !i.resigned);
     const query = search.trim().toLowerCase();
@@ -144,9 +162,10 @@ const AssignInvigilatorDialogBody: React.FC<{
       const entry = invigilator.availabilities?.find(
         (a) => a.date === slotInfo.dateKey && a.slot === slotInfo.slot
       );
+      if (hasConflict(invigilator.id)) return false;
       return entry ? entry.available : true;
     });
-  }, [invigilators, search, showResigned, onlyAvailable, slotInfo]);
+  }, [invigilators, search, showResigned, onlyAvailable, slotInfo, examWindow, assignments]);
 
   const assignMutation = useMutation({
     mutationFn: async () => {
@@ -232,6 +251,7 @@ const AssignInvigilatorDialogBody: React.FC<{
           <List dense sx={{ border: "1px solid #e5e7eb", borderRadius: 1 }}>
             {filteredInvigilators.map((invigilator) => {
               const assigned = assignedIds.has(invigilator.id);
+              const conflict = hasConflict(invigilator.id);
               let availabilityLabel: string | null = null;
               if (slotInfo && invigilator.availabilities) {
                 const entry = invigilator.availabilities.find(
@@ -243,6 +263,7 @@ const AssignInvigilatorDialogBody: React.FC<{
               }
               const secondaryParts = [
                 assigned ? "Already assigned to this exam" : null,
+                conflict ? "Conflicts with existing shift" : null,
                 availabilityLabel,
               ].filter(Boolean);
               return (
@@ -250,7 +271,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                   key={invigilator.id}
                   selected={selectedId === invigilator.id}
                   onClick={() => setSelectedId(invigilator.id)}
-                  disabled={assigned}
+                  disabled={assigned || conflict}
                 >
                   <Radio checked={selectedId === invigilator.id} />
                   <ListItemText
