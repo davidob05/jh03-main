@@ -1,9 +1,13 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Checkbox,
+  FormControlLabel,
+  InputAdornment,
+  TextField,
   List,
   ListItemButton,
   ListItemText,
@@ -11,6 +15,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { Search } from "@mui/icons-material";
 import { PillButton } from "../PillButton";
 
 type ExamVenue = {
@@ -88,7 +93,14 @@ const AssignInvigilatorDialogBody: React.FC<{
   invigilators: Invigilator[];
 }> = ({ examVenue, invigilators }) => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const activeInvigilators = invigilators.filter((i) => !i.resigned);
+  const [search, setSearch] = useState("");
+  const [showResigned, setShowResigned] = useState(false);
+  const filteredInvigilators = useMemo(() => {
+    const base = showResigned ? invigilators : invigilators.filter((i) => !i.resigned);
+    const query = search.trim().toLowerCase();
+    if (!query) return base;
+    return base.filter((i) => displayName(i).toLowerCase().includes(query));
+  }, [invigilators, search, showResigned]);
 
   return (
     <Stack spacing={2}>
@@ -108,11 +120,28 @@ const AssignInvigilatorDialogBody: React.FC<{
 
       <Stack spacing={0.5}>
         <Typography variant="subtitle2" color="text.secondary">Invigilators</Typography>
-        {activeInvigilators.length === 0 ? (
+        <TextField
+          size="small"
+          placeholder="Search invigilators"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <FormControlLabel
+          control={<Checkbox checked={showResigned} onChange={(e) => setShowResigned(e.target.checked)} />}
+          label="Show resigned"
+        />
+        {filteredInvigilators.length === 0 ? (
           <Typography variant="body2" color="text.secondary">No invigilators available.</Typography>
         ) : (
           <List dense sx={{ border: "1px solid #e5e7eb", borderRadius: 1 }}>
-            {activeInvigilators.map((invigilator) => (
+            {filteredInvigilators.map((invigilator) => (
               <ListItemButton
                 key={invigilator.id}
                 selected={selectedId === invigilator.id}
