@@ -69,11 +69,16 @@ export const AssignInvigilatorDialog: React.FC<AssignInvigilatorDialogProps> = (
   onClose,
   examVenue,
   invigilators,
+  assignments,
 }) => (
   <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
     <DialogTitle>Assign invigilator</DialogTitle>
     <DialogContent dividers>
-      <AssignInvigilatorDialogBody examVenue={examVenue} invigilators={invigilators} />
+      <AssignInvigilatorDialogBody
+        examVenue={examVenue}
+        invigilators={invigilators}
+        assignments={assignments}
+      />
     </DialogContent>
     <DialogActions>
       <PillButton variant="outlined" onClick={onClose}>
@@ -91,10 +96,19 @@ const displayName = (invigilator: Invigilator) =>
 const AssignInvigilatorDialogBody: React.FC<{
   examVenue: ExamVenue | null;
   invigilators: Invigilator[];
-}> = ({ examVenue, invigilators }) => {
+  assignments: InvigilatorAssignment[];
+}> = ({ examVenue, invigilators, assignments }) => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [showResigned, setShowResigned] = useState(false);
+  const assignedIds = useMemo(() => {
+    if (!examVenue) return new Set<number>();
+    return new Set(
+      assignments
+        .filter((a) => a.exam_venue === examVenue.examvenue_id)
+        .map((a) => a.invigilator)
+    );
+  }, [assignments, examVenue]);
   const filteredInvigilators = useMemo(() => {
     const base = showResigned ? invigilators : invigilators.filter((i) => !i.resigned);
     const query = search.trim().toLowerCase();
@@ -146,9 +160,13 @@ const AssignInvigilatorDialogBody: React.FC<{
                 key={invigilator.id}
                 selected={selectedId === invigilator.id}
                 onClick={() => setSelectedId(invigilator.id)}
+                disabled={assignedIds.has(invigilator.id)}
               >
                 <Radio checked={selectedId === invigilator.id} />
-                <ListItemText primary={displayName(invigilator)} />
+                <ListItemText
+                  primary={displayName(invigilator)}
+                  secondary={assignedIds.has(invigilator.id) ? "Already assigned to this exam" : undefined}
+                />
               </ListItemButton>
             ))}
           </List>
