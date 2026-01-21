@@ -11,7 +11,6 @@ import {
   List,
   ListItemButton,
   ListItemText,
-  Radio,
   Stack,
   Typography,
   Alert,
@@ -115,7 +114,7 @@ const AssignInvigilatorDialogBody: React.FC<{
   onAssigned?: () => void;
   onClose: () => void;
 }> = ({ examVenue, invigilators, assignments, onAssigned, onClose }) => {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [search, setSearch] = useState("");
   const [showResigned, setShowResigned] = useState(false);
   const [onlyAvailable, setOnlyAvailable] = useState(true);
@@ -170,32 +169,37 @@ const AssignInvigilatorDialogBody: React.FC<{
 
   const assignMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedId) throw new Error("Select an invigilator first.");
+      if (selectedIds.length === 0) throw new Error("Select at least one invigilator.");
       if (!examVenue?.start_time || examVenue.exam_length == null) {
         throw new Error("Exam start time or duration is missing.");
       }
       const start = dayjs(examVenue.start_time);
       if (!start.isValid()) throw new Error("Exam start time is invalid.");
       const end = start.add(examVenue.exam_length, "minute");
-
-      const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          invigilator: selectedId,
-          exam_venue: examVenue.examvenue_id,
-          role: "assistant",
-          assigned_start: start.toISOString(),
-          assigned_end: end.toISOString(),
-          break_time_minutes: 0,
-          confirmed: false,
-        }),
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || "Failed to assign invigilator.");
+      const failures: { id: number; error: string }[] = [];
+      for (const invigilatorId of selectedIds) {
+        const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            invigilator: invigilatorId,
+            exam_venue: examVenue.examvenue_id,
+            role: "assistant",
+            assigned_start: start.toISOString(),
+            assigned_end: end.toISOString(),
+            break_time_minutes: 0,
+            confirmed: false,
+          }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          failures.push({ id: invigilatorId, error: text || "Failed to assign." });
+        }
       }
-      return response.json();
+      if (failures.length) {
+        throw new Error(`Failed to assign ${failures.length} invigilator(s).`);
+      }
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
@@ -207,6 +211,9 @@ const AssignInvigilatorDialogBody: React.FC<{
     },
   });
   const canAssign = Boolean(examWindow);
+  const toggleSelected = (id: number) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]));
+  };
 
   return (
     <Stack spacing={2}>
@@ -271,11 +278,11 @@ const AssignInvigilatorDialogBody: React.FC<{
               return (
                 <ListItemButton
                   key={invigilator.id}
-                  selected={selectedId === invigilator.id}
-                  onClick={() => setSelectedId(invigilator.id)}
+                  selected={selectedIds.includes(invigilator.id)}
+                  onClick={() => toggleSelected(invigilator.id)}
                   disabled={assigned || conflict}
                 >
-                  <Radio checked={selectedId === invigilator.id} />
+                  <Checkbox checked={selectedIds.includes(invigilator.id)} />
                   <ListItemText
                     primary={displayName(invigilator)}
                     secondary={secondaryParts.length ? secondaryParts.join(" • ") : undefined}
@@ -290,9 +297,9 @@ const AssignInvigilatorDialogBody: React.FC<{
       <PillButton
         variant="contained"
         onClick={() => assignMutation.mutate()}
-        disabled={!selectedId || !canAssign || assignMutation.isPending}
+        disabled={selectedIds.length === 0 || !canAssign || assignMutation.isPending}
       >
-        {assignMutation.isPending ? "Assigning..." : "Assign invigilator"}
+        {assignMutation.isPending ? "Assigning..." : `Assign ${selectedIds.length || 0} invigilator(s)`}
       </PillButton>
     </Stack>
   );
