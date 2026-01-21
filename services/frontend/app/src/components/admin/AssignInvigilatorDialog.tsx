@@ -35,6 +35,7 @@ type Invigilator = {
   full_name: string | null;
   resigned: boolean;
   availabilities?: InvigilatorAvailability[];
+  qualifications?: { qualification: string }[];
 };
 
 type InvigilatorAvailability = {
@@ -106,6 +107,14 @@ export default AssignInvigilatorDialog;
 
 const displayName = (invigilator: Invigilator) =>
   invigilator.preferred_name || invigilator.full_name || `Invigilator #${invigilator.id}`;
+
+const qualificationLabels: Record<string, string> = {
+  SENIOR_INVIGILATOR: "Senior Invigilator",
+  AKT_TRAINED: "AKT Trained",
+  CHECK_IN: "Check-In",
+};
+
+const formatQualification = (code: string) => qualificationLabels[code] || code;
 
 const AssignInvigilatorDialogBody: React.FC<{
   examVenue: ExamVenue | null;
@@ -273,10 +282,21 @@ const AssignInvigilatorDialogBody: React.FC<{
                   availabilityLabel = entry.available ? "Available for this slot" : "Unavailable for this slot";
                 }
               }
+              const qualificationNames = Array.from(
+                new Set(
+                  (invigilator.qualifications || [])
+                    .map((q) => formatQualification(q.qualification))
+                    .filter(Boolean)
+                )
+              );
+              const qualificationsLabel = `Qualifications: ${
+                qualificationNames.length ? qualificationNames.join(", ") : "None"
+              }`;
               const secondaryParts = [
                 assigned ? "Already assigned to this exam" : null,
                 conflict ? "Conflicts with existing shift" : null,
                 availabilityLabel,
+                qualificationsLabel,
               ].filter(Boolean);
               return (
                 <ListItemButton

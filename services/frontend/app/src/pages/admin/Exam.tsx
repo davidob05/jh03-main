@@ -50,6 +50,7 @@ type Invigilator = {
   full_name: string | null;
   resigned: boolean;
   availabilities?: { date: string; slot: "MORNING" | "EVENING"; available: boolean }[];
+  qualifications?: { qualification: string }[];
 };
 
 type InvigilatorAssignment = {

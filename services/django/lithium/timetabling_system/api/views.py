@@ -267,6 +267,7 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
         "assignments__exam_venue__exam",
         "assignments__exam_venue__venue",
         "availabilities",
+        "qualifications",
     )
     serializer_class = InvigilatorSerializer
     permission_classes = [permissions.IsAdminUser]
