@@ -197,17 +197,19 @@ export const AdminExamDetails: React.FC = () => {
               fontWeight: 600,
             }}
           />
-          <Chip
-            label={
-              ratioMet
-                ? `Invigilators: ${assignedInvigilators} / ${requiredInvigilators} (ratio ${ratioLabel})`
-                : `Invigilators: ${assignedInvigilators} / ${requiredInvigilators} (${remainingInvigilators} more needed, ratio ${ratioLabel})`
-            }
-            size="medium"
-            color={ratioMet ? "success" : "warning"}
-            variant="outlined"
-            sx={{ fontWeight: 600 }}
-          />
+          <Tooltip
+            title={`Current ratio: ${ratioLabel}${!ratioMet && remainingInvigilators > 0 ? ` • ${remainingInvigilators} more needed` : ""}`}
+          >
+            <Chip
+              label={`Invigilators: ${assignedInvigilators} / ${requiredInvigilators}`}
+              size="medium"
+              sx={{
+                fontWeight: 700,
+                backgroundColor: ratioMet ? "#f0fdf4" : "#fff4e5",
+                color: ratioMet ? "#166534" : "#b45309",
+              }}
+            />
+          </Tooltip>
           <Chip
             label={formatSchool(data.exam_school) || "School"}
             size="medium"
