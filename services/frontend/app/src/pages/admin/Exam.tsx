@@ -42,6 +42,23 @@ type ExamData = {
   exam_venues: ExamVenue[];
 };
 
+type Invigilator = {
+  id: number;
+  preferred_name: string | null;
+  full_name: string | null;
+  resigned: boolean;
+  availabilities?: { date: string; slot: "MORNING" | "EVENING"; available: boolean }[];
+};
+
+type InvigilatorAssignment = {
+  id: number;
+  invigilator: number;
+  exam_venue: number;
+  assigned_start: string;
+  assigned_end: string;
+  cancel?: boolean;
+};
+
 type ExamRouteParams = {
   examId?: string;
 };
@@ -50,6 +67,22 @@ const fetchExam = async (examId: string): Promise<ExamData> => {
   const response = await apiFetch(`${apiBaseUrl}/exams/${examId}/`);
   if (!response.ok) throw new Error("Unable to load exam");
   return response.json();
+};
+
+const fetchInvigilators = async (): Promise<Invigilator[]> => {
+  const response = await apiFetch(`${apiBaseUrl}/invigilators/`);
+  if (!response.ok) throw new Error("Unable to load invigilators");
+  return response.json();
+};
+
+const fetchAssignments = async (): Promise<InvigilatorAssignment[]> => {
+  const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`);
+  if (!response.ok) throw new Error("Unable to load invigilator assignments");
+  const data = await response.json();
+  if (Array.isArray(data)) return data as InvigilatorAssignment[];
+  if (Array.isArray(data?.results)) return data.results as InvigilatorAssignment[];
+  if (Array.isArray(data?.assignments)) return data.assignments as InvigilatorAssignment[];
+  return [];
 };
 
 const formatDisplayDate = (isoDate?: string | null) => {
@@ -96,6 +129,14 @@ export const AdminExamDetails: React.FC = () => {
     queryKey: ["exam", examId],
     queryFn: () => fetchExam(examId || ""),
     enabled: Boolean(examId),
+  });
+  const { data: invigilators = [] } = useQuery<Invigilator[], Error>({
+    queryKey: ["invigilators"],
+    queryFn: fetchInvigilators,
+  });
+  const { data: assignments = [] } = useQuery<InvigilatorAssignment[], Error>({
+    queryKey: ["invigilator-assignments"],
+    queryFn: fetchAssignments,
   });
 
   if (isLoading) {

@@ -31,6 +31,13 @@ type Invigilator = {
   preferred_name: string | null;
   full_name: string | null;
   resigned: boolean;
+  availabilities?: InvigilatorAvailability[];
+};
+
+type InvigilatorAvailability = {
+  date: string;
+  slot: SlotCode;
+  available: boolean;
 };
 
 type InvigilatorAssignment = {
@@ -40,6 +47,8 @@ type InvigilatorAssignment = {
   assigned_start: string;
   assigned_end: string;
 };
+
+type SlotCode = "MORNING" | "EVENING";
 
 type AssignInvigilatorDialogProps = {
   open: boolean;
@@ -101,6 +110,14 @@ const AssignInvigilatorDialogBody: React.FC<{
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [showResigned, setShowResigned] = useState(false);
+  const slotInfo = useMemo(() => {
+    if (!examVenue?.start_time) return null;
+    const start = new Date(examVenue.start_time);
+    if (Number.isNaN(start.getTime())) return null;
+    const slot: SlotCode = start.getHours() < 12 ? "MORNING" : "EVENING";
+    const dateKey = start.toISOString().slice(0, 10);
+    return { slot, dateKey };
+  }, [examVenue?.start_time]);
   const assignedIds = useMemo(() => {
     if (!examVenue) return new Set<number>();
     return new Set(
@@ -155,20 +172,36 @@ const AssignInvigilatorDialogBody: React.FC<{
           <Typography variant="body2" color="text.secondary">No invigilators available.</Typography>
         ) : (
           <List dense sx={{ border: "1px solid #e5e7eb", borderRadius: 1 }}>
-            {filteredInvigilators.map((invigilator) => (
-              <ListItemButton
-                key={invigilator.id}
-                selected={selectedId === invigilator.id}
-                onClick={() => setSelectedId(invigilator.id)}
-                disabled={assignedIds.has(invigilator.id)}
-              >
-                <Radio checked={selectedId === invigilator.id} />
-                <ListItemText
-                  primary={displayName(invigilator)}
-                  secondary={assignedIds.has(invigilator.id) ? "Already assigned to this exam" : undefined}
-                />
-              </ListItemButton>
-            ))}
+            {filteredInvigilators.map((invigilator) => {
+              const assigned = assignedIds.has(invigilator.id);
+              let availabilityLabel: string | null = null;
+              if (slotInfo && invigilator.availabilities) {
+                const entry = invigilator.availabilities.find(
+                  (a) => a.date === slotInfo.dateKey && a.slot === slotInfo.slot
+                );
+                if (entry) {
+                  availabilityLabel = entry.available ? "Available for this slot" : "Unavailable for this slot";
+                }
+              }
+              const secondaryParts = [
+                assigned ? "Already assigned to this exam" : null,
+                availabilityLabel,
+              ].filter(Boolean);
+              return (
+                <ListItemButton
+                  key={invigilator.id}
+                  selected={selectedId === invigilator.id}
+                  onClick={() => setSelectedId(invigilator.id)}
+                  disabled={assigned}
+                >
+                  <Radio checked={selectedId === invigilator.id} />
+                  <ListItemText
+                    primary={displayName(invigilator)}
+                    secondary={secondaryParts.length ? secondaryParts.join(" • ") : undefined}
+                  />
+                </ListItemButton>
+              );
+            })}
           </List>
         )}
       </Stack>
