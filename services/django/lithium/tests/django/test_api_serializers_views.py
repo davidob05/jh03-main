@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -16,6 +16,7 @@ from timetabling_system.api.serializers import (
 from timetabling_system.models import (
     Exam,
     ExamVenue,
+    ExamVenueProvisionType,
     Invigilator,
     Diet,
     InvigilatorAvailability,
@@ -132,6 +133,42 @@ class ExamVenueSerializerTests(TestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
         updated = serializer.save()
         self.assertEqual(updated.venue, second)
+
+    def test_separate_room_update_ignores_same_exam_conflict(self):
+        venue = Venue.objects.create(
+            venue_name="Room 1",
+            capacity=10,
+            venuetype=VenueType.SEPARATE_ROOM,
+            is_accessible=True,
+        )
+        start_time = timezone.make_aware(datetime(2025, 1, 10, 9, 0))
+        ExamVenue.objects.create(
+            exam=self.exam,
+            venue=venue,
+            start_time=start_time,
+            exam_length=60,
+            core=False,
+        )
+        ev = ExamVenue.objects.create(
+            exam=self.exam,
+            venue=venue,
+            start_time=start_time,
+            exam_length=60,
+            core=False,
+        )
+
+        serializer = ExamVenueWriteSerializer(
+            instance=ev,
+            data={
+                "exam": self.exam.pk,
+                "venue_name": venue.venue_name,
+                "start_time": start_time,
+                "exam_length": 60,
+                "provision_capabilities": [ExamVenueProvisionType.SEPARATE_ROOM_ON_OWN],
+            },
+            partial=True,
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
 
 class InvigilatorSerializerTests(TestCase):

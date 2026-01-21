@@ -360,10 +360,27 @@ def _import_exam_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             summary["errors"].append(f"Row {idx}: {exc}")
             continue
 
-        exam_obj, created = Exam.objects.update_or_create(
-            course_code=payload["course_code"],
-            defaults=payload["defaults"],
-        )
+        course_code = payload["course_code"]
+        defaults = payload["defaults"]
+        existing = list(Exam.objects.filter(course_code=course_code).order_by("exam_id")[:2])
+        if not existing:
+            exam_obj = Exam.objects.create(course_code=course_code, **defaults)
+            created = True
+        else:
+            exam_obj = existing[0]
+            if len(existing) > 1:
+                summary["errors"].append(
+                    f"Row {idx}: Multiple exams found for course_code '{course_code}'. "
+                    f"Updating exam_id={exam_obj.exam_id}."
+                )
+            updates = []
+            for field, value in defaults.items():
+                if getattr(exam_obj, field) != value:
+                    setattr(exam_obj, field, value)
+                    updates.append(field)
+            if updates:
+                exam_obj.save(update_fields=updates)
+            created = False
         if created:
             summary["created"] += 1
         else:
@@ -465,7 +482,11 @@ def _match_extra_time_token(token: str) -> Optional[str]:
     return None
 
 
-def _normalize_provisions(value: Any) -> List[str]:
+def _normalize_provisions(
+    value: Any,
+    *,
+    unknown_tokens: Optional[List[str]] = None,
+) -> List[str]:
     if _is_missing(value):
         return []
     if isinstance(value, (list, tuple, set)):
@@ -492,14 +513,20 @@ def _normalize_provisions(value: Any) -> List[str]:
 
     normalized: List[str] = []
     seen = set()
+    unknown_seen = set()
     for token in tokens:
         slug = _slugify(token)
         mapped = PROVISION_SLUG_MAP.get(slug)
         if not mapped:
-            mapped = _match_extra_time_token(token)
+            mapped = _match_extra_time_token(token, slug)
         if mapped and mapped not in seen:
             normalized.append(mapped)
             seen.add(mapped)
+        elif not mapped and unknown_tokens is not None:
+            cleaned = _clean_string(token, max_length=60)
+            if cleaned and slug and slug not in unknown_seen:
+                unknown_seen.add(slug)
+                unknown_tokens.append(cleaned)
     return normalized
 
 
@@ -538,8 +565,20 @@ def _import_provision_rows(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             },
         )
 
-        provisions = _normalize_provisions(raw.get("provisions"))
+        unknown_provisions: List[str] = []
+        provisions = _normalize_provisions(
+            raw.get("provisions"),
+            unknown_tokens=unknown_provisions,
+        )
         notes = _clean_string(raw.get("additional_info") or raw.get("notes"), max_length=200)
+        if unknown_provisions:
+            unknown_text = ", ".join(unknown_provisions)
+            suffix = f"Unrecognized provisions: {unknown_text}"
+            if notes:
+                notes = f"{notes}; {suffix}"
+            else:
+                notes = suffix
+            notes = _clean_string(notes, max_length=200)
 
         provision_obj, created = Provisions.objects.update_or_create(
             student=student,
@@ -1114,10 +1153,11 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             continue
 
         cap_val = _coerce_int(room.get("capacity"))
+        incoming_accessible = room.get("accessible", None)
         defaults = {
             "capacity": cap_val if cap_val is not None else 0,
             "venuetype": room.get("venuetype") or VenueType.SCHOOL_TO_SORT,
-            "is_accessible": bool(room.get("accessible", True)),
+            "is_accessible": True if incoming_accessible is None else bool(incoming_accessible),
             "qualifications": room.get("qualifications") or [],
             "availability": [],
         }
@@ -1132,10 +1172,15 @@ def _import_venue_days(days: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         )
 
         updated_fields = []
-        for field in ("venuetype", "is_accessible", "qualifications"):
+        for field in ("venuetype", "qualifications"):
             if getattr(venue_obj, field) != defaults[field]:
                 setattr(venue_obj, field, defaults[field])
                 updated_fields.append(field)
+        if incoming_accessible is not None:
+            merged_accessible = venue_obj.is_accessible and bool(incoming_accessible)
+            if venue_obj.is_accessible != merged_accessible:
+                venue_obj.is_accessible = merged_accessible
+                updated_fields.append("is_accessible")
         if cap_val is not None and venue_obj.capacity != cap_val:
             venue_obj.capacity = cap_val
             updated_fields.append("capacity")

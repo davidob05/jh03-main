@@ -25,7 +25,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../../components/PillButton";
 import { PhotoCamera, Visibility, VisibilityOff, Logout } from "@mui/icons-material";
-import { apiBaseUrl, apiFetch, getAuthToken, setAuthSession } from "../../utils/api";
+import { apiBaseUrl, apiFetch, clearAuthSession, getAuthToken, setAuthSession } from "../../utils/api";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { Panel } from "../../components/Panel";
 
@@ -206,8 +206,7 @@ export const AdminProfile: React.FC = () => {
         throw new Error(msg);
       }
       // Clear local auth state and redirect to login
-      localStorage.removeItem(authTokenKey);
-      localStorage.removeItem(authUserKey);
+      clearAuthSession();
       setSnackbar({ open: true, message: "Account deleted.", severity: "success" });
       navigate("/login", { replace: true });
     } catch (err: any) {

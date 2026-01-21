@@ -122,3 +122,49 @@ class InvigilatorStatsNextAssignmentTests(TestCase):
         # No restrictions or availability in this fixture
         self.assertEqual(data.get("restrictions"), 0)
         self.assertEqual(data.get("availability_entries"), 0)
+
+
+class InvigilatorAssignmentsFallbackTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(username="alex", password="secret", email="alex@example.com")
+        self.invigilator = Invigilator.objects.create(preferred_name="Alex", full_name="Alex Example")
+
+        exam = Exam.objects.create(
+            exam_name="Assignment Exam",
+            course_code="ASN100",
+            exam_type="Written",
+            no_students=5,
+            exam_school="Test School",
+            school_contact="Dr. Test",
+        )
+        venue = Venue.objects.create(
+            venue_name="Hall A",
+            capacity=50,
+            venuetype=VenueType.MAIN_HALL,
+            is_accessible=True,
+        )
+        exam_venue = ExamVenue.objects.create(
+            exam=exam,
+            venue=venue,
+            start_time=timezone.now() + timedelta(days=1),
+            exam_length=60,
+            core=False,
+        )
+        self.assignment = InvigilatorAssignment.objects.create(
+            invigilator=self.invigilator,
+            exam_venue=exam_venue,
+            role="assistant",
+            assigned_start=timezone.now() + timedelta(days=1),
+            assigned_end=timezone.now() + timedelta(days=1, hours=1),
+        )
+
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_assignments_resolve_invigilator_without_profile(self):
+        res = self.client.get(reverse("api-invigilator-assignments"))
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]["invigilator"], self.invigilator.pk)
+        self.assertEqual(res.data[0]["exam_name"], "Assignment Exam")

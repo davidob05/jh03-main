@@ -13,10 +13,14 @@ if ! command -v npm >/dev/null 2>&1; then
     exec sleep infinity
 fi
 
-# Install dependencies only when node_modules is missing.
-if [ ! -d node_modules ]; then
+# Install dependencies when node_modules is missing or Vite isn't available.
+if [ ! -d node_modules ] || [ ! -x node_modules/.bin/vite ]; then
     echo "[frontend] Installing dependencies..."
-    npm install
+    if [ -f package-lock.json ]; then
+        npm ci
+    else
+        npm install
+    fi
 fi
 
 echo "[frontend] Starting Vite dev server..."

@@ -64,6 +64,48 @@ class UploadProcessorBranchTests(TestCase):
         self.assertEqual(summary["skipped"], 1)
         self.assertEqual(summary["errors"][0].startswith("Row 1"), True)
 
+    def test_import_exam_rows_handles_duplicate_course_codes(self):
+        exam1 = Exam.objects.create(
+            exam_name="Old A",
+            course_code="DUP1",
+            exam_type="Written",
+            no_students=10,
+            exam_school="Science",
+            school_contact="Old A",
+        )
+        exam2 = Exam.objects.create(
+            exam_name="Old B",
+            course_code="DUP1",
+            exam_type="Written",
+            no_students=20,
+            exam_school="Arts",
+            school_contact="Old B",
+        )
+        row = {
+            "exam_code": "DUP1",
+            "exam_name": "New Name",
+            "exam_type": "Written",
+            "no_students": 42,
+            "school": "Engineering",
+            "school_contact": "New Contact",
+            "main_venue": "",
+        }
+
+        summary = up._import_exam_rows([row])
+
+        self.assertEqual(summary["created"], 0)
+        self.assertEqual(summary["updated"], 1)
+        self.assertEqual(len(summary["errors"]), 1)
+        self.assertIn("Multiple exams found for course_code 'DUP1'", summary["errors"][0])
+
+        exam1.refresh_from_db()
+        exam2.refresh_from_db()
+        self.assertEqual(exam1.exam_name, "New Name")
+        self.assertEqual(exam1.no_students, 42)
+        self.assertEqual(exam1.exam_school, "Engineering")
+        self.assertEqual(exam2.exam_name, "Old B")
+        self.assertEqual(exam2.no_students, 20)
+
     def test_import_venue_days_handles_empty(self):
         summary = up._import_venue_days([])
         self.assertEqual(summary["total_rows"], 0)
@@ -236,6 +278,40 @@ class UploadProcessorBranchTests(TestCase):
         summary = up._import_provision_rows(rows)
         self.assertEqual(summary["skipped"], 3)
         self.assertEqual(len(summary["errors"]), 3)
+
+    def test_import_provision_rows_appends_unknown_provisions_to_notes(self):
+        exam = Exam.objects.create(
+            exam_name="Unknown Notes",
+            course_code="UNK1",
+            exam_type="Written",
+            no_students=0,
+            exam_school="Science",
+            school_contact="",
+        )
+        row = {
+            "student_id": "S900",
+            "student_name": "Unknown Provision",
+            "exam_code": exam.course_code,
+            "provisions": "Reader;Mystery Flag",
+            "additional_info": "Extra notes",
+        }
+
+        with mock.patch(
+            "timetabling_system.services.upload_processor._find_matching_exam_venue",
+            return_value=None,
+        ), mock.patch(
+            "timetabling_system.services.upload_processor._allocate_exam_venue",
+            return_value=None,
+        ):
+            summary = up._import_provision_rows([row])
+
+        self.assertEqual(summary["created"], 1)
+        provision = up.Provisions.objects.get(student__student_id="S900", exam=exam)
+        self.assertIn(ProvisionType.READER, provision.provisions)
+        self.assertEqual(
+            provision.notes,
+            "Extra notes; Unrecognized provisions: Mystery Flag",
+        )
 
     def test_import_provision_rows_updates_existing_exam_venue(self):
         core_start = timezone.make_aware(datetime(2025, 7, 16, 12, 0))

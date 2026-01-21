@@ -117,7 +117,11 @@ class ExamVenueWriteSerializer(serializers.ModelSerializer):
             venue = venue_obj
             start_time = attrs.get("start_time", getattr(self.instance, "start_time", None))
             exam_length = attrs.get("exam_length", getattr(self.instance, "exam_length", None))
-            exam_id = attrs.get("exam", getattr(self.instance, "exam_id", None))
+            exam_value = attrs.get("exam", None)
+            if exam_value is None:
+                exam_id = getattr(self.instance, "exam_id", None)
+            else:
+                exam_id = getattr(exam_value, "pk", exam_value)
 
             if start_time and exam_length is not None:
                 new_end = start_time + timedelta(minutes=exam_length)

@@ -596,7 +596,7 @@ class UploadProcessorTests(TestCase):
         main_hall.refresh_from_db()
         purple_lab.refresh_from_db()
         self.assertEqual(main_hall.capacity, 180)
-        self.assertTrue(main_hall.is_accessible)
+        self.assertFalse(main_hall.is_accessible)
         self.assertEqual(purple_lab.capacity, 60)
         self.assertEqual(UploadLog.objects.count(), 2)
 
@@ -628,6 +628,31 @@ class UploadProcessorTests(TestCase):
         room.refresh_from_db()
         self.assertEqual(sorted(room.availability), ["2025-07-28", "2025-07-29"])
         self.assertEqual(room.capacity, 20)
+
+    def test_venue_accessibility_does_not_flip_to_true(self):
+        result = {
+            "status": "ok",
+            "type": "Venue",
+            "days": [
+                {
+                    "day": "Monday",
+                    "date": "2025-07-28",
+                    "rooms": [
+                        {"name": "Main Hall", "accessible": False},
+                    ],
+                }
+            ],
+        }
+
+        ingest_upload_result(result, file_name="venues.xlsx", uploaded_by=self.user)
+        venue = Venue.objects.get(pk="Main Hall")
+        self.assertFalse(venue.is_accessible)
+
+        # Previously this would flip the venue back to accessible.
+        result["days"][0]["rooms"][0]["accessible"] = True
+        ingest_upload_result(result, file_name="venues.xlsx", uploaded_by=self.user)
+        venue.refresh_from_db()
+        self.assertFalse(venue.is_accessible)
 
     def test_provisions_assign_existing_or_new_exam_venue(self):
         exam_date = datetime(2025, 7, 10).date()

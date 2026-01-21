@@ -9,7 +9,7 @@ TEST_FRONTEND_CMD := npm test -- --passWithNoTests
 TEST_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py makemigrations --noinput && python manage.py migrate --noinput && python manage.py test
 
 
-.PHONY: up down logs build reset-django-db makemigrations migrate superuser django frontend test
+.PHONY: up down logs build reset-django-db migrations makemigrations migrate superuser django frontend test
 up:
 	@echo "Installing frontend dependencies locally so the container can run tests without hitting the network..."
 	rm -rf $(FRONTEND_DIR)/node_modules
@@ -52,6 +52,8 @@ print(f\"Admin {u.username} ready. Token: {t.key}\")" \
 
 makemigrations:
 	$(DJANGO_MANAGE) makemigrations timetabling_system
+
+migrations: makemigrations
 
 migrate: makemigrations
 	$(DJANGO_MANAGE) migrate
