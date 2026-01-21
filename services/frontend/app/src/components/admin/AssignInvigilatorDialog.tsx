@@ -197,7 +197,10 @@ const AssignInvigilatorDialogBody: React.FC<{
         }
       }
       if (failures.length) {
-        throw new Error(`Failed to assign ${failures.length} invigilator(s).`);
+        const names = failures
+          .map((f) => displayName(invigilators.find((i) => i.id === f.id) || { id: f.id, preferred_name: null, full_name: null, resigned: false }))
+          .join(", ");
+        throw new Error(`Failed to assign ${failures.length} invigilator(s): ${names}`);
       }
       return { success: true };
     },
