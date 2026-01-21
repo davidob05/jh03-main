@@ -34,6 +34,7 @@ import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIco
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { PillButton } from "../../components/PillButton";
 
 type StudentProvisionRow = {
   student_id: string;
@@ -149,8 +150,6 @@ const deleteStudentProvision = async (row: StudentProvisionRow): Promise<void> =
 };
 
 type SectionProps = {
-  title: string;
-  subtitle: string;
   search: string;
   onSearchChange: (value: string) => void;
   query: ReturnType<typeof useQuery<StudentProvisionRow[], Error>>;
@@ -307,8 +306,6 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
 };
 
 const StudentTableSection: React.FC<SectionProps> = ({
-  title,
-  subtitle,
   search,
   onSearchChange,
   query,
@@ -405,10 +402,6 @@ const StudentTableSection: React.FC<SectionProps> = ({
     setSelected(event.target.checked ? visibleKeys : []);
   };
 
-  const handleToggleSelectAll = () => {
-    setSelected(allVisibleSelected ? [] : visibleKeys);
-  };
-
   const handleRowSelect = (key: string) => {
     setSelected((prev) => (prev.includes(key) ? prev.filter((value) => value !== key) : [...prev, key]));
   };
@@ -446,44 +439,32 @@ const StudentTableSection: React.FC<SectionProps> = ({
       <Toolbar
         sx={[
           { pl: { sm: 2 }, pr: { xs: 1, sm: 1 } },
-          { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", rowGap: 1 },
+          selected.length > 0 && { bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity) },
         ]}
       >
-        <Box>
-          <Typography variant="h6" fontWeight={700}>{title}</Typography>
-          <Typography variant="body2" color="text.secondary">{subtitle}</Typography>
-        </Box>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={1}>
-          {selected.length ? (
-            <Chip
-              label={`${selected.length} selected`}
-              size="small"
-              sx={{ backgroundColor: "action.hover", fontWeight: 600 }}
-            />
-          ) : null}
-          <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5, minWidth: 240 }}>
-            <SearchIcon sx={{ color: "action.active", mr: 1 }} />
-            <InputBase placeholder="Search students..." value={search} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: "100%" }} />
+        {selected.length > 0 ? (
+          <>
+            <Typography sx={{ flex: "1 1 100%" }} color="inherit" variant="subtitle1" component="div">
+              {selected.length} selected
+            </Typography>
+            <PillButton
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={openDeleteDialogForSelection}
+              disabled={deleteMutation.isPending}
+            >
+              Delete
+            </PillButton>
+          </>
+        ) : (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: "1 1 100%" }}>
+            <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5 }}>
+              <SearchIcon sx={{ color: "action.active", mr: 1 }} />
+              <InputBase placeholder="Search students..." value={search} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: 250 }} />
+            </Box>
           </Box>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleToggleSelectAll}
-            disabled={!visibleKeys.length || deleteMutation.isPending}
-          >
-            {allVisibleSelected ? "Clear selection" : "Select all"}
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={openDeleteDialogForSelection}
-            disabled={selected.length === 0 || deleteMutation.isPending}
-          >
-            Delete selected
-          </Button>
-        </Stack>
+        )}
       </Toolbar>
       <Divider />
       {query.isLoading ? (
@@ -497,7 +478,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
         </Box>
       ) : (
         <TableContainer>
-          <Table size="small">
+          <Table sx={{ minWidth: 750 }} size="medium">
             <TableHead>
               <TableRow>
                 <TableCell padding="checkbox">
@@ -510,7 +491,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
                     disabled={!visibleKeys.length || deleteMutation.isPending}
                   />
                 </TableCell>
-                <TableCell sortDirection={orderBy === "student_name" ? order : false}>
+                <TableCell padding="none" sortDirection={orderBy === "student_name" ? order : false}>
                   <TableSortLabel
                     active={orderBy === "student_name"}
                     direction={orderBy === "student_name" ? order : "asc"}
@@ -568,7 +549,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
                           disabled={deleteMutation.isPending}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell padding="none">
                         <Typography fontWeight={600}>{row.student_name}</Typography>
                         <Typography variant="body2" color="text.secondary">{row.student_id}</Typography>
                       </TableCell>
@@ -779,8 +760,6 @@ export const AdminStudents: React.FC = () => {
 
       <Stack spacing={3}>
         <StudentTableSection
-          title="All students with provisions"
-          subtitle="Full list of students and their provision requirements."
           search={allSearch}
           onSearchChange={setAllSearch}
           query={allQuery}
