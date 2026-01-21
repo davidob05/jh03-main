@@ -14,10 +14,13 @@ import {
   Radio,
   Stack,
   Typography,
+  Alert,
 } from "@mui/material";
 import { Search } from "@mui/icons-material";
 import dayjs from "dayjs";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../PillButton";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -80,6 +83,7 @@ export const AssignInvigilatorDialog: React.FC<AssignInvigilatorDialogProps> = (
   examVenue,
   invigilators,
   assignments,
+  onAssigned,
 }) => (
   <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
     <DialogTitle>Assign invigilator</DialogTitle>
@@ -88,12 +92,12 @@ export const AssignInvigilatorDialog: React.FC<AssignInvigilatorDialogProps> = (
         examVenue={examVenue}
         invigilators={invigilators}
         assignments={assignments}
+        onAssigned={onAssigned}
+        onClose={onClose}
       />
     </DialogContent>
     <DialogActions>
-      <PillButton variant="outlined" onClick={onClose}>
-        Close
-      </PillButton>
+      <AssignInvigilatorDialogActions examVenue={examVenue} onClose={onClose} />
     </DialogActions>
   </Dialog>
 );
@@ -107,11 +111,15 @@ const AssignInvigilatorDialogBody: React.FC<{
   examVenue: ExamVenue | null;
   invigilators: Invigilator[];
   assignments: InvigilatorAssignment[];
-}> = ({ examVenue, invigilators, assignments }) => {
+  onAssigned?: () => void;
+  onClose: () => void;
+}> = ({ examVenue, invigilators, assignments, onAssigned, onClose }) => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [showResigned, setShowResigned] = useState(false);
   const [onlyAvailable, setOnlyAvailable] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const slotInfo = useMemo(() => {
     if (!examVenue?.start_time) return null;
     const start = dayjs(examVenue.start_time);
@@ -139,6 +147,45 @@ const AssignInvigilatorDialogBody: React.FC<{
       return entry ? entry.available : true;
     });
   }, [invigilators, search, showResigned, onlyAvailable, slotInfo]);
+
+  const assignMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedId) throw new Error("Select an invigilator first.");
+      if (!examVenue?.start_time || examVenue.exam_length == null) {
+        throw new Error("Exam start time or duration is missing.");
+      }
+      const start = dayjs(examVenue.start_time);
+      if (!start.isValid()) throw new Error("Exam start time is invalid.");
+      const end = start.add(examVenue.exam_length, "minute");
+
+      const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invigilator: selectedId,
+          exam_venue: examVenue.examvenue_id,
+          role: "assistant",
+          assigned_start: start.toISOString(),
+          assigned_end: end.toISOString(),
+          break_time_minutes: 0,
+          confirmed: false,
+        }),
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to assign invigilator.");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
+      onAssigned?.();
+      onClose();
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof Error ? err.message : "Failed to assign invigilator.");
+    },
+  });
 
   return (
     <Stack spacing={2}>
@@ -216,6 +263,30 @@ const AssignInvigilatorDialogBody: React.FC<{
           </List>
         )}
       </Stack>
+      {error && <Alert severity="error">{error}</Alert>}
+      <PillButton
+        variant="contained"
+        onClick={() => assignMutation.mutate()}
+        disabled={!selectedId || assignMutation.isPending}
+      >
+        {assignMutation.isPending ? "Assigning..." : "Assign invigilator"}
+      </PillButton>
     </Stack>
   );
 };
+
+const AssignInvigilatorDialogActions: React.FC<{
+  examVenue: ExamVenue | null;
+  onClose: () => void;
+}> = ({ examVenue, onClose }) => (
+  <>
+    {examVenue?.start_time ? null : (
+      <Typography variant="caption" color="text.secondary">
+        Exam time not set
+      </Typography>
+    )}
+    <PillButton variant="outlined" onClick={onClose}>
+      Close
+    </PillButton>
+  </>
+);
