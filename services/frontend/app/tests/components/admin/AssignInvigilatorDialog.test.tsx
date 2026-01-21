@@ -75,4 +75,26 @@ describe("Components - AssignInvigilatorDialog", () => {
     expect(brookeRow).toBeDisabled();
     expect(screen.getByText(/already assigned/i)).toBeInTheDocument();
   });
+
+  it("disables invigilators with overlapping assignments", () => {
+    renderDialog({
+      invigilators: [
+        { id: 1, preferred_name: "Alex", full_name: "Alex Smith", resigned: false },
+        { id: 2, preferred_name: "Brooke", full_name: "Brooke Lee", resigned: false },
+      ],
+      assignments: [
+        {
+          id: 11,
+          invigilator: 1,
+          exam_venue: 99,
+          assigned_start: "2025-12-01T10:00:00",
+          assigned_end: "2025-12-01T12:00:00",
+        },
+      ],
+    });
+
+    const alexRow = screen.getByText("Alex").closest("button");
+    expect(alexRow).toBeDisabled();
+    expect(screen.getByText(/conflicts with existing shift/i)).toBeInTheDocument();
+  });
 });
