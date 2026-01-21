@@ -17,8 +17,10 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { Edit, Delete } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { AssignInvigilatorDialog } from "../../components/admin/AssignInvigilatorDialog";
 import { EditExamDialog } from "../../components/admin/EditExamDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 
 type ExamVenue = {
@@ -124,6 +126,8 @@ export const AdminExamDetails: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignVenue, setAssignVenue] = useState<ExamVenue | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery<ExamData, Error>({
     queryKey: ["exam", examId],
@@ -222,6 +226,17 @@ export const AdminExamDetails: React.FC = () => {
             <Typography variant="subtitle1" fontWeight={600}>{coreVenue.venue_name || "Unassigned"}</Typography>
             <Typography variant="body2" color="text.secondary">{formatDisplayDate(coreVenue.start_time)}</Typography>
             <Typography variant="body2">Duration: {formatDuration(coreVenue.exam_length)}</Typography>
+            <Box>
+              <PillButton
+                variant="outlined"
+                onClick={() => {
+                  setAssignVenue(coreVenue);
+                  setAssignOpen(true);
+                }}
+              >
+                Assign invigilator
+              </PillButton>
+            </Box>
           </Stack>
         ) : (
           <Typography variant="body2" color="text.secondary">No venue assigned.</Typography>
@@ -321,6 +336,15 @@ export const AdminExamDetails: React.FC = () => {
             setDeleting(false);
           }
         }}
+      />
+
+      <AssignInvigilatorDialog
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        examVenue={assignVenue}
+        invigilators={invigilators}
+        assignments={assignments}
+        onAssigned={() => refetch()}
       />
 
       <Snackbar
