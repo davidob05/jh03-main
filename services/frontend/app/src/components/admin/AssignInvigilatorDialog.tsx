@@ -50,6 +50,7 @@ type InvigilatorAssignment = {
   exam_venue: number;
   assigned_start: string;
   assigned_end: string;
+  cancel?: boolean;
 };
 
 type SlotCode = "MORNING" | "EVENING";
@@ -205,6 +206,7 @@ const AssignInvigilatorDialogBody: React.FC<{
       setError(err instanceof Error ? err.message : "Failed to assign invigilator.");
     },
   });
+  const canAssign = Boolean(examWindow);
 
   return (
     <Stack spacing={2}>
@@ -288,7 +290,7 @@ const AssignInvigilatorDialogBody: React.FC<{
       <PillButton
         variant="contained"
         onClick={() => assignMutation.mutate()}
-        disabled={!selectedId || assignMutation.isPending}
+        disabled={!selectedId || !canAssign || assignMutation.isPending}
       >
         {assignMutation.isPending ? "Assigning..." : "Assign invigilator"}
       </PillButton>
