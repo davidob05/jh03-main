@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogActions,
@@ -90,6 +90,7 @@ export const AssignInvigilatorDialog: React.FC<AssignInvigilatorDialogProps> = (
     <DialogTitle>Assign invigilator</DialogTitle>
     <DialogContent dividers>
       <AssignInvigilatorDialogBody
+        open={open}
         examVenue={examVenue}
         invigilators={invigilators}
         assignments={assignments}
@@ -117,18 +118,41 @@ const qualificationLabels: Record<string, string> = {
 const formatQualification = (code: string) => qualificationLabels[code] || code;
 
 const AssignInvigilatorDialogBody: React.FC<{
+  open: boolean;
   examVenue: ExamVenue | null;
   invigilators: Invigilator[];
   assignments: InvigilatorAssignment[];
   onAssigned?: () => void;
   onClose: () => void;
-}> = ({ examVenue, invigilators, assignments, onAssigned, onClose }) => {
+}> = ({ open, examVenue, invigilators, assignments, onAssigned, onClose }) => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [search, setSearch] = useState("");
   const [showResigned, setShowResigned] = useState(false);
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const assignedAssignments = useMemo(() => {
+    if (!examVenue) return [];
+    return assignments.filter((a) => a.exam_venue === examVenue.examvenue_id);
+  }, [assignments, examVenue]);
+  const assignedIds = useMemo(() => new Set(assignedAssignments.map((a) => a.invigilator)), [assignedAssignments]);
+  const assignmentByInvigilator = useMemo(() => {
+    const map = new Map<number, InvigilatorAssignment>();
+    assignedAssignments.forEach((assignment) => {
+      map.set(assignment.invigilator, assignment);
+    });
+    return map;
+  }, [assignedAssignments]);
+  const selectionDelta = useMemo(() => {
+    const selectedSet = new Set(selectedIds);
+    const toAdd = selectedIds.filter((id) => !assignedIds.has(id));
+    const toRemove = Array.from(assignedIds).filter((id) => !selectedSet.has(id));
+    return {
+      toAdd,
+      toRemove,
+      hasChanges: toAdd.length > 0 || toRemove.length > 0,
+    };
+  }, [assignedIds, selectedIds]);
   const slotInfo = useMemo(() => {
     if (!examVenue?.start_time) return null;
     const start = dayjs(examVenue.start_time);
@@ -142,14 +166,11 @@ const AssignInvigilatorDialogBody: React.FC<{
     if (!start.isValid()) return null;
     return { start, end: start.add(examVenue.exam_length, "minute") };
   }, [examVenue?.start_time, examVenue?.exam_length]);
-  const assignedIds = useMemo(() => {
-    if (!examVenue) return new Set<number>();
-    return new Set(
-      assignments
-        .filter((a) => a.exam_venue === examVenue.examvenue_id)
-        .map((a) => a.invigilator)
-    );
-  }, [assignments, examVenue]);
+  useEffect(() => {
+    if (!open) return;
+    setSelectedIds(Array.from(new Set(assignedAssignments.map((a) => a.invigilator))));
+    setError(null);
+  }, [assignedAssignments, examVenue?.examvenue_id, open]);
   const hasConflict = (invigilatorId: number) => {
     if (!examWindow) return false;
     return assignments.some((assignment) => {
@@ -163,53 +184,79 @@ const AssignInvigilatorDialogBody: React.FC<{
     });
   };
   const filteredInvigilators = useMemo(() => {
-    const base = showResigned ? invigilators : invigilators.filter((i) => !i.resigned);
+    const base = showResigned ? invigilators : invigilators.filter((i) => !i.resigned || assignedIds.has(i.id));
     const query = search.trim().toLowerCase();
     const searched = query ? base.filter((i) => displayName(i).toLowerCase().includes(query)) : base;
     if (!onlyAvailable || !slotInfo) return searched;
     return searched.filter((invigilator) => {
+      if (assignedIds.has(invigilator.id)) return true;
       const entry = invigilator.availabilities?.find(
         (a) => a.date === slotInfo.dateKey && a.slot === slotInfo.slot
       );
       if (hasConflict(invigilator.id)) return false;
       return entry ? entry.available : true;
     });
-  }, [invigilators, search, showResigned, onlyAvailable, slotInfo, examWindow, assignments]);
+  }, [assignedIds, invigilators, search, showResigned, onlyAvailable, slotInfo, examWindow, assignments]);
 
   const assignMutation = useMutation({
     mutationFn: async () => {
-      if (selectedIds.length === 0) throw new Error("Select at least one invigilator.");
-      if (!examVenue?.start_time || examVenue.exam_length == null) {
-        throw new Error("Exam start time or duration is missing.");
+      if (!examVenue) throw new Error("Exam venue is missing.");
+      const selectedSet = new Set(selectedIds);
+      const toAdd = selectedIds.filter((id) => !assignedIds.has(id));
+      const toRemove = Array.from(assignedIds).filter((id) => !selectedSet.has(id));
+      if (toAdd.length === 0 && toRemove.length === 0) {
+        throw new Error("No assignment changes to save.");
       }
-      const start = dayjs(examVenue.start_time);
-      if (!start.isValid()) throw new Error("Exam start time is invalid.");
-      const end = start.add(examVenue.exam_length, "minute");
-      const failures: { id: number; error: string }[] = [];
-      for (const invigilatorId of selectedIds) {
-        const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            invigilator: invigilatorId,
-            exam_venue: examVenue.examvenue_id,
-            role: "assistant",
-            assigned_start: start.toISOString(),
-            assigned_end: end.toISOString(),
-            break_time_minutes: 0,
-            confirmed: false,
-          }),
+      const failures: { id: number; error: string; action: "assign" | "unassign" }[] = [];
+      for (const invigilatorId of toRemove) {
+        const assignment = assignmentByInvigilator.get(invigilatorId);
+        if (!assignment) {
+          failures.push({ id: invigilatorId, error: "Assignment not found.", action: "unassign" });
+          continue;
+        }
+        const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/${assignment.id}/`, {
+          method: "DELETE",
         });
         if (!response.ok) {
           const text = await response.text();
-          failures.push({ id: invigilatorId, error: text || "Failed to assign." });
+          failures.push({ id: invigilatorId, error: text || "Failed to unassign.", action: "unassign" });
+        }
+      }
+      if (toAdd.length > 0) {
+        if (!examWindow) {
+          throw new Error("Exam start time or duration is missing.");
+        }
+        for (const invigilatorId of toAdd) {
+          const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              invigilator: invigilatorId,
+              exam_venue: examVenue.examvenue_id,
+              role: "assistant",
+              assigned_start: examWindow.start.toISOString(),
+              assigned_end: examWindow.end.toISOString(),
+              break_time_minutes: 0,
+              confirmed: false,
+            }),
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            failures.push({ id: invigilatorId, error: text || "Failed to assign.", action: "assign" });
+          }
         }
       }
       if (failures.length) {
         const names = failures
           .map((f) => displayName(invigilators.find((i) => i.id === f.id) || { id: f.id, preferred_name: null, full_name: null, resigned: false }))
           .join(", ");
-        throw new Error(`Failed to assign ${failures.length} invigilator(s): ${names}`);
+        const hasAssignFailures = failures.some((f) => f.action === "assign");
+        const hasUnassignFailures = failures.some((f) => f.action === "unassign");
+        let actionLabel = "update";
+        if (hasAssignFailures && hasUnassignFailures) actionLabel = "assign/unassign";
+        else if (hasAssignFailures) actionLabel = "assign";
+        else if (hasUnassignFailures) actionLabel = "unassign";
+        throw new Error(`Failed to ${actionLabel} ${failures.length} invigilator(s): ${names}`);
       }
       return { success: true };
     },
@@ -219,10 +266,12 @@ const AssignInvigilatorDialogBody: React.FC<{
       onClose();
     },
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to assign invigilator.");
+      setError(err instanceof Error ? err.message : "Failed to update invigilator assignments.");
     },
   });
-  const canAssign = Boolean(examWindow);
+  const canUpdate = Boolean(examVenue)
+    && selectionDelta.hasChanges
+    && (selectionDelta.toAdd.length === 0 || Boolean(examWindow));
   const toggleSelected = (id: number) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]));
   };
@@ -245,6 +294,9 @@ const AssignInvigilatorDialogBody: React.FC<{
 
       <Stack spacing={0.5}>
         <Typography variant="subtitle2" color="text.secondary">Invigilators</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Select to assign. Deselect to unassign.
+        </Typography>
         <TextField
           size="small"
           placeholder="Search invigilators"
@@ -272,6 +324,7 @@ const AssignInvigilatorDialogBody: React.FC<{
           <List dense sx={{ border: "1px solid #e5e7eb", borderRadius: 1 }}>
             {filteredInvigilators.map((invigilator) => {
               const assigned = assignedIds.has(invigilator.id);
+              const isSelected = selectedIds.includes(invigilator.id);
               const conflict = hasConflict(invigilator.id);
               let availabilityLabel: string | null = null;
               if (slotInfo && invigilator.availabilities) {
@@ -282,6 +335,10 @@ const AssignInvigilatorDialogBody: React.FC<{
                   availabilityLabel = entry.available ? "Available for this slot" : "Unavailable for this slot";
                 }
               }
+              let assignmentLabel: string | null = null;
+              if (assigned && isSelected) assignmentLabel = "Assigned to this exam";
+              if (assigned && !isSelected) assignmentLabel = "Will be unassigned";
+              if (!assigned && isSelected) assignmentLabel = "Will be assigned";
               const qualificationNames = Array.from(
                 new Set(
                   (invigilator.qualifications || [])
@@ -293,7 +350,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                 qualificationNames.length ? qualificationNames.join(", ") : "None"
               }`;
               const secondaryParts = [
-                assigned ? "Already assigned to this exam" : null,
+                assignmentLabel,
                 conflict ? "Conflicts with existing shift" : null,
                 availabilityLabel,
                 qualificationsLabel,
@@ -303,7 +360,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                   key={invigilator.id}
                   selected={selectedIds.includes(invigilator.id)}
                   onClick={() => toggleSelected(invigilator.id)}
-                  disabled={assigned || conflict}
+                  disabled={!assigned && conflict}
                 >
                   <Checkbox checked={selectedIds.includes(invigilator.id)} />
                   <ListItemText
@@ -320,9 +377,17 @@ const AssignInvigilatorDialogBody: React.FC<{
       <PillButton
         variant="contained"
         onClick={() => assignMutation.mutate()}
-        disabled={selectedIds.length === 0 || !canAssign || assignMutation.isPending}
+        disabled={!canUpdate || assignMutation.isPending}
       >
-        {assignMutation.isPending ? "Assigning..." : `Assign ${selectedIds.length || 0} invigilator(s)`}
+        {assignMutation.isPending
+          ? "Updating..."
+          : selectionDelta.toAdd.length && selectionDelta.toRemove.length
+            ? "Update assignments"
+            : selectionDelta.toAdd.length
+              ? `Assign ${selectionDelta.toAdd.length} invigilator(s)`
+              : selectionDelta.toRemove.length
+                ? `Unassign ${selectionDelta.toRemove.length} invigilator(s)`
+                : "Update assignments"}
       </PillButton>
     </Stack>
   );
