@@ -111,6 +111,7 @@ const AssignInvigilatorDialogBody: React.FC<{
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [showResigned, setShowResigned] = useState(false);
+  const [onlyAvailable, setOnlyAvailable] = useState(true);
   const slotInfo = useMemo(() => {
     if (!examVenue?.start_time) return null;
     const start = dayjs(examVenue.start_time);
@@ -129,9 +130,15 @@ const AssignInvigilatorDialogBody: React.FC<{
   const filteredInvigilators = useMemo(() => {
     const base = showResigned ? invigilators : invigilators.filter((i) => !i.resigned);
     const query = search.trim().toLowerCase();
-    if (!query) return base;
-    return base.filter((i) => displayName(i).toLowerCase().includes(query));
-  }, [invigilators, search, showResigned]);
+    const searched = query ? base.filter((i) => displayName(i).toLowerCase().includes(query)) : base;
+    if (!onlyAvailable || !slotInfo) return searched;
+    return searched.filter((invigilator) => {
+      const entry = invigilator.availabilities?.find(
+        (a) => a.date === slotInfo.dateKey && a.slot === slotInfo.slot
+      );
+      return entry ? entry.available : true;
+    });
+  }, [invigilators, search, showResigned, onlyAvailable, slotInfo]);
 
   return (
     <Stack spacing={2}>
@@ -167,6 +174,10 @@ const AssignInvigilatorDialogBody: React.FC<{
         <FormControlLabel
           control={<Checkbox checked={showResigned} onChange={(e) => setShowResigned(e.target.checked)} />}
           label="Show resigned"
+        />
+        <FormControlLabel
+          control={<Checkbox checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} />}
+          label="Only show available"
         />
         {filteredInvigilators.length === 0 ? (
           <Typography variant="body2" color="text.secondary">No invigilators available.</Typography>
