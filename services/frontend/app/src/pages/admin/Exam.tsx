@@ -115,6 +115,13 @@ export const AdminExamDetails: React.FC = () => {
     );
   }
 
+  const examVenueIds = new Set(data.exam_venues.map((ev) => ev.examvenue_id));
+  const assignedInvigilators = assignments.filter(
+    (assignment) => examVenueIds.has(assignment.exam_venue) && !assignment.cancel
+  ).length;
+  const requiredInvigilators = Math.ceil((data.no_students || 0) / 100);
+  const ratioMet = assignedInvigilators >= requiredInvigilators;
+
   const coreVenue = data.exam_venues.find((ev) => ev.core) || data.exam_venues[0];
   const extraVenues = data.exam_venues.filter((ev) => !coreVenue || ev.examvenue_id !== coreVenue.examvenue_id);
 
@@ -135,6 +142,13 @@ export const AdminExamDetails: React.FC = () => {
               backgroundColor: "#f0f0f0ff",
               fontWeight: 600,
             }}
+          />
+          <Chip
+            label={`Invigilators: ${assignedInvigilators} / ${requiredInvigilators}`}
+            size="medium"
+            color={ratioMet ? "success" : "warning"}
+            variant="outlined"
+            sx={{ fontWeight: 600 }}
           />
           <Chip
             label={formatSchool(data.exam_school) || "School"}
