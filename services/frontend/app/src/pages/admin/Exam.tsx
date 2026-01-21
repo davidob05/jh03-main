@@ -17,8 +17,10 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { Edit, Delete } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { AssignInvigilatorDialog } from "../../components/admin/AssignInvigilatorDialog";
 import { EditExamDialog } from "../../components/admin/EditExamDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 
 type ExamVenue = {
@@ -42,6 +44,24 @@ type ExamData = {
   exam_venues: ExamVenue[];
 };
 
+type Invigilator = {
+  id: number;
+  preferred_name: string | null;
+  full_name: string | null;
+  resigned: boolean;
+  availabilities?: { date: string; slot: "MORNING" | "EVENING"; available: boolean }[];
+  qualifications?: { qualification: string }[];
+};
+
+type InvigilatorAssignment = {
+  id: number;
+  invigilator: number;
+  exam_venue: number;
+  assigned_start: string;
+  assigned_end: string;
+  cancel?: boolean;
+};
+
 type ExamRouteParams = {
   examId?: string;
 };
@@ -50,6 +70,22 @@ const fetchExam = async (examId: string): Promise<ExamData> => {
   const response = await apiFetch(`${apiBaseUrl}/exams/${examId}/`);
   if (!response.ok) throw new Error("Unable to load exam");
   return response.json();
+};
+
+const fetchInvigilators = async (): Promise<Invigilator[]> => {
+  const response = await apiFetch(`${apiBaseUrl}/invigilators/`);
+  if (!response.ok) throw new Error("Unable to load invigilators");
+  return response.json();
+};
+
+const fetchAssignments = async (): Promise<InvigilatorAssignment[]> => {
+  const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`);
+  if (!response.ok) throw new Error("Unable to load invigilator assignments");
+  const data = await response.json();
+  if (Array.isArray(data)) return data as InvigilatorAssignment[];
+  if (Array.isArray(data?.results)) return data.results as InvigilatorAssignment[];
+  if (Array.isArray(data?.assignments)) return data.assignments as InvigilatorAssignment[];
+  return [];
 };
 
 const formatDisplayDate = (isoDate?: string | null) => {
@@ -91,11 +127,21 @@ export const AdminExamDetails: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignVenue, setAssignVenue] = useState<ExamVenue | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery<ExamData, Error>({
     queryKey: ["exam", examId],
     queryFn: () => fetchExam(examId || ""),
     enabled: Boolean(examId),
+  });
+  const { data: invigilators = [] } = useQuery<Invigilator[], Error>({
+    queryKey: ["invigilators"],
+    queryFn: fetchInvigilators,
+  });
+  const { data: assignments = [] } = useQuery<InvigilatorAssignment[], Error>({
+    queryKey: ["invigilator-assignments"],
+    queryFn: fetchAssignments,
   });
 
   if (isLoading) {
@@ -114,6 +160,21 @@ export const AdminExamDetails: React.FC = () => {
       </Box>
     );
   }
+
+  const examVenueIds = new Set(data.exam_venues.map((ev) => ev.examvenue_id));
+  const assignedInvigilators = assignments.filter(
+    (assignment) => examVenueIds.has(assignment.exam_venue) && !assignment.cancel
+  ).length;
+  const totalStudents = data.no_students || 0;
+  const studentsPerInvigilator = 50;
+  const requiredInvigilators = Math.ceil(totalStudents / studentsPerInvigilator);
+  const remainingInvigilators = Math.max(requiredInvigilators - assignedInvigilators, 0);
+  const ratioMet = assignedInvigilators >= requiredInvigilators;
+  const currentRatio =
+    totalStudents > 0 && assignedInvigilators > 0
+      ? Math.round(totalStudents / assignedInvigilators)
+      : null;
+  const ratioLabel = currentRatio ? `1:${currentRatio}` : "N/A";
 
   const coreVenue = data.exam_venues.find((ev) => ev.core) || data.exam_venues[0];
   const extraVenues = data.exam_venues.filter((ev) => !coreVenue || ev.examvenue_id !== coreVenue.examvenue_id);
@@ -135,6 +196,17 @@ export const AdminExamDetails: React.FC = () => {
               backgroundColor: "#f0f0f0ff",
               fontWeight: 600,
             }}
+          />
+          <Chip
+            label={
+              ratioMet
+                ? `Invigilators: ${assignedInvigilators} / ${requiredInvigilators} (ratio ${ratioLabel})`
+                : `Invigilators: ${assignedInvigilators} / ${requiredInvigilators} (${remainingInvigilators} more needed, ratio ${ratioLabel})`
+            }
+            size="medium"
+            color={ratioMet ? "success" : "warning"}
+            variant="outlined"
+            sx={{ fontWeight: 600 }}
           />
           <Chip
             label={formatSchool(data.exam_school) || "School"}
@@ -162,6 +234,17 @@ export const AdminExamDetails: React.FC = () => {
             <Typography variant="subtitle1" fontWeight={600}>{coreVenue.venue_name || "Unassigned"}</Typography>
             <Typography variant="body2" color="text.secondary">{formatDisplayDate(coreVenue.start_time)}</Typography>
             <Typography variant="body2">Duration: {formatDuration(coreVenue.exam_length)}</Typography>
+            <Box>
+              <PillButton
+                variant="outlined"
+                onClick={() => {
+                  setAssignVenue(coreVenue);
+                  setAssignOpen(true);
+                }}
+              >
+                Assign invigilator
+              </PillButton>
+            </Box>
           </Stack>
         ) : (
           <Typography variant="body2" color="text.secondary">No venue assigned.</Typography>
@@ -189,6 +272,17 @@ export const AdminExamDetails: React.FC = () => {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">{formatDisplayDate(ev.start_time)}</Typography>
                   <Typography variant="body2">Duration: {formatDuration(ev.exam_length)}</Typography>
+                  <Box sx={{ mt: 1 }}>
+                    <PillButton
+                      variant="outlined"
+                      onClick={() => {
+                        setAssignVenue(ev);
+                        setAssignOpen(true);
+                      }}
+                    >
+                      Assign invigilator
+                    </PillButton>
+                  </Box>
                 </Panel>
               </Grid>
             ))}
@@ -261,6 +355,15 @@ export const AdminExamDetails: React.FC = () => {
             setDeleting(false);
           }
         }}
+      />
+
+      <AssignInvigilatorDialog
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        examVenue={assignVenue}
+        invigilators={invigilators}
+        assignments={assignments}
+        onAssigned={() => refetch()}
       />
 
       <Snackbar

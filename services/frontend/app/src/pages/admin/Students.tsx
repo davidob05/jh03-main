@@ -1,9 +1,10 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -29,9 +30,10 @@ import {
   Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Search as SearchIcon, ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
+import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../../components/Panel";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 
 type StudentProvisionRow = {
   student_id: string;
@@ -128,6 +130,22 @@ const updateStudentExamVenue = async (studentExamId: number, examVenueId: number
     throw new Error(text || "Failed to update student venue");
   }
   return response.json();
+};
+
+const deleteStudentProvision = async (row: StudentProvisionRow): Promise<void> => {
+  const response = await apiFetch(`${apiBaseUrl}/students/provisions/`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      student_exam_id: row.student_exam_id,
+      student_id: row.student_id,
+      exam_id: row.exam_id,
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Delete failed");
+  }
 };
 
 type SectionProps = {
@@ -297,11 +315,33 @@ const StudentTableSection: React.FC<SectionProps> = ({
   emptyLabel,
 }) => {
   const rows = query.data || [];
+  const rowKey = useCallback((row: StudentProvisionRow) => `${row.student_id}::${row.exam_id}`, []);
   const [order, setOrder] = useState<Order>("asc");
   const [orderBy, setOrderBy] = useState<keyof StudentProvisionRow>("student_name");
+  const [selected, setSelected] = useState<string[]>([]);
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
   const [venueDialog, setVenueDialog] = useState<VenueDialogState | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTargets, setDeleteTargets] = useState<StudentProvisionRow[]>([]);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
+  const deleteMutation = useMutation<void, Error, StudentProvisionRow[]>({
+    mutationFn: async (targets: StudentProvisionRow[]) => {
+      for (const target of targets) {
+        await deleteStudentProvision(target);
+      }
+    },
+    onSuccess: (_data, targets) => {
+      const deletedKeys = new Set(targets.map(rowKey));
+      setSelected((prev) => prev.filter((key) => !deletedKeys.has(key)));
+      setDeleteOpen(false);
+      setDeleteTargets([]);
+      setDeleteError(null);
+      queryClient.invalidateQueries({ queryKey: ["student-provisions"] });
+    },
+    onError: (err: any) => setDeleteError(err?.message || "Delete failed"),
+  });
   const handleRequestSort = (_: React.MouseEvent<unknown>, property: keyof StudentProvisionRow) => {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
@@ -343,6 +383,36 @@ const StudentTableSection: React.FC<SectionProps> = ({
     return [...filtered].sort(comparator);
   }, [filtered, order, orderBy]);
 
+  const rowMap = useMemo(() => {
+    const map = new Map<string, StudentProvisionRow>();
+    rows.forEach((row) => map.set(rowKey(row), row));
+    return map;
+  }, [rows, rowKey]);
+  const visibleKeys = useMemo(() => filtered.map(rowKey), [filtered, rowKey]);
+  const visibleKeySet = useMemo(() => new Set(visibleKeys), [visibleKeys]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectedVisibleCount = useMemo(
+    () => visibleKeys.reduce((count, key) => count + (selectedSet.has(key) ? 1 : 0), 0),
+    [visibleKeys, selectedSet]
+  );
+  const allVisibleSelected = visibleKeys.length > 0 && selectedVisibleCount === visibleKeys.length;
+
+  useEffect(() => {
+    setSelected((prev) => prev.filter((key) => visibleKeySet.has(key)));
+  }, [visibleKeySet]);
+
+  const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelected(event.target.checked ? visibleKeys : []);
+  };
+
+  const handleToggleSelectAll = () => {
+    setSelected(allVisibleSelected ? [] : visibleKeys);
+  };
+
+  const handleRowSelect = (key: string) => {
+    setSelected((prev) => (prev.includes(key) ? prev.filter((value) => value !== key) : [...prev, key]));
+  };
+
   const openVenueDialogForRow = (row: StudentProvisionRow) => {
     if (!row.student_exam_id) return;
     setVenueDialog({
@@ -353,6 +423,23 @@ const StudentTableSection: React.FC<SectionProps> = ({
       examName: `${row.course_code} • ${row.exam_name}`,
     });
   };
+
+  const openDeleteDialogForRow = (row: StudentProvisionRow) => {
+    setDeleteTargets([row]);
+    setDeleteError(null);
+    setDeleteOpen(true);
+  };
+
+  const openDeleteDialogForSelection = () => {
+    const targets = selected.map((key) => rowMap.get(key)).filter(Boolean) as StudentProvisionRow[];
+    if (!targets.length) return;
+    setDeleteTargets(targets);
+    setDeleteError(null);
+    setDeleteOpen(true);
+  };
+
+  const deleteCount = deleteTargets.length;
+  const deleteTarget = deleteTargets[0];
 
   return (
     <Panel disableDivider sx={{ p: 0, overflow: "hidden" }}>
@@ -366,10 +453,37 @@ const StudentTableSection: React.FC<SectionProps> = ({
           <Typography variant="h6" fontWeight={700}>{title}</Typography>
           <Typography variant="body2" color="text.secondary">{subtitle}</Typography>
         </Box>
-        <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5, minWidth: 240 }}>
-          <SearchIcon sx={{ color: "action.active", mr: 1 }} />
-          <InputBase placeholder="Search students..." value={search} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: "100%" }} />
-        </Box>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={1}>
+          {selected.length ? (
+            <Chip
+              label={`${selected.length} selected`}
+              size="small"
+              sx={{ backgroundColor: "action.hover", fontWeight: 600 }}
+            />
+          ) : null}
+          <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5, minWidth: 240 }}>
+            <SearchIcon sx={{ color: "action.active", mr: 1 }} />
+            <InputBase placeholder="Search students..." value={search} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: "100%" }} />
+          </Box>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleToggleSelectAll}
+            disabled={!visibleKeys.length || deleteMutation.isPending}
+          >
+            {allVisibleSelected ? "Clear selection" : "Select all"}
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={openDeleteDialogForSelection}
+            disabled={selected.length === 0 || deleteMutation.isPending}
+          >
+            Delete selected
+          </Button>
+        </Stack>
       </Toolbar>
       <Divider />
       {query.isLoading ? (
@@ -386,6 +500,16 @@ const StudentTableSection: React.FC<SectionProps> = ({
           <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    color="primary"
+                    indeterminate={selectedVisibleCount > 0 && !allVisibleSelected}
+                    checked={allVisibleSelected}
+                    onChange={handleSelectAllClick}
+                    inputProps={{ "aria-label": "select all students" }}
+                    disabled={!visibleKeys.length || deleteMutation.isPending}
+                  />
+                </TableCell>
                 <TableCell sortDirection={orderBy === "student_name" ? order : false}>
                   <TableSortLabel
                     active={orderBy === "student_name"}
@@ -429,11 +553,21 @@ const StudentTableSection: React.FC<SectionProps> = ({
               {sorted.map((row) => {
                 const statusColor = row.matches_needs ? "success" : "warning";
                 const statusLabel = row.matches_needs ? "Allocated" : row.allocation_issue || "Needs allocation";
-                const key = `${row.student_id}-${row.exam_id}`;
+                const key = rowKey(row);
                 const isOpen = openRows[key] || false;
+                const isSelected = selectedSet.has(key);
                 return (
                   <React.Fragment key={key}>
-                    <TableRow hover>
+                    <TableRow hover role="checkbox" aria-checked={isSelected} selected={isSelected}>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          color="primary"
+                          checked={isSelected}
+                          onChange={() => handleRowSelect(key)}
+                          inputProps={{ "aria-label": `select ${row.student_name}` }}
+                          disabled={deleteMutation.isPending}
+                        />
+                      </TableCell>
                       <TableCell>
                         <Typography fontWeight={600}>{row.student_name}</Typography>
                         <Typography variant="body2" color="text.secondary">{row.student_id}</Typography>
@@ -469,16 +603,25 @@ const StudentTableSection: React.FC<SectionProps> = ({
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton
-                          aria-label={isOpen ? "Collapse details" : "Expand details"}
-                          onClick={() => setOpenRows((prev) => ({ ...prev, [key]: !isOpen }))}
-                        >
-                          <ExpandMoreIcon sx={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
-                        </IconButton>
+                        <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
+                          <IconButton
+                            aria-label={isOpen ? "Collapse details" : "Expand details"}
+                            onClick={() => setOpenRows((prev) => ({ ...prev, [key]: !isOpen }))}
+                          >
+                            <ExpandMoreIcon sx={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
+                          </IconButton>
+                          <IconButton
+                            aria-label="Delete student record"
+                            onClick={() => openDeleteDialogForRow(row)}
+                            disabled={deleteMutation.isPending}
+                          >
+                            <DeleteIcon color="error" />
+                          </IconButton>
+                        </Stack>
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={5}>
+                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
                         <Collapse in={isOpen} timeout="auto" unmountOnExit>
                           <Box sx={{ margin: 2, display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
                             <Box>
@@ -542,7 +685,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
               })}
               {!filtered.length && (
                 <TableRow>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={6}>
                     <Typography variant="body2" color="text.secondary">{emptyLabel}</Typography>
                   </TableCell>
                 </TableRow>
@@ -558,6 +701,44 @@ const StudentTableSection: React.FC<SectionProps> = ({
           {...venueDialog}
         />
       ) : null}
+      <DeleteConfirmationDialog
+        open={deleteOpen}
+        title={deleteCount > 1 ? "Delete student records?" : "Delete student record?"}
+        description={
+          <>
+            {deleteCount > 1 ? (
+              <>
+                This will permanently delete <strong>{deleteCount}</strong> student provision records.
+              </>
+            ) : (
+              <>
+                This will permanently delete the provision record for{" "}
+                <strong>{deleteTarget?.student_name || "this student"}</strong>{" "}
+                {deleteTarget?.course_code
+                  ? `in ${deleteTarget.course_code} • ${deleteTarget.exam_name}.`
+                  : "in this exam."}
+              </>
+            )}
+            {deleteError ? (
+              <Typography sx={{ mt: 2 }} color="error">
+                {deleteError}
+              </Typography>
+            ) : null}
+          </>
+        }
+        confirmText={deleteCount > 1 ? `Delete ${deleteCount}` : "Delete"}
+        loading={deleteMutation.isPending}
+        onClose={() => {
+          if (!deleteMutation.isPending) {
+            setDeleteOpen(false);
+            setDeleteTargets([]);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={() => {
+          if (deleteTargets.length) deleteMutation.mutate(deleteTargets);
+        }}
+      />
     </Panel>
   );
 };

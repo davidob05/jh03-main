@@ -374,8 +374,7 @@ class InvigilatorRestriction(models.Model):
         related_name="restrictions"
     )
     diet = models.CharField(
-        max_length=20,
-        choices=DietChoices.choices
+        max_length=20
     )
     restrictions = ArrayField(
         models.CharField(
