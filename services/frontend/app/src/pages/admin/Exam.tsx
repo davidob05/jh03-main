@@ -264,6 +264,17 @@ export const AdminExamDetails: React.FC = () => {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">{formatDisplayDate(ev.start_time)}</Typography>
                   <Typography variant="body2">Duration: {formatDuration(ev.exam_length)}</Typography>
+                  <Box sx={{ mt: 1 }}>
+                    <PillButton
+                      variant="outlined"
+                      onClick={() => {
+                        setAssignVenue(ev);
+                        setAssignOpen(true);
+                      }}
+                    >
+                      Assign invigilator
+                    </PillButton>
+                  </Box>
                 </Panel>
               </Grid>
             ))}
