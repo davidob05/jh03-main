@@ -16,6 +16,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Search } from "@mui/icons-material";
+import dayjs from "dayjs";
 import { PillButton } from "../PillButton";
 
 type ExamVenue = {
@@ -112,11 +113,10 @@ const AssignInvigilatorDialogBody: React.FC<{
   const [showResigned, setShowResigned] = useState(false);
   const slotInfo = useMemo(() => {
     if (!examVenue?.start_time) return null;
-    const start = new Date(examVenue.start_time);
-    if (Number.isNaN(start.getTime())) return null;
-    const slot: SlotCode = start.getHours() < 12 ? "MORNING" : "EVENING";
-    const dateKey = start.toISOString().slice(0, 10);
-    return { slot, dateKey };
+    const start = dayjs(examVenue.start_time);
+    if (!start.isValid()) return null;
+    const slot: SlotCode = start.hour() < 12 ? "MORNING" : "EVENING";
+    return { slot, dateKey: start.format("YYYY-MM-DD") };
   }, [examVenue?.start_time]);
   const assignedIds = useMemo(() => {
     if (!examVenue) return new Set<number>();
