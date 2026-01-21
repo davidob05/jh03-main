@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AssignInvigilatorDialog } from "@/components/admin/AssignInvigilatorDialog";
@@ -71,8 +71,8 @@ describe("Components - AssignInvigilatorDialog", () => {
       ],
     });
 
-    const brookeRow = screen.getByText("Brooke").closest("button");
-    expect(brookeRow).toBeDisabled();
+    const brookeRow = screen.getByRole("button", { name: /brooke/i });
+    expect(brookeRow).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText(/already assigned/i)).toBeInTheDocument();
   });
 
@@ -93,8 +93,10 @@ describe("Components - AssignInvigilatorDialog", () => {
       ],
     });
 
-    const alexRow = screen.getByText("Alex").closest("button");
-    expect(alexRow).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/only show available/i));
+
+    const alexRow = screen.getByRole("button", { name: /alex/i });
+    expect(alexRow).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText(/conflicts with existing shift/i)).toBeInTheDocument();
   });
 });
