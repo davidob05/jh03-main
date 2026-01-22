@@ -116,6 +116,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
   const [promoting, setPromoting] = useState(false);
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const { id } = useParams();
@@ -234,6 +235,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
       setPromoteError(err?.message || "Failed to promote invigilator.");
     } finally {
       setPromoting(false);
+      setPromoteOpen(false);
     }
   };
 
@@ -286,7 +288,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
           <Button
             variant="contained"
             color="secondary"
-            onClick={handlePromote}
+            onClick={() => setPromoteOpen(true)}
             disabled={!canPromote || promoting}
           >
             {data.user_is_superuser ? "Already admin" : "Make them an admin"}
@@ -860,6 +862,18 @@ export const AdminInvigilatorProfile: React.FC = () => {
           if (!deleting) setDeleteOpen(false);
         }}
         onConfirm={handleDelete}
+      />
+      <DeleteConfirmationDialog
+        open={promoteOpen}
+        title="Make this invigilator an admin?"
+        description="This grants full admin access while keeping their existing login."
+        confirmText="Make admin"
+        destructive={false}
+        loading={promoting}
+        onClose={() => {
+          if (!promoting) setPromoteOpen(false);
+        }}
+        onConfirm={handlePromote}
       />
       <Snackbar
         open={successOpen}
