@@ -12,6 +12,8 @@ from timetabling_system.models import (
     InvigilatorRestriction,
     InvigilatorAvailability,
     InvigilatorAssignment,
+    StudentExam,
+    Provisions,
     Notification,
     Announcement,
     SlotChoices,
@@ -320,6 +322,9 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
     exam_start = serializers.DateTimeField(source="exam_venue.start_time", read_only=True)
     exam_length = serializers.IntegerField(source="exam_venue.exam_length", read_only=True)
     cover_filled = serializers.SerializerMethodField()
+    provision_capabilities = serializers.SerializerMethodField()
+    student_provisions = serializers.SerializerMethodField()
+    student_provision_notes = serializers.SerializerMethodField()
 
     class Meta:
         model = InvigilatorAssignment
@@ -332,6 +337,9 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
             "venue_name",
             "exam_start",
             "exam_length",
+            "provision_capabilities",
+            "student_provisions",
+            "student_provision_notes",
             "role",
             "assigned_start",
             "assigned_end",
@@ -355,6 +363,34 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
 
     def get_cover_filled(self, obj):
         return obj.cover_assignments.filter(cancel=False).exists()
+
+    def get_provision_capabilities(self, obj):
+        caps = getattr(getattr(obj, "exam_venue", None), "provision_capabilities", None)
+        return list(caps or [])
+
+    def _student_provision_rows(self, obj):
+        exam_venue = getattr(obj, "exam_venue", None)
+        if not exam_venue or not getattr(exam_venue, "exam", None):
+            return []
+        student_ids = StudentExam.objects.filter(exam_venue=exam_venue).values_list("student_id", flat=True)
+        if not student_ids:
+            return []
+        return Provisions.objects.filter(exam=exam_venue.exam, student_id__in=student_ids)
+
+    def get_student_provisions(self, obj):
+        provisions: list[str] = []
+        for row in self._student_provision_rows(obj):
+            provisions.extend(row.provisions or [])
+        return sorted(set(provisions))
+
+    def get_student_provision_notes(self, obj):
+        notes: list[str] = []
+        for row in self._student_provision_rows(obj):
+            if row.extra_time_custom:
+                notes.append(str(row.extra_time_custom).strip())
+            if row.notes:
+                notes.append(str(row.notes).strip())
+        return [note for note in dict.fromkeys(notes) if note]
 
 
 class InvigilatorQualificationSerializer(serializers.ModelSerializer):
