@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogTitle,
   Checkbox,
+  Button,
   FormControlLabel,
   FormControl,
   InputLabel,
@@ -61,6 +62,7 @@ type InvigilatorAssignment = {
   role?: string | null;
   confirmed?: boolean | null;
   cancel?: boolean;
+  cancel_cause?: string | null;
 };
 
 type SlotCode = "MORNING" | "EVENING";
@@ -418,6 +420,40 @@ const AssignInvigilatorDialogBody: React.FC<{
     },
   });
 
+  const cancellationMutation = useMutation({
+    mutationFn: async ({ assignmentId, action }: { assignmentId: number; action: "approve" | "reject" }) => {
+      if (action === "approve") {
+        const res = await apiFetch(`${apiBaseUrl}/invigilator-assignments/${assignmentId}/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmed: true }),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || "Failed to approve cancellation.");
+        }
+        return { action };
+      }
+      const res = await apiFetch(`${apiBaseUrl}/invigilator-assignments/${assignmentId}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancel: false, cancel_cause: "" }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to reject cancellation.");
+      }
+      return { action };
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
+      onAssigned?.();
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof Error ? err.message : "Failed to update cancellation status.");
+    },
+  });
+
   const canUpdate = Boolean(examVenue)
     && selectionDelta.hasChanges;
 
@@ -537,6 +573,10 @@ const AssignInvigilatorDialogBody: React.FC<{
               const assigned = assignedIds.has(invigilator.id);
               const isSelected = selectedIds.includes(invigilator.id);
               const conflict = hasConflict(invigilator.id);
+              const assignment = assignmentByInvigilator.get(invigilator.id);
+              const isCancelled = Boolean(assignment?.cancel);
+              const isCancelledConfirmed = isCancelled && Boolean(assignment?.confirmed);
+              const canEditAssignment = isSelected && !isCancelledConfirmed;
               let availabilityLabel: string | null = null;
               if (slotInfo && invigilator.availabilities) {
                 const entry = invigilator.availabilities.find(
@@ -566,9 +606,16 @@ const AssignInvigilatorDialogBody: React.FC<{
                 requirementNames.length ? `${requirementNames.length} requirement${requirementNames.length > 1 ? "s" : ""}` : null,
               ].filter(Boolean);
               const statusChips: { label: string; tone: "success" | "error" | "warning" | "info" | "default"; solid?: boolean }[] = [];
-              if (assigned && isSelected) statusChips.push({ label: "Assigned", tone: "success", solid: true });
-              if (assigned && !isSelected) statusChips.push({ label: "Unassigning", tone: "error", solid: true });
-              if (!assigned && isSelected) statusChips.push({ label: "Assigning", tone: "success" });
+              if (!isCancelledConfirmed) {
+                if (assigned && isSelected) statusChips.push({ label: "Assigned", tone: "success", solid: true });
+                if (assigned && !isSelected) statusChips.push({ label: "Unassigning", tone: "error", solid: true });
+                if (!assigned && isSelected) statusChips.push({ label: "Assigning", tone: "success" });
+              }
+              if (isCancelled) statusChips.push({
+                label: isCancelledConfirmed ? "Cancelled" : "Cancellation requested",
+                tone: isCancelledConfirmed ? "error" : "warning",
+                solid: true,
+              });
               if (conflict) statusChips.push({ label: "Has conflict", tone: "error", solid: true });
               if (availabilityLabel) {
                 const available = availabilityLabel.toLowerCase().startsWith("available");
@@ -602,7 +649,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                     <Checkbox
                       checked={selectedIds.includes(invigilator.id)}
                       onChange={() => toggleSelected(invigilator.id)}
-                      disabled={!assigned && conflict}
+                      disabled={!assigned && conflict || isCancelledConfirmed}
                       inputProps={{ "aria-label": displayName(invigilator) }}
                     />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -666,6 +713,44 @@ const AssignInvigilatorDialogBody: React.FC<{
                       <ExpandMore />
                     </IconButton>
                   </Box>
+                  {assignment?.cancel && (
+                    <Box
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 2,
+                        bgcolor: alpha(isCancelledConfirmed ? "#b91c1c" : "#ed6c02", 0.12),
+                        borderBottom: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body2" fontWeight={600} color={isCancelledConfirmed ? "#b91c1c" : "#b45309"}>
+                          {isCancelledConfirmed ? "Cancelled" : "Cancellation requested"}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <PillButton
+                          variant="contained"
+                          color="error"
+                          disabled={cancellationMutation.isPending || isCancelledConfirmed}
+                          onClick={() => cancellationMutation.mutate({ assignmentId: assignment.id, action: "approve" })}
+                        >
+                          Approve
+                        </PillButton>
+                        <PillButton
+                          variant="outlined"
+                          disabled={cancellationMutation.isPending || isCancelledConfirmed}
+                          onClick={() => cancellationMutation.mutate({ assignmentId: assignment.id, action: "reject" })}
+                        >
+                          Reject
+                        </PillButton>
+                      </Stack>
+                    </Box>
+                  )}
                   <Collapse in={expandedIds.has(invigilator.id)} timeout="auto" unmountOnExit>
                     <Box sx={{ px: 2, py: 1.5 }}>
                       <Stack spacing={1.5}>
@@ -726,7 +811,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                               size="small"
                               value={getInputFor(invigilator.id).start}
                               onChange={(e) => updateInput(invigilator.id, { start: e.target.value })}
-                              disabled={!isSelected}
+                              disabled={!canEditAssignment}
                               InputLabelProps={{ shrink: true }}
                               sx={{ flex: 1 }}
                             />
@@ -736,7 +821,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                               size="small"
                               value={getInputFor(invigilator.id).end}
                               onChange={(e) => updateInput(invigilator.id, { end: e.target.value })}
-                              disabled={!isSelected}
+                              disabled={!canEditAssignment}
                               InputLabelProps={{ shrink: true }}
                               sx={{ flex: 1 }}
                             />
@@ -747,7 +832,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                               label="Invigilator role"
                               value={getInputFor(invigilator.id).role}
                               onChange={(e) => updateInput(invigilator.id, { role: e.target.value as string })}
-                              disabled={!isSelected}
+                              disabled={!canEditAssignment}
                             >
                               <MenuItem value="">
                                 <em>Choose...</em>
@@ -764,17 +849,26 @@ const AssignInvigilatorDialogBody: React.FC<{
                               <Checkbox
                                 checked={getInputFor(invigilator.id).confirmed}
                                 onChange={(e) => updateInput(invigilator.id, { confirmed: e.target.checked })}
-                                disabled={!isSelected}
+                                disabled={!canEditAssignment}
                               />
                             }
                             label="Confirmed"
                             sx={{ m: 0 }}
                           />
-                          {!isSelected && (
+                          {assignment?.cancel && assignment.cancel_cause && (
+                            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "pre-line" }}>
+                              Reason: {assignment.cancel_cause}
+                            </Typography>
+                          )}
+                          {isCancelledConfirmed ? (
+                            <Typography variant="caption" color="error.main">
+                              This shift is cancelled and cannot be edited.
+                            </Typography>
+                          ) : !isSelected ? (
                             <Typography variant="caption" color="text.secondary">
                               Select the invigilator to edit assignment details.
                             </Typography>
-                          )}
+                          ) : null}
                         </Stack>
                         {availabilityLabel && (
                           <Typography variant="body2" color="text.secondary">

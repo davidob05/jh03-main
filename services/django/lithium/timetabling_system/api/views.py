@@ -347,7 +347,9 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         instance = self.get_object()
         was_confirmed = bool(instance.confirmed)
+        was_cancelled = bool(instance.cancel)
         updated = serializer.save()
+        is_cancelled = bool(updated.cancel)
         if not was_confirmed and bool(updated.confirmed):
             name = updated.invigilator.preferred_name or updated.invigilator.full_name or "Invigilator"
             exam_name = updated.exam_venue.exam.exam_name if updated.exam_venue and updated.exam_venue.exam else "an exam"
@@ -357,10 +359,35 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
                 if updated.assigned_start else "start time TBC"
             )
             details = f"{exam_name} at {venue_name} on {start_str}"
+            if is_cancelled:
+                Notification.objects.create(
+                    type=Notification.NotificationType.CANCELLATION,
+                    admin_message=f"Cancellation request approved for {name} ({details}).",
+                    invigilator_message=f"Your cancellation request was approved for {details}.",
+                    invigilator=updated.invigilator,
+                    triggered_by=_get_request_user(self, serializer),
+                )
+            else:
+                Notification.objects.create(
+                    type=Notification.NotificationType.ASSIGNMENT,
+                    admin_message=f"{name} has confirmed their assignment for {details}.",
+                    invigilator_message=f"Your assignment has been confirmed for {details}.",
+                    invigilator=updated.invigilator,
+                    triggered_by=_get_request_user(self, serializer),
+                )
+        if was_cancelled and not is_cancelled:
+            name = updated.invigilator.preferred_name or updated.invigilator.full_name or "Invigilator"
+            exam_name = updated.exam_venue.exam.exam_name if updated.exam_venue and updated.exam_venue.exam else "an exam"
+            venue_name = updated.exam_venue.venue.venue_name if updated.exam_venue and updated.exam_venue.venue else "Venue TBC"
+            start_str = (
+                timezone.localtime(updated.assigned_start).strftime("%d %b %Y at %H:%M")
+                if updated.assigned_start else "start time TBC"
+            )
+            details = f"{exam_name} at {venue_name} on {start_str}"
             Notification.objects.create(
-                type=Notification.NotificationType.ASSIGNMENT,
-                admin_message=f"{name} has confirmed their assignment for {details}.",
-                invigilator_message=f"Your assignment has been confirmed for {details}.",
+                type=Notification.NotificationType.CANCELLATION,
+                admin_message=f"Cancellation request rejected for {name} ({details}).",
+                invigilator_message=f"Your cancellation request was rejected for {details}.",
                 invigilator=updated.invigilator,
                 triggered_by=_get_request_user(self, serializer),
             )
@@ -615,9 +642,9 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         )
         details = f"{exam_name} at {venue_name} on {start_str}"
         Notification.objects.create(
-            type=Notification.NotificationType.ASSIGNMENT,
-            admin_message=f"{name} has been unassigned from {details}.",
-            invigilator_message=f"You have been unassigned from {details}.",
+            type=Notification.NotificationType.CANCELLATION,
+            admin_message=f"Cancellation request approved for {name} ({details}).",
+            invigilator_message=f"Your cancellation request was approved for {details}.",
             invigilator=instance.invigilator,
             triggered_by=_get_request_user(self),
         )
