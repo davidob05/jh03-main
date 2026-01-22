@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import dayjs, { Dayjs } from "dayjs";
+import "dayjs/locale/en-gb";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { StaticDatePicker, DatePicker } from "@mui/x-date-pickers";
@@ -32,6 +33,7 @@ import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateWithWeekday, formatDateTime, formatTime } from "../../utils/dates";
 
 interface Exam {
   id: string;
@@ -228,9 +230,9 @@ export const InvigilatorTimetable: React.FC = () => {
   const handleNextDay = () => setDay((selectedDate || today).add(1, "day"));
 
   const friendlyDate = selectedDate
-    ? selectedDate.format("dddd, D MMMM")
+    ? formatDateWithWeekday(selectedDate)
     : "Pick a day to see exams";
-  const headerDate = (selectedDate ?? month).format("dddd, D MMMM YYYY");
+  const headerDate = formatDateWithWeekday(selectedDate ?? month);
 
   const openDrawer = (assignment: InvigilatorAssignment, mode: "request" | "undo" = "request") => {
     setDrawerAssignment(assignment);
@@ -245,7 +247,7 @@ export const InvigilatorTimetable: React.FC = () => {
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
       <Box sx={{ p: 3 }}>
         <Stack
           direction={{ xs: "column", md: "row" }}
@@ -789,8 +791,7 @@ export const InvigilatorTimetable: React.FC = () => {
             <Stack spacing={0.5}>
               <Typography fontWeight={700}>{drawerAssignment.exam_name || "Exam"}</Typography>
               <Typography color="text.secondary">
-                {dayjs(drawerAssignment.assigned_start).format("ddd, D MMM YYYY @ HH:mm")} - 
-                {dayjs(drawerAssignment.assigned_end).format("HH:mm")}
+                {formatDateTime(drawerAssignment.assigned_start)} - {formatTime(drawerAssignment.assigned_end)}
               </Typography>
               <Typography color="text.secondary">
                 {drawerAssignment.venue_name || "Venue TBC"}

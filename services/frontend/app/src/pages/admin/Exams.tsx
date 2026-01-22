@@ -30,6 +30,7 @@ import { visuallyHidden } from '@mui/utils';
 import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
+import { formatDateTime } from '../../utils/dates';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
@@ -104,13 +105,6 @@ const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
   const venues = exam.exam_venues || [];
   return venues.find((v) => v.core) || venues[0];
 };
-
-function formatDateTime(dateTime: string): string {
-  if (!dateTime) return 'N/A';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 function calculateDuration(startTime: string, endTime: string): string {
   if (!startTime || !endTime) return 'N/A';

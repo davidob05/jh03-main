@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Chip, Divider, Stack, Typography } from "@mui/material";
 import { AccessTime, EventBusy, CancelOutlined, Update, EditNote, CheckCircleOutline, InfoOutlined, PlaceOutlined, AlternateEmail, AssignmentIndOutlined, CheckCircleOutlined } from "@mui/icons-material";
 import { Panel } from "../Panel";
+import { formatDateTime } from "../../utils/dates";
 
 export type NotificationType =
   | "availability"
@@ -73,18 +74,6 @@ const typeStyles: Record<
     bg: "rgba(0,105,92,0.08)",
     icon: <AlternateEmail fontSize="small" />,
   },
-};
-
-const formatDate = (iso: string) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 };
 
 export const NotificationsPanel: React.FC<{
@@ -166,7 +155,7 @@ export const NotificationsPanel: React.FC<{
                   </Stack>
                   <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary" }}>
                     <AccessTime fontSize="small" />
-                    <Typography variant="caption">{formatDate(n.timestamp)}</Typography>
+                    <Typography variant="caption">{formatDateTime(n.timestamp)}</Typography>
                   </Stack>
                 </Stack>
               </Box>

@@ -41,6 +41,6 @@ describe("DietManager", () => {
     renderWithClient(<DietManager />);
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled());
     expect(await screen.findByText("December 2025")).toBeInTheDocument();
-    expect(screen.getByText(/Restriction cutoff: 2025-11-15/)).toBeInTheDocument();
+    expect(screen.getByText(/Restriction cutoff: 15\/11\/2025/)).toBeInTheDocument();
   });
 });

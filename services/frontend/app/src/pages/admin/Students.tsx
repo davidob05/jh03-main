@@ -32,6 +32,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon, Close } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatTime } from "../../utils/dates";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
@@ -83,13 +84,6 @@ const formatLabel = (text?: string | null): string => {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
-const formatDateTime = (iso?: string | null): string => {
-  if (!iso) return "TBC";
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return "TBC";
-  return parsed.toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-};
-
 const formatDuration = (minutes?: number | null): string => {
   if (minutes == null || Number.isNaN(minutes)) return "N/A";
   const hrs = Math.floor(minutes / 60);
@@ -102,8 +96,8 @@ const formatTimeWindow = (start?: string | null, minutes?: number | null): strin
   const parsed = new Date(start);
   if (Number.isNaN(parsed.getTime())) return "Time TBC";
   const end = new Date(parsed.getTime() + ((minutes || 0) * 60 * 1000));
-  const startLabel = parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const endLabel = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const startLabel = formatTime(parsed, "Time TBC");
+  const endLabel = formatTime(end, "Time TBC");
   return `${startLabel} - ${endLabel}`;
 };
 

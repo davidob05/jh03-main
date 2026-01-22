@@ -119,9 +119,7 @@ export const UploadFile: React.FC = () => {
         <FormControl fullWidth size="small">
           <InputLabel>Select file type...</InputLabel>
           <Select value={uploadType} onChange={(e) => setUploadType(e.target.value)} label="Select file type...">
-            <MenuItem value="">
-              <em>Choose...</em>
-            </MenuItem>
+            <MenuItem value="">Choose...</MenuItem>
             <MenuItem value="exam">Exam Timetable</MenuItem>
             <MenuItem value="provisions">Student Provisions</MenuItem>
             <MenuItem value="venues">Venue Data</MenuItem>

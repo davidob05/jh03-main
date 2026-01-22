@@ -6,6 +6,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDate } from "../../utils/dates";
 import { NotificationsPanel, NotificationItem } from "../../components/admin/NotificationsPanel";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
@@ -315,11 +316,7 @@ export const AdminDashboard: React.FC = () => {
                 }}
               >
                 <Typography variant="overline" sx={{ letterSpacing: 0.6, opacity: 0.9 }}>
-                  {new Date(publishedAtDisplay).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  {formatDate(publishedAtDisplay)}
                 </Typography>
                 <Typography variant="body1" sx={{ color: "#e8ecf1" }}>
                   {activeAnnouncement.body}

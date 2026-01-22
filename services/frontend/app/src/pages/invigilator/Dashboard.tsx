@@ -12,6 +12,7 @@ import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { NotificationItem, NotificationsPanel } from "../../components/admin/NotificationsPanel";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDate, formatTime } from "../../utils/dates";
 
 type Announcement = {
   id: number;
@@ -76,12 +77,10 @@ export const InvigilatorDashboard: React.FC = () => {
     if (!ns) return null;
     const start = ns.start ? new Date(ns.start) : null;
     const end = ns.end ? new Date(ns.end) : null;
-    const formattedDate = start
-      ? start.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-      : "TBC";
+    const formattedDate = formatDate(start, "TBC");
     const formattedTime =
       start && end
-        ? `${start.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} - ${end.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+        ? `${formatTime(start, "Time TBC")} - ${formatTime(end, "Time TBC")}`
         : "Time TBC";
     return {
       date: formattedDate,
@@ -341,11 +340,7 @@ export const InvigilatorDashboard: React.FC = () => {
                 }}
               >
                 <Typography variant="overline" sx={{ letterSpacing: 0.6, opacity: 0.9 }}>
-                  {new Date(publishedAtDisplay).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  {formatDate(publishedAtDisplay)}
                 </Typography>
                 <Typography variant="body1" sx={{ color: "#e8ecf1" }}>
                   {activeAnnouncement.body}

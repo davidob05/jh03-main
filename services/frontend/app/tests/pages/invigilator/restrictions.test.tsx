@@ -94,8 +94,8 @@ describe("Page - Invigilator Restrictions", () => {
 
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled());
 
-    expect(await screen.findByText(/Mon, 1 Dec/i)).toBeInTheDocument();
-    expect(await screen.findByText(/Tue, 2 Dec/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Mon 01\/12\/2025/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Tue 02\/12\/2025/i)).toBeInTheDocument();
     const morningButtons = await screen.findAllByRole("button", { name: /morning/i });
     const eveningButtons = await screen.findAllByRole("button", { name: /evening/i });
     expect(morningButtons.length).toBeGreaterThan(0);
@@ -104,9 +104,9 @@ describe("Page - Invigilator Restrictions", () => {
 
   it("sends deselected slots on submit and shows success snackbar", async () => {
     renderPage();
-    await screen.findByText(/Mon, 1 Dec/i);
+    await screen.findByText(/Mon 01\/12\/2025/i);
 
-    const firstCard = screen.getByText(/Mon, 1 Dec/i).closest("[role='region']") || screen.getByText(/Mon, 1 Dec/i).parentElement?.parentElement;
+    const firstCard = screen.getByText(/Mon 01\/12\/2025/i).closest("[role='region']") || screen.getByText(/Mon 01\/12\/2025/i).parentElement?.parentElement;
     const eveningBtn =
       firstCard && within(firstCard).queryByRole("button", { name: /Evening/i })
         ? within(firstCard).getByRole("button", { name: /Evening/i })
@@ -127,7 +127,7 @@ describe("Page - Invigilator Restrictions", () => {
 
   it("submits empty unavailable list if all slots left available", async () => {
     renderPage();
-    await screen.findByText(/Mon, 1 Dec/i);
+    await screen.findByText(/Mon 01\/12\/2025/i);
     const submitBtn = await screen.findByRole("button", { name: /submit restrictions/i });
     fireEvent.click(submitBtn);
     await waitFor(() => {
@@ -145,7 +145,7 @@ describe("Page - Invigilator Restrictions", () => {
       Promise.resolve({ ok: true, json: async () => fallbackResp, text: async () => "" })
     );
     renderPage();
-    expect(await screen.findByText(/Mon, 1 Dec/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Mon 01\/12\/2025/i)).toBeInTheDocument();
     expect(await screen.findAllByRole("button", { name: /evening/i })).toHaveLength(2);
   });
 
@@ -205,7 +205,7 @@ describe("Page - Invigilator Restrictions", () => {
       });
 
     renderPage();
-    await screen.findByText(/Mon, 1 Dec/i);
+    await screen.findByText(/Mon 01\/12\/2025/i);
 
     fireEvent.click((await screen.findAllByRole("button", { name: /evening/i }))[0]);
     fireEvent.click(screen.getByRole("button", { name: /submit restrictions/i }));

@@ -63,6 +63,7 @@ import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialo
 import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { NotifyDialog } from '../../components/admin/NotifyDialog';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
+import { formatMonthYear } from '../../utils/dates';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 
@@ -134,7 +135,7 @@ export const AdminInvigilators: React.FC = () => {
   const itemsPerPage = viewMode === 'grid' ? 12 : 10;
 
   // Calendar state
-  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(dayjs());
+  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
 
   // Searching state
@@ -573,7 +574,7 @@ export const AdminInvigilators: React.FC = () => {
             {/* Three Independent Calendars */}
             <Box sx={{ display: 'flex', p: 3, gap: 3, flex: 1, overflow: 'hidden' }}>
               {[-1, 0, 1].map((offset) => {
-                const monthDate = dayjs('2025-12-01').add(currentMonthIndex + offset, 'month');
+                const monthDate = dayjs().startOf("month").add(currentMonthIndex + offset, "month");
                 const isCurrentMonth = offset === 0;
 
                 return (
@@ -590,12 +591,13 @@ export const AdminInvigilators: React.FC = () => {
                     }}
                   >
                     <Typography variant="h6" align="center" gutterBottom sx={{ fontWeight: 600 }}>
-                      {monthDate.format('MMMM YYYY')}
+                      {formatMonthYear(monthDate)}
                     </Typography>
 
                     <StaticDatePicker
                       displayStaticWrapperAs="desktop"
-                      value={monthDate}
+                      value={null}
+                      referenceDate={monthDate}
                       onChange={(newValue) => {
                         setSelectedDate(newValue);
                         setCalendarModalOpen(true);

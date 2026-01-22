@@ -17,6 +17,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { Edit, Delete } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateTime } from "../../utils/dates";
 import { AssignInvigilatorDialog } from "../../components/admin/AssignInvigilatorDialog";
 import { EditExamDialog } from "../../components/admin/EditExamDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
@@ -86,13 +87,6 @@ const fetchAssignments = async (): Promise<InvigilatorAssignment[]> => {
   if (Array.isArray(data?.results)) return data.results as InvigilatorAssignment[];
   if (Array.isArray(data?.assignments)) return data.assignments as InvigilatorAssignment[];
   return [];
-};
-
-const formatDisplayDate = (isoDate?: string | null) => {
-  if (!isoDate) return "N/A";
-  const parsed = new Date(isoDate);
-  if (Number.isNaN(parsed.getTime())) return "N/A";
-  return parsed.toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
 const formatDuration = (minutes?: number | null) => {
@@ -234,7 +228,7 @@ export const AdminExamDetails: React.FC = () => {
         {coreVenue ? (
           <Stack spacing={1}>
             <Typography variant="subtitle1" fontWeight={600}>{coreVenue.venue_name || "Unassigned"}</Typography>
-            <Typography variant="body2" color="text.secondary">{formatDisplayDate(coreVenue.start_time)}</Typography>
+            <Typography variant="body2" color="text.secondary">{formatDateTime(coreVenue.start_time)}</Typography>
             <Typography variant="body2">Duration: {formatDuration(coreVenue.exam_length)}</Typography>
             <Box>
               <PillButton
@@ -272,7 +266,7 @@ export const AdminExamDetails: React.FC = () => {
                   <Typography variant="subtitle1" fontWeight={600}>
                     {ev.venue_name || "Unassigned"}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">{formatDisplayDate(ev.start_time)}</Typography>
+                  <Typography variant="body2" color="text.secondary">{formatDateTime(ev.start_time)}</Typography>
                   <Typography variant="body2">Duration: {formatDuration(ev.exam_length)}</Typography>
                   <Box sx={{ mt: 1 }}>
                     <PillButton

@@ -26,6 +26,7 @@ import dayjs from "dayjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateTime } from "../../utils/dates";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -72,13 +73,6 @@ type AssignInvigilatorDialogProps = {
   invigilators: Invigilator[];
   assignments: InvigilatorAssignment[];
   onAssigned?: () => void;
-};
-
-const formatDisplayDate = (isoDate?: string | null) => {
-  if (!isoDate) return "N/A";
-  const parsed = new Date(isoDate);
-  if (Number.isNaN(parsed.getTime())) return "N/A";
-  return parsed.toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
 const formatDuration = (minutes?: number | null) => {
@@ -537,7 +531,7 @@ const AssignInvigilatorDialogBody: React.FC<{
           </Typography>
           <Typography variant="h6" fontWeight={700}>{examVenue.venue_name || "Unassigned"}</Typography>
           <Typography variant="body2" color="text.secondary">
-            {formatDisplayDate(examVenue.start_time)} • {formatDuration(examVenue.exam_length)}
+            {formatDateTime(examVenue.start_time)} • {formatDuration(examVenue.exam_length)}
           </Typography>
         </Stack>
       ) : (

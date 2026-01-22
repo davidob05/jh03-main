@@ -26,6 +26,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateWithWeekday } from "../../utils/dates";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 
@@ -172,14 +173,6 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
   const isLoading = shouldFetch && queryLoading;
   const isError = shouldFetch && queryError;
 
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString("en-GB", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-
   const formatDateInput = (date: Date) => date.toISOString().split("T")[0];
 
   const examsToday = useMemo(
@@ -268,7 +261,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
           <Typography variant="body2" color="text.secondary">Browse and manage the exam scheduling system.</Typography>
         </Stack>
         <Typography variant="h6" color="text.secondary" data-testid="date-header">
-          {formatDate(currentDate)}
+          {formatDateWithWeekday(currentDate)}
         </Typography>
       </Stack>
 

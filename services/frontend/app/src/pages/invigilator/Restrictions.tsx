@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDate, formatDateWithWeekday } from "../../utils/dates";
 
 type SlotCode = "MORNING" | "EVENING";
 
@@ -283,7 +284,7 @@ export const InvigilatorRestrictions: React.FC = () => {
             <Alert severity={cutoffReached ? "warning" : "info"} sx={{ mt: 1 }}>
               {cutoffReached
                 ? "Restrictions are closed for this diet. Please email admin to request changes."
-                : `Restrictions remain open until ${dayjs(selectedDietCutoff).format("D MMM YYYY")}.`}
+                : `Restrictions remain open until ${formatDate(selectedDietCutoff)}.`}
             </Alert>
           )}
         </Panel>
@@ -308,7 +309,7 @@ export const InvigilatorRestrictions: React.FC = () => {
 
             <Grid container spacing={1.5}>
               {days.map((day) => {
-                const dateLabel = dayjs(day.date).format("ddd, D MMM");
+                const dateLabel = formatDateWithWeekday(day.date);
                 return (
                   <Grid item xs={12} sm={6} md={4} key={day.date}>
                     <Panel

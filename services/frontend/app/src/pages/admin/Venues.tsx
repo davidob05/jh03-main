@@ -34,6 +34,7 @@ import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, S
 import { visuallyHidden } from '@mui/utils';
 import { Link } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
+import { formatDateTime } from '../../utils/dates';
 import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
 import { PillButton } from '../../components/PillButton';
 import { Panel } from '../../components/Panel';
@@ -102,18 +103,6 @@ const formatLabel = (text?: string): string => {
   if (!text) return 'Unknown';
   const spaced = text.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-};
-
-const formatDateTime = (dateTime?: string): string => {
-  if (!dateTime) return 'N/A';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleString('en-GB', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 };
 
 const formatDurationFromLength = (length: number | null | undefined): string => {

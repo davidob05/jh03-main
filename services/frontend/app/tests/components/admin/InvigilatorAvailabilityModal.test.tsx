@@ -24,11 +24,11 @@ describe("Components - InvigilatorAvailabilityModal", () => {
     });
     it ("renders title with formatted date", () => {
         renderComponent();
-        expect(screen.getByText("Available on 10 January 2025")).toBeInTheDocument();
+        expect(screen.getByText("Available on 10/01/2025")).toBeInTheDocument();
     });
     it ("shows message when no invigilators available", () => {
         renderComponent();
-        expect(screen.getByText("No invigilators available on 10 January 2025")).toBeInTheDocument();
+        expect(screen.getByText("No invigilators available on 10/01/2025")).toBeInTheDocument();
     });
     it("shows invigilators available on the selected date", () => {
         const invigilators = [

@@ -28,6 +28,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { StaticDatePicker } from "@mui/x-date-pickers/StaticDatePicker";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateWithWeekday } from "../../utils/dates";
 import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
@@ -631,8 +632,8 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 {sortedAvailabilityEntries.slice(0, availabilityLimit).map(([date, slots]) => (
                   <Grid item xs={12} key={date} sx={{ display: "flex", justifyContent: "center" }}>
                     <Panel sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2, mb: 0, width: { xs: "100%", sm: 350 } }}>
-                      <Typography variant="subtitle1" fontWeight={600} mb={2} noWrap title={dayjs(date).format("dddd, D MMMM YYYY")}>
-                        {dayjs(date).format("dddd, D MMMM YYYY")}
+                      <Typography variant="subtitle1" fontWeight={600} mb={2} noWrap title={formatDateWithWeekday(date)}>
+                        {formatDateWithWeekday(date)}
                       </Typography>
                       <Stack direction="row" spacing={1.5} flexWrap="wrap">
                         {slots.map((s, i) => (
@@ -733,7 +734,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
               {selectedAvailabilityDate && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle1" fontWeight={600} mb={1}>
-                    {selectedAvailabilityDate.format("dddd, D MMMM YYYY")}
+                    {formatDateWithWeekday(selectedAvailabilityDate)}
                   </Typography>
                   <Stack direction="row" spacing={1.5} flexWrap="wrap">
                     {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).map((slot, i) => (
