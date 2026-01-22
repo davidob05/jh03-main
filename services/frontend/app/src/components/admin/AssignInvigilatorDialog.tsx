@@ -5,8 +5,12 @@ import {
   DialogTitle,
   Checkbox,
   FormControlLabel,
+  FormControl,
+  InputLabel,
   InputAdornment,
   InputBase,
+  Select,
+  MenuItem,
   Box,
   Chip,
   Collapse,
@@ -54,6 +58,7 @@ type InvigilatorAssignment = {
   exam_venue: number;
   assigned_start: string;
   assigned_end: string;
+  role?: string | null;
   cancel?: boolean;
 };
 
@@ -139,6 +144,11 @@ const restrictionLabels: Record<string, string> = {
 
 const formatQualification = (code: string) => qualificationLabels[code] || code;
 const formatRequirement = (code: string) => restrictionLabels[code] || code;
+const roleOptions = [
+  { value: "assistant", label: "Assistant invigilator" },
+  { value: "lead", label: "Lead invigilator" },
+  { value: "support", label: "Support invigilator" },
+];
 
 const AssignInvigilatorDialogBody: React.FC<{
   open: boolean;
@@ -152,6 +162,7 @@ const AssignInvigilatorDialogBody: React.FC<{
   const [search, setSearch] = useState("");
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [assignmentInputs, setAssignmentInputs] = useState<Map<number, { start: string; end: string; role: string }>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -169,17 +180,6 @@ const AssignInvigilatorDialogBody: React.FC<{
     });
     return map;
   }, [assignedAssignments]);
-
-  const selectionDelta = useMemo(() => {
-    const selectedSet = new Set(selectedIds);
-    const toAdd = selectedIds.filter((id) => !assignedIds.has(id));
-    const toRemove = Array.from(assignedIds).filter((id) => !selectedSet.has(id));
-    return {
-      toAdd,
-      toRemove,
-      hasChanges: toAdd.length > 0 || toRemove.length > 0,
-    };
-  }, [assignedIds, selectedIds]);
 
   const slotInfo = useMemo(() => {
     if (!examVenue?.start_time) return null;
@@ -200,6 +200,32 @@ const AssignInvigilatorDialogBody: React.FC<{
     if (!open) return;
     setSelectedIds(Array.from(new Set(assignedAssignments.map((a) => a.invigilator))));
     setError(null);
+
+    // Seed per-invigilator inputs with existing assignments or exam defaults
+    setAssignmentInputs(() => {
+      const next = new Map<number, { start: string; end: string; role: string }>();
+      const defaultStart = examWindow?.start ? examWindow.start.format("YYYY-MM-DDTHH:mm") : "";
+      const defaultEnd = examWindow?.end ? examWindow.end.format("YYYY-MM-DDTHH:mm") : "";
+      assignedAssignments.forEach((a) => {
+        const start = dayjs(a.assigned_start);
+        const end = dayjs(a.assigned_end);
+        next.set(a.invigilator, {
+          start: start.isValid() ? start.format("YYYY-MM-DDTHH:mm") : defaultStart,
+          end: end.isValid() ? end.format("YYYY-MM-DDTHH:mm") : defaultEnd,
+          role: a.role || "",
+        });
+      });
+      invigilators.forEach((i) => {
+        if (!next.has(i.id)) {
+          next.set(i.id, {
+            start: defaultStart,
+            end: defaultEnd,
+            role: "",
+          });
+        }
+      });
+      return next;
+    });
   }, [assignedAssignments, examVenue?.examvenue_id, open]);
 
   const hasConflict = (invigilatorId: number) => {
@@ -231,17 +257,59 @@ const AssignInvigilatorDialogBody: React.FC<{
     });
   }, [assignedIds, invigilators, search, onlyAvailable, slotInfo, examWindow, assignments]);
 
+  const getInputFor = (id: number) =>
+    assignmentInputs.get(id)
+    || {
+      start: examWindow?.start?.format("YYYY-MM-DDTHH:mm") || "",
+      end: examWindow?.end?.format("YYYY-MM-DDTHH:mm") || "",
+      role: "",
+    };
+
+  const selectionDelta = useMemo(() => {
+    const selectedSet = new Set(selectedIds);
+    const toAdd = selectedIds.filter((id) => !assignedIds.has(id));
+    const toRemove = Array.from(assignedIds).filter((id) => !selectedSet.has(id));
+    const toUpdate: number[] = [];
+
+    selectedIds.forEach((id) => {
+      if (!assignedIds.has(id)) return;
+      const assignment = assignmentByInvigilator.get(id);
+      if (!assignment) return;
+      const input = getInputFor(id);
+      const inputStart = dayjs(input.start);
+      const inputEnd = dayjs(input.end);
+      const currentStart = dayjs(assignment.assigned_start);
+      const currentEnd = dayjs(assignment.assigned_end);
+      const role = input.role || "";
+      const currentRole = assignment.role || "";
+      const startChanged = inputStart.isValid() && currentStart.isValid()
+        ? !inputStart.isSame(currentStart, "minute")
+        : input.start !== "";
+      const endChanged = inputEnd.isValid() && currentEnd.isValid()
+        ? !inputEnd.isSame(currentEnd, "minute")
+        : input.end !== "";
+
+      if (startChanged || endChanged || role !== currentRole) {
+        toUpdate.push(id);
+      }
+    });
+
+    return {
+      toAdd,
+      toRemove,
+      toUpdate,
+      hasChanges: toAdd.length > 0 || toRemove.length > 0 || toUpdate.length > 0,
+    };
+  }, [assignedIds, selectedIds, assignmentByInvigilator, assignmentInputs, examWindow]);
+
   const assignMutation = useMutation({
     mutationFn: async () => {
       if (!examVenue) throw new Error("Exam venue is missing.");
-      const selectedSet = new Set(selectedIds);
-      const toAdd = selectedIds.filter((id) => !assignedIds.has(id));
-      const toRemove = Array.from(assignedIds).filter((id) => !selectedSet.has(id));
-      if (toAdd.length === 0 && toRemove.length === 0) {
+      if (!selectionDelta.hasChanges) {
         throw new Error("No assignment changes to save.");
       }
-      const failures: { id: number; error: string; action: "assign" | "unassign" }[] = [];
-      for (const invigilatorId of toRemove) {
+      const failures: { id: number; error: string; action: "assign" | "unassign" | "update" }[] = [];
+      for (const invigilatorId of selectionDelta.toRemove) {
         const assignment = assignmentByInvigilator.get(invigilatorId);
         if (!assignment) {
           failures.push({ id: invigilatorId, error: "Assignment not found.", action: "unassign" });
@@ -255,20 +323,23 @@ const AssignInvigilatorDialogBody: React.FC<{
           failures.push({ id: invigilatorId, error: text || "Failed to unassign.", action: "unassign" });
         }
       }
-      if (toAdd.length > 0) {
-        if (!examWindow) {
-          throw new Error("Exam start time or duration is missing.");
-        }
-        for (const invigilatorId of toAdd) {
+      if (selectionDelta.toAdd.length > 0) {
+        for (const invigilatorId of selectionDelta.toAdd) {
+          const input = getInputFor(invigilatorId);
+          const start = dayjs(input.start);
+          const end = dayjs(input.end);
+          if (!start.isValid() || !end.isValid()) {
+            throw new Error(`Invalid start or end time for ${displayName(invigilators.find((i) => i.id === invigilatorId) || { id: invigilatorId, preferred_name: null, full_name: null, resigned: false })}.`);
+          }
           const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               invigilator: invigilatorId,
               exam_venue: examVenue.examvenue_id,
-              role: "assistant",
-              assigned_start: examWindow.start.toISOString(),
-              assigned_end: examWindow.end.toISOString(),
+              role: input.role || null,
+              assigned_start: start.toISOString(),
+              assigned_end: end.toISOString(),
               break_time_minutes: 0,
               confirmed: false,
             }),
@@ -279,16 +350,47 @@ const AssignInvigilatorDialogBody: React.FC<{
           }
         }
       }
+      if (selectionDelta.toUpdate.length > 0) {
+        for (const invigilatorId of selectionDelta.toUpdate) {
+          const assignment = assignmentByInvigilator.get(invigilatorId);
+          if (!assignment) {
+            failures.push({ id: invigilatorId, error: "Assignment not found.", action: "update" });
+            continue;
+          }
+          const input = getInputFor(invigilatorId);
+          const start = dayjs(input.start);
+          const end = dayjs(input.end);
+          if (!start.isValid() || !end.isValid()) {
+            throw new Error(`Invalid start or end time for ${displayName(invigilators.find((i) => i.id === invigilatorId) || { id: invigilatorId, preferred_name: null, full_name: null, resigned: false })}.`);
+          }
+          const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/${assignment.id}/`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              role: input.role || null,
+              assigned_start: start.toISOString(),
+              assigned_end: end.toISOString(),
+            }),
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            failures.push({ id: invigilatorId, error: text || "Failed to update assignment.", action: "update" });
+          }
+        }
+      }
       if (failures.length) {
         const names = failures
           .map((f) => displayName(invigilators.find((i) => i.id === f.id) || { id: f.id, preferred_name: null, full_name: null, resigned: false }))
           .join(", ");
         const hasAssignFailures = failures.some((f) => f.action === "assign");
         const hasUnassignFailures = failures.some((f) => f.action === "unassign");
+        const hasUpdateFailures = failures.some((f) => f.action === "update");
         let actionLabel = "update";
-        if (hasAssignFailures && hasUnassignFailures) actionLabel = "assign/unassign";
+        if ((hasAssignFailures || hasUpdateFailures) && hasUnassignFailures) actionLabel = "assign/unassign/update";
+        else if (hasAssignFailures && hasUpdateFailures) actionLabel = "assign/update";
         else if (hasAssignFailures) actionLabel = "assign";
         else if (hasUnassignFailures) actionLabel = "unassign";
+        else if (hasUpdateFailures) actionLabel = "update";
         throw new Error(`Failed to ${actionLabel} ${failures.length} invigilator(s): ${names}`);
       }
       return { success: true };
@@ -304,8 +406,7 @@ const AssignInvigilatorDialogBody: React.FC<{
   });
 
   const canUpdate = Boolean(examVenue)
-    && selectionDelta.hasChanges
-    && (selectionDelta.toAdd.length === 0 || Boolean(examWindow));
+    && selectionDelta.hasChanges;
 
   const toggleSelected = (id: number) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]));
@@ -320,6 +421,14 @@ const AssignInvigilatorDialogBody: React.FC<{
     });
   };
 
+  const updateInput = (id: number, patch: Partial<{ start: string; end: string; role: string }>) => {
+    setAssignmentInputs((prev) => {
+      const next = new Map(prev);
+      const current = next.get(id) || { start: "", end: "", role: "" };
+      next.set(id, { ...current, ...patch });
+      return next;
+    });
+  };
   const requirementLabelsFor = (invigilator: Invigilator) => {
     const raw = invigilator.restrictions || [];
     const codes = raw.flatMap((entry) => {
@@ -546,7 +655,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                   </Box>
                   <Collapse in={expandedIds.has(invigilator.id)} timeout="auto" unmountOnExit>
                     <Box sx={{ px: 2, py: 1.5 }}>
-                      <Stack spacing={1}>
+                      <Stack spacing={1.5}>
                         <Stack spacing={0.5}>
                           <Typography variant="caption" color="text.secondary" fontWeight={700}>Qualifications</Typography>
                             {qualificationNames.length ? (
@@ -595,6 +704,54 @@ const AssignInvigilatorDialogBody: React.FC<{
                             <Typography variant="body2" color="text.secondary">No requirements recorded.</Typography>
                           )}
                         </Stack>
+                        <Stack spacing={0.75}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={700}>Assignment details</Typography>
+                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                            <TextField
+                              label="Start"
+                              type="datetime-local"
+                              size="small"
+                              value={getInputFor(invigilator.id).start}
+                              onChange={(e) => updateInput(invigilator.id, { start: e.target.value })}
+                              disabled={!isSelected}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ flex: 1 }}
+                            />
+                            <TextField
+                              label="End"
+                              type="datetime-local"
+                              size="small"
+                              value={getInputFor(invigilator.id).end}
+                              onChange={(e) => updateInput(invigilator.id, { end: e.target.value })}
+                              disabled={!isSelected}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ flex: 1 }}
+                            />
+                          </Stack>
+                          <FormControl size="small" sx={{ minWidth: 200 }}>
+                            <InputLabel>Invigilator role</InputLabel>
+                            <Select
+                              label="Invigilator role"
+                              value={getInputFor(invigilator.id).role}
+                              onChange={(e) => updateInput(invigilator.id, { role: e.target.value as string })}
+                              disabled={!isSelected}
+                            >
+                              <MenuItem value="">
+                                <em>Choose...</em>
+                              </MenuItem>
+                              {roleOptions.map((option) => (
+                                <MenuItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          {!isSelected && (
+                            <Typography variant="caption" color="text.secondary">
+                              Select the invigilator to edit assignment details.
+                            </Typography>
+                          )}
+                        </Stack>
                         {availabilityLabel && (
                           <Typography variant="body2" color="text.secondary">
                             {availabilityLabel}
@@ -629,3 +786,8 @@ const AssignInvigilatorDialogBody: React.FC<{
     </Stack>
   );
 };
+
+
+
+
+
