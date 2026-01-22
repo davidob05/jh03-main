@@ -28,6 +28,14 @@ class AdminApiCrudTests(TestCase):
             is_staff=True,
             is_superuser=True,
         )
+        self.senior_admin = User.objects.create_user(
+            username="senior",
+            email="senior@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+            is_senior_admin=True,
+        )
         self.non_admin = User.objects.create_user(
             username="user",
             email="user@example.com",
@@ -209,6 +217,61 @@ class AdminApiCrudTests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_remove_admin_requires_senior_admin(self):
+        User = get_user_model()
+        admin_user = User.objects.create_user(
+            username="adminish",
+            email="adminish@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Alex",
+            full_name="Alex Example",
+            user=admin_user,
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.admin)
+
+        response = client.post(
+            reverse("invigilator-remove-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_remove_admin_demotes_user(self):
+        User = get_user_model()
+        admin_user = User.objects.create_user(
+            username="demote",
+            email="demote@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+            is_senior_admin=True,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Jo",
+            full_name="Jo Example",
+            user=admin_user,
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.senior_admin)
+
+        response = client.post(
+            reverse("invigilator-remove-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        admin_user.refresh_from_db()
+        self.assertFalse(admin_user.is_staff)
+        self.assertFalse(admin_user.is_superuser)
+        self.assertFalse(admin_user.is_senior_admin)
 
     def test_invigilator_assignment_create_and_delete_log_notifications(self):
         exam = Exam.objects.create(
