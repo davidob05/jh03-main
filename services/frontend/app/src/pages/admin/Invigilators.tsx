@@ -114,7 +114,6 @@ type NotifyMethod = 'email' | 'sms' | 'call';
 export const AdminInvigilators: React.FC = () => {
   const dispatch = useAppDispatch();
   const { viewMode, firstLetter, lastLetter, searchQuery, sortField, sortOrder, page, showAll } = useAppSelector((s) => s.adminTables.invigilators);
-  const [searchDraft, setSearchDraft] = useState(searchQuery);
   const { data: invigilatorsData = [], isLoading, isError, error } = useQuery<Invigilator[], Error>({ queryKey: ['invigilators'], queryFn: fetchInvigilators });
   const [invigilators, setInvigilators] = useState<Invigilator[]>([]);
   const [filtered, setFiltered] = useState<Invigilator[]>([]);
@@ -150,7 +149,6 @@ export const AdminInvigilators: React.FC = () => {
     setInvigilators(invigilatorsData);
     setFiltered(invigilatorsData);
   }, [invigilatorsData]);
-  useEffect(() => setSearchDraft(searchQuery), [searchQuery]);
 
   // Handle view mode change
   const handleViewChange = (event: React.MouseEvent<HTMLElement>, value: ViewMode) => {
@@ -448,19 +446,10 @@ export const AdminInvigilators: React.FC = () => {
             <Search sx={{ color: "action.active", mr: 1 }} />
             <InputBase
               placeholder="Search invigilators..."
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  dispatch(setInvigilatorsPrefs({ searchQuery: searchDraft.trim(), page: 1 }));
-                }
-              }}
+              value={searchQuery}
+              onChange={(e) => dispatch(setInvigilatorsPrefs({ searchQuery: e.target.value, page: 1 }))}
               sx={{ width: 250 }}
             />
-            <IconButton aria-label="Apply search" color="primary" onClick={() => dispatch(setInvigilatorsPrefs({ searchQuery: searchDraft.trim(), page: 1 }))}>
-              <ArrowForward />
-            </IconButton>
           </Box>
 
           {/* Sort by First Name */}
