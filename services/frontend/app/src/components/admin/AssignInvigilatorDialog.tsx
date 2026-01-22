@@ -15,10 +15,10 @@ import {
   Stack,
   Typography,
   Alert,
+  Link as MUILink,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Close, ExpandMore, Search } from "@mui/icons-material";
-import { Link as RouterLink } from "react-router-dom";
 import dayjs from "dayjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../PillButton";
@@ -481,23 +481,18 @@ const AssignInvigilatorDialogBody: React.FC<{
                       checked={selectedIds.includes(invigilator.id)}
                       onChange={() => toggleSelected(invigilator.id)}
                       disabled={!assigned && conflict}
+                      inputProps={{ "aria-label": displayName(invigilator) }}
                     />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography variant="subtitle1" fontWeight={700} noWrap title={displayName(invigilator)}>
-                        <RouterLink
-                          to={`/admin/invigilators/${invigilator.id}`}
-                          style={{ textDecoration: "none", color: "inherit" }}
+                        <MUILink
+                          href={`/admin/invigilators/${invigilator.id}`}
+                          underline="none"
+                          color="primary"
+                          sx={{ fontWeight: 700, "&:hover": { textDecoration: "none" } }}
                         >
-                          <Box
-                            component="span"
-                            sx={{
-                              color: "primary.main",
-                              "&:hover": { textDecoration: "none" },
-                            }}
-                          >
-                            {displayName(invigilator)}
-                          </Box>
-                        </RouterLink>
+                          {displayName(invigilator)}
+                        </MUILink>
                       </Typography>
                       <Stack direction="row" spacing={0.75} flexWrap="wrap" rowGap={0.75} sx={{ mt: 0.5 }}>
                         {statusChips.map((chip) => {
@@ -528,6 +523,11 @@ const AssignInvigilatorDialogBody: React.FC<{
                       {assignmentLabel && (
                         <Typography variant="caption" color="text.secondary">
                           {assignmentLabel}
+                        </Typography>
+                      )}
+                      {conflict && (
+                        <Typography variant="caption" color="error.main">
+                          Conflicts with existing shift
                         </Typography>
                       )}
                     </Box>

@@ -71,10 +71,10 @@ describe("Components - AssignInvigilatorDialog", () => {
       ],
     });
 
-    const brookeRow = screen.getByRole("button", { name: /brooke/i });
-    expect(brookeRow).not.toHaveAttribute("aria-disabled", "true");
+    const brookeCheckbox = screen.getByLabelText(/brooke/i);
+    expect(brookeCheckbox).not.toBeDisabled();
     expect(screen.getByText(/assigned to this exam/i)).toBeInTheDocument();
-    fireEvent.click(brookeRow);
+    fireEvent.click(brookeCheckbox);
     expect(screen.getByText(/will be unassigned/i)).toBeInTheDocument();
   });
 
@@ -95,10 +95,10 @@ describe("Components - AssignInvigilatorDialog", () => {
       ],
     });
 
-    fireEvent.click(screen.getByLabelText(/only show available/i));
+    fireEvent.click(screen.getByLabelText(/available/i));
 
-    const alexRow = screen.getByRole("button", { name: /alex/i });
-    expect(alexRow).toHaveAttribute("aria-disabled", "true");
+    const alexCheckbox = screen.getByLabelText(/alex/i);
+    expect(alexCheckbox).toBeDisabled();
     expect(screen.getByText(/conflicts with existing shift/i)).toBeInTheDocument();
   });
 });

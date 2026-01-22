@@ -30,7 +30,7 @@ import {
   Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon } from "@mui/icons-material";
+import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon, Close } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
@@ -226,9 +226,16 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
+      <DialogTitle sx={{ pr: 6 }}>
         Change venue for {studentName}
         <Typography variant="body2" color="text.secondary">{examName}</Typography>
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", right: 12, top: 10 }}
+        >
+          <Close />
+        </IconButton>
       </DialogTitle>
       <DialogContent dividers>
         {isLoading ? (
@@ -296,10 +303,9 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
         {saveError ? <Alert severity="error" sx={{ mt: 2 }}>{saveError}</Alert> : null}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={mutation.isLoading}>Cancel</Button>
-        <Button variant="contained" onClick={handleSave} disabled={disableSave}>
+        <PillButton variant="contained" onClick={handleSave} disabled={disableSave}>
           {mutation.isLoading ? "Saving..." : "Save"}
-        </Button>
+        </PillButton>
       </DialogActions>
     </Dialog>
   );
@@ -434,6 +440,23 @@ const StudentTableSection: React.FC<SectionProps> = ({
   const deleteCount = deleteTargets.length;
   const deleteTarget = deleteTargets[0];
 
+  if (query.isLoading) {
+    return (
+      <Box sx={{ p: 6, textAlign: "center" }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }}>Loading students...</Typography>
+      </Box>
+    );
+  }
+
+  if (query.isError) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography color="error" variant="body1">{query.error?.message || "Failed to load students"}</Typography>
+      </Box>
+    );
+  }
+
   return (
     <Panel disableDivider sx={{ p: 0, overflow: "hidden" }}>
       <Toolbar
@@ -467,74 +490,64 @@ const StudentTableSection: React.FC<SectionProps> = ({
         )}
       </Toolbar>
       <Divider />
-      {query.isLoading ? (
-        <Box sx={{ p: 4, textAlign: "center" }}>
-          <CircularProgress size={48} />
-          <Typography sx={{ mt: 2 }}>Loading students…</Typography>
-        </Box>
-      ) : query.isError ? (
-        <Box sx={{ p: 3 }}>
-          <Typography color="error" variant="body1">{query.error?.message || "Failed to load students"}</Typography>
-        </Box>
-      ) : (
-        <TableContainer>
-          <Table sx={{ minWidth: 750 }} size="medium">
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    color="primary"
-                    indeterminate={selectedVisibleCount > 0 && !allVisibleSelected}
-                    checked={allVisibleSelected}
-                    onChange={handleSelectAllClick}
-                    inputProps={{ "aria-label": "select all students" }}
-                    disabled={!visibleKeys.length || deleteMutation.isPending}
-                  />
-                </TableCell>
-                <TableCell padding="none" sortDirection={orderBy === "student_name" ? order : false}>
-                  <TableSortLabel
-                    active={orderBy === "student_name"}
-                    direction={orderBy === "student_name" ? order : "asc"}
-                    onClick={(e) => handleRequestSort(e, "student_name")}
-                  >
-                    Student
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sortDirection={orderBy === "course_code" ? order : false}>
-                  <TableSortLabel
-                    active={orderBy === "course_code"}
-                    direction={orderBy === "course_code" ? order : "asc"}
-                    onClick={(e) => handleRequestSort(e, "course_code")}
-                  >
-                    Exam Code
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sortDirection={orderBy === "venue_name" ? order : false}>
-                  <TableSortLabel
-                    active={orderBy === "venue_name"}
-                    direction={orderBy === "venue_name" ? order : "asc"}
-                    onClick={(e) => handleRequestSort(e, "venue_name")}
-                  >
-                    Venue
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sortDirection={orderBy === "matches_needs" ? order : false}>
-                  <TableSortLabel
-                    active={orderBy === "matches_needs"}
-                    direction={orderBy === "matches_needs" ? order : "asc"}
-                    onClick={(e) => handleRequestSort(e, "matches_needs")}
-                  >
-                    Status
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell align="center">Details</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sorted.map((row) => {
-                const statusColor = row.matches_needs ? "success" : "warning";
-                const statusLabel = row.matches_needs ? "Allocated" : row.allocation_issue || "Needs allocation";
-                const key = rowKey(row);
+      <TableContainer>
+        <Table sx={{ minWidth: 750 }} size="medium">
+          <TableHead>
+            <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  color="primary"
+                  indeterminate={selectedVisibleCount > 0 && !allVisibleSelected}
+                  checked={allVisibleSelected}
+                  onChange={handleSelectAllClick}
+                  inputProps={{ "aria-label": "select all students" }}
+                  disabled={!visibleKeys.length || deleteMutation.isPending}
+                />
+              </TableCell>
+              <TableCell padding="none" sortDirection={orderBy === "student_name" ? order : false}>
+                <TableSortLabel
+                  active={orderBy === "student_name"}
+                  direction={orderBy === "student_name" ? order : "asc"}
+                  onClick={(e) => handleRequestSort(e, "student_name")}
+                >
+                  Student
+                </TableSortLabel>
+              </TableCell>
+              <TableCell sortDirection={orderBy === "course_code" ? order : false}>
+                <TableSortLabel
+                  active={orderBy === "course_code"}
+                  direction={orderBy === "course_code" ? order : "asc"}
+                  onClick={(e) => handleRequestSort(e, "course_code")}
+                >
+                  Exam Code
+                </TableSortLabel>
+              </TableCell>
+              <TableCell sortDirection={orderBy === "venue_name" ? order : false}>
+                <TableSortLabel
+                  active={orderBy === "venue_name"}
+                  direction={orderBy === "venue_name" ? order : "asc"}
+                  onClick={(e) => handleRequestSort(e, "venue_name")}
+                >
+                  Venue
+                </TableSortLabel>
+              </TableCell>
+              <TableCell sortDirection={orderBy === "matches_needs" ? order : false}>
+                <TableSortLabel
+                  active={orderBy === "matches_needs"}
+                  direction={orderBy === "matches_needs" ? order : "asc"}
+                  onClick={(e) => handleRequestSort(e, "matches_needs")}
+                >
+                  Status
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="center">Details</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sorted.map((row) => {
+              const statusColor = row.matches_needs ? "success" : "warning";
+              const statusLabel = row.matches_needs ? "Allocated" : row.allocation_issue || "needs allocation";
+              const key = rowKey(row);
                 const isOpen = openRows[key] || false;
                 const isSelected = selectedSet.has(key);
                 return (
@@ -584,21 +597,12 @@ const StudentTableSection: React.FC<SectionProps> = ({
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
-                          <IconButton
-                            aria-label={isOpen ? "Collapse details" : "Expand details"}
-                            onClick={() => setOpenRows((prev) => ({ ...prev, [key]: !isOpen }))}
-                          >
-                            <ExpandMoreIcon sx={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
-                          </IconButton>
-                          <IconButton
-                            aria-label="Delete student record"
-                            onClick={() => openDeleteDialogForRow(row)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <DeleteIcon color="error" />
-                          </IconButton>
-                        </Stack>
+                        <IconButton
+                          aria-label={isOpen ? "Collapse details" : "Expand details"}
+                          onClick={() => setOpenRows((prev) => ({ ...prev, [key]: !isOpen }))}
+                        >
+                          <ExpandMoreIcon sx={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                     <TableRow>
@@ -648,14 +652,14 @@ const StudentTableSection: React.FC<SectionProps> = ({
                               ) : null}
                             </Box>
                             <Box sx={{ gridColumn: { xs: "1", sm: "1 / -1" }, display: "flex", justifyContent: "flex-end" }}>
-                              <Button
+                              <PillButton
                                 variant="outlined"
                                 size="small"
                                 onClick={() => openVenueDialogForRow(row)}
                                 disabled={!row.student_exam_id}
                               >
                                 Change venue
-                              </Button>
+                              </PillButton>
                             </Box>
                           </Box>
                         </Collapse>
@@ -674,7 +678,6 @@ const StudentTableSection: React.FC<SectionProps> = ({
             </TableBody>
           </Table>
         </TableContainer>
-      )}
       {venueDialog ? (
         <ChangeVenueDialog
           open
@@ -737,6 +740,24 @@ export const AdminStudents: React.FC = () => {
     queryFn: () => fetchStudentProvisions(false),
   });
 
+  if (unallocatedQuery.isLoading || allQuery.isLoading) {
+    return (
+      <Box sx={{ p: 6, textAlign: "center" }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }}>Loading students...</Typography>
+      </Box>
+    );
+  }
+
+  if (unallocatedQuery.isError || allQuery.isError) {
+    const err = unallocatedQuery.error || allQuery.error;
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography color="error" variant="body1">{err?.message || "Failed to load students"}</Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ width: "100%", maxWidth: 1200, p: { xs: 2, md: 4 }, mx: "auto" }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" rowGap={1.5}>
@@ -746,12 +767,12 @@ export const AdminStudents: React.FC = () => {
         </Box>
         <Stack direction="row" spacing={1}>
           <Chip
-            label={`${unallocatedQuery.data?.length ?? 0} Needs allocation`}
+            label={`${unallocatedQuery.data?.length ?? 0} needs allocation`}
             size="medium"
             sx={{ backgroundColor: "#fff3e0", color: "warning.dark", fontWeight: 600 }}
           />
           <Chip
-            label={`${allQuery.data?.length ?? 0} With provisions`}
+            label={`${allQuery.data?.length ?? 0} with provisions`}
             size="medium"
             sx={{ backgroundColor: "#e3f2fd", color: "primary.main", fontWeight: 600 }}
           />
