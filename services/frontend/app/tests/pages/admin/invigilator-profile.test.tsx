@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AdminInvigilatorProfile } from "@/pages/admin/Invigilator";
@@ -77,8 +78,11 @@ describe("AdminInvigilatorProfile", () => {
     });
   });
 
-  it("renders the make admin button for eligible invigilators", async () => {
+  it("opens confirmation dialog before promoting", async () => {
     renderPage();
-    expect(await screen.findByText("Make them an admin")).toBeInTheDocument();
+    const user = userEvent.setup();
+    const trigger = await screen.findByText("Make them an admin");
+    await user.click(trigger);
+    expect(await screen.findByText("Make this invigilator an admin?")).toBeInTheDocument();
   });
 });
