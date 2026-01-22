@@ -59,6 +59,7 @@ type InvigilatorAssignment = {
   assigned_start: string;
   assigned_end: string;
   role?: string | null;
+  confirmed?: boolean | null;
   cancel?: boolean;
 };
 
@@ -162,7 +163,7 @@ const AssignInvigilatorDialogBody: React.FC<{
   const [search, setSearch] = useState("");
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
-  const [assignmentInputs, setAssignmentInputs] = useState<Map<number, { start: string; end: string; role: string }>>(new Map());
+  const [assignmentInputs, setAssignmentInputs] = useState<Map<number, { start: string; end: string; role: string; confirmed: boolean }>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -203,7 +204,7 @@ const AssignInvigilatorDialogBody: React.FC<{
 
     // Seed per-invigilator inputs with existing assignments or exam defaults
     setAssignmentInputs(() => {
-      const next = new Map<number, { start: string; end: string; role: string }>();
+      const next = new Map<number, { start: string; end: string; role: string; confirmed: boolean }>();
       const defaultStart = examWindow?.start ? examWindow.start.format("YYYY-MM-DDTHH:mm") : "";
       const defaultEnd = examWindow?.end ? examWindow.end.format("YYYY-MM-DDTHH:mm") : "";
       assignedAssignments.forEach((a) => {
@@ -213,6 +214,7 @@ const AssignInvigilatorDialogBody: React.FC<{
           start: start.isValid() ? start.format("YYYY-MM-DDTHH:mm") : defaultStart,
           end: end.isValid() ? end.format("YYYY-MM-DDTHH:mm") : defaultEnd,
           role: a.role || "",
+          confirmed: Boolean(a.confirmed),
         });
       });
       invigilators.forEach((i) => {
@@ -221,6 +223,7 @@ const AssignInvigilatorDialogBody: React.FC<{
             start: defaultStart,
             end: defaultEnd,
             role: "",
+            confirmed: false,
           });
         }
       });
@@ -263,6 +266,7 @@ const AssignInvigilatorDialogBody: React.FC<{
       start: examWindow?.start?.format("YYYY-MM-DDTHH:mm") || "",
       end: examWindow?.end?.format("YYYY-MM-DDTHH:mm") || "",
       role: "",
+      confirmed: false,
     };
 
   const selectionDelta = useMemo(() => {
@@ -282,6 +286,8 @@ const AssignInvigilatorDialogBody: React.FC<{
       const currentEnd = dayjs(assignment.assigned_end);
       const role = input.role || "";
       const currentRole = assignment.role || "";
+      const confirmed = Boolean(input.confirmed);
+      const currentConfirmed = Boolean(assignment.confirmed);
       const startChanged = inputStart.isValid() && currentStart.isValid()
         ? !inputStart.isSame(currentStart, "minute")
         : input.start !== "";
@@ -289,7 +295,7 @@ const AssignInvigilatorDialogBody: React.FC<{
         ? !inputEnd.isSame(currentEnd, "minute")
         : input.end !== "";
 
-      if (startChanged || endChanged || role !== currentRole) {
+      if (startChanged || endChanged || role !== currentRole || confirmed !== currentConfirmed) {
         toUpdate.push(id);
       }
     });
@@ -344,7 +350,7 @@ const AssignInvigilatorDialogBody: React.FC<{
               assigned_start: start.toISOString(),
               assigned_end: end.toISOString(),
               break_time_minutes: 0,
-              confirmed: false,
+              confirmed: input.confirmed,
             }),
           });
           if (!response.ok) {
@@ -376,6 +382,7 @@ const AssignInvigilatorDialogBody: React.FC<{
               role: input.role,
               assigned_start: start.toISOString(),
               assigned_end: end.toISOString(),
+              confirmed: input.confirmed,
             }),
           });
           if (!response.ok) {
@@ -427,10 +434,10 @@ const AssignInvigilatorDialogBody: React.FC<{
     });
   };
 
-  const updateInput = (id: number, patch: Partial<{ start: string; end: string; role: string }>) => {
+  const updateInput = (id: number, patch: Partial<{ start: string; end: string; role: string; confirmed: boolean }>) => {
     setAssignmentInputs((prev) => {
       const next = new Map(prev);
-      const current = next.get(id) || { start: "", end: "", role: "" };
+      const current = next.get(id) || { start: "", end: "", role: "", confirmed: false };
       next.set(id, { ...current, ...patch });
       return next;
     });
@@ -752,6 +759,17 @@ const AssignInvigilatorDialogBody: React.FC<{
                               ))}
                             </Select>
                           </FormControl>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={getInputFor(invigilator.id).confirmed}
+                                onChange={(e) => updateInput(invigilator.id, { confirmed: e.target.checked })}
+                                disabled={!isSelected}
+                              />
+                            }
+                            label="Confirmed"
+                            sx={{ m: 0 }}
+                          />
                           {!isSelected && (
                             <Typography variant="caption" color="text.secondary">
                               Select the invigilator to edit assignment details.
