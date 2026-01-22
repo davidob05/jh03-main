@@ -15,7 +15,8 @@ export type NotificationType =
 export interface NotificationItem {
   id: number;
   type: NotificationType;
-  message: string;
+  invigilator_message?: string;
+  admin_message?: string;
   timestamp: string;
 }
 
@@ -79,7 +80,10 @@ const formatDate = (iso: string) => {
   });
 };
 
-export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }> = ({ notifications }) => {
+export const NotificationsPanel: React.FC<{
+  notifications: NotificationItem[];
+  messageKey?: "invigilator_message" | "admin_message";
+}> = ({ notifications, messageKey = "invigilator_message" }) => {
   return (
     <Panel
       title="Notifications"
@@ -117,6 +121,11 @@ export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }>
         ) : (
           notifications.map((n) => {
             const style = typeStyles[n.type];
+            const message =
+              (messageKey === "admin_message" ? n.admin_message : n.invigilator_message) ||
+              n.invigilator_message ||
+              n.admin_message ||
+              "";
             return (
               <Box
                 key={n.id}
@@ -145,7 +154,7 @@ export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }>
                       }}
                     />
                     <Typography variant="body2" sx={{ color: "text.primary" }}>
-                      {n.message}
+                      {message || "No message provided."}
                     </Typography>
                   </Stack>
                   <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary" }}>

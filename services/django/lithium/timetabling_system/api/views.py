@@ -63,10 +63,15 @@ from .serializers import (
 
 
 def log_notification(type_: str, message: str, when=None, user=None):
+    """
+    Create a notification using the new admin/invigilator message fields.
+    Existing callers pass a single `message`; we fan that out to both variants.
+    """
     try:
         Notification.objects.create(
             type=type_,
-            message=message,
+            invigilator_message=message or "",
+            admin_message=message or "",
             timestamp=when or timezone.now(),
             triggered_by=user,
         )
@@ -300,7 +305,13 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         instance = serializer.save()
         name = instance.preferred_name or instance.full_name or "Invigilator"
-        log_notification("invigilatorUpdate", f"{name} has updated details.", user=_get_request_user(self, serializer))
+        Notification.objects.create(
+            type=Notification.NotificationType.INVIGILATOR_UPDATE,
+            admin_message=f"{name} has updated details.",
+            invigilator_message="Your details have been updated",
+            invigilator=instance,
+            triggered_by=_get_request_user(self, serializer),
+        )
         return instance
 
 
@@ -420,10 +431,17 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
             if candidate.assigned_start else "start time TBC"
         )
         details = f"{exam_name} at {venue_name} on {start_str}"
+        admin_details = details
         original_invigilator = getattr(candidate.invigilator, "preferred_name", None) or getattr(candidate.invigilator, "full_name", None) or None
         if original_invigilator:
-            details = f"{details} (covering for {original_invigilator})"
-        log_notification("shiftPickup", f"{name} picked up a shift for {details}.", user=request.user)
+            admin_details = f"{admin_details} (covering for {original_invigilator})"
+        Notification.objects.create(
+            type=Notification.NotificationType.SHIFT_PICKUP,
+            admin_message=f"{name} picked up a shift for {admin_details}.",
+            invigilator_message=f"You picked up a shift for {details}.",
+            invigilator=invigilator,
+            triggered_by=request.user,
+        )
 
         serializer = self.get_serializer(new_assignment)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -471,7 +489,13 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         details = f"{exam_name} at {venue_name} on {start_str}"
         if reason:
             details = f"{details} (reason: {reason})"
-        log_notification("cancellation", f"{name} requested cancellation for {details}.", user=request.user)
+        Notification.objects.create(
+            type=Notification.NotificationType.CANCELLATION,
+            admin_message=f"{name} requested cancellation for {details}.",
+            invigilator_message=f"Your cancellation request was submitted for {details}.",
+            invigilator=assignment.invigilator,
+            triggered_by=request.user,
+        )
 
         return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
 
@@ -516,7 +540,13 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         details = f"{exam_name} at {venue_name} on {start_str}"
         if reason:
             details = f"{details} (undo reason: {reason})"
-        log_notification("cancellation", f"{name} withdrew cancellation for {details}.", user=request.user)
+        Notification.objects.create(
+            type=Notification.NotificationType.CANCELLATION,
+            admin_message=f"{name} withdrew cancellation for {details}.",
+            invigilator_message=f"Your cancellation withdrawal was submitted for {details}.",
+            invigilator=assignment.invigilator,
+            triggered_by=request.user,
+        )
 
         return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
 
@@ -530,6 +560,8 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
             if instance.assigned_start else "start time TBC"
         )
         details = f"{exam_name} at {venue_name} on {start_str}"
+        admin_details = details
+        invigilator_details = details
         original_invigilator = None
         try:
             original_invigilator = (
@@ -541,8 +573,14 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         except Exception:
             original_invigilator = None
         if original_invigilator:
-            details = f"{details} (covering for {original_invigilator})"
-        log_notification("shiftPickup", f"{name} picked up a shift for {details}.", user=_get_request_user(self, serializer))
+            admin_details = f"{admin_details} (covering for {original_invigilator})"
+        Notification.objects.create(
+            type=Notification.NotificationType.SHIFT_PICKUP,
+            admin_message=f"{name} picked up a shift for {admin_details}.",
+            invigilator_message=f"You picked up a shift for {invigilator_details}.",
+            invigilator=instance.invigilator,
+            triggered_by=_get_request_user(self, serializer),
+        )
         return instance
 
     def perform_destroy(self, instance):
@@ -655,9 +693,11 @@ class NotificationsView(APIView):
 
         if log_only:
             count = len(recipients)
+            method_label = " & ".join(methods) if methods else "mail"
             Notification.objects.create(
                 type=Notification.NotificationType.MAIL_MERGE,
-                message=f"Sent '{subject_to_use}' mail merge to {count} invigilator{'s' if count != 1 else ''}",
+                admin_message=f"Sent '{subject_to_use}' mail merge to {count} invigilator{'s' if count != 1 else ''} via {method_label}",
+                invigilator_message="",
                 timestamp=timezone.now(),
                 triggered_by=request.user,
             )
@@ -1147,15 +1187,30 @@ class StudentProvisionListView(APIView):
 
 class InvigilatorNotificationsView(APIView):
     """
-    Return recent notifications (last 20) for authenticated invigilators.
-    Currently returns global notifications as the model is not scoped per-invigilator.
+    Return recent notifications (last 20) for the authenticated invigilator.
+    Includes global notifications and those targeted at the invigilator.
     """
 
     permission_classes = [IsAuthenticated]
     throttle_classes: list = []  # Lightweight
 
     def get(self, request, *args, **kwargs):
-        qs = Notification.objects.order_by("-timestamp")[:20]
+        invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        if invigilator is None:
+            return Response([])
+
+        hidden_types = [
+            Notification.NotificationType.EXAM_CHANGE,
+            Notification.NotificationType.VENUE_CHANGE,
+            Notification.NotificationType.MAIL_MERGE,
+        ]
+        qs = (
+            Notification.objects.filter(
+                models.Q(invigilator__isnull=True) | models.Q(invigilator=invigilator)
+            )
+            .exclude(type__in=hidden_types)
+            .order_by("-timestamp")[:20]
+        )
         return Response(NotificationSerializer(qs, many=True).data)
 
 
@@ -1497,3 +1552,13 @@ class InvigilatorAssignmentsView(APIView):
         )
 
         return Response(InvigilatorAssignmentSerializer(assignments, many=True).data)
+
+
+
+
+
+
+
+
+
+

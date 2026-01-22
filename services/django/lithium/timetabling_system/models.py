@@ -257,7 +257,8 @@ class Notification(models.Model):
 
     id = models.AutoField(primary_key=True)
     type = models.CharField(max_length=30, choices=NotificationType.choices)
-    message = models.TextField()
+    invigilator_message = models.TextField(blank=True, default="")
+    admin_message = models.TextField(blank=True, default="")
     timestamp = models.DateTimeField(auto_now_add=True)
     triggered_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -266,12 +267,20 @@ class Notification(models.Model):
         blank=True,
         related_name="triggered_notifications",
     )
+    invigilator = models.ForeignKey(
+        "Invigilator",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
 
     class Meta:
         ordering = ["-timestamp"]
 
     def __str__(self):
-        return f"{self.get_type_display()}: {self.message[:40]}"
+        preview = (self.invigilator_message or self.admin_message or "")[:40]
+        return f"{self.get_type_display()}: {preview}"
 
 
 class Announcement(models.Model):

@@ -374,7 +374,10 @@ export const AdminDashboard: React.FC = () => {
       <DietManager />
 
       {/* Notifications */}
-      <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
+      <NotificationsPanel
+        notifications={notifications.slice(0, visibleCount)}
+        messageKey="admin_message"
+      />
       {notifications.length > 0 && (
         <Box sx={{ textAlign: "center", mt: 3, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
           <PillButton

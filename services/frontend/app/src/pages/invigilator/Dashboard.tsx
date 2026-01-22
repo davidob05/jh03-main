@@ -420,7 +420,7 @@ export const InvigilatorDashboard: React.FC = () => {
                 </Typography>
                 <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
                   {statsError
-                    ? "—"
+                    ? "ï¿½"
                     : statsLoading || !stats
                     ? "..."
                     : (stats?.[item.key] ?? 0).toString()}
@@ -434,6 +434,7 @@ export const InvigilatorDashboard: React.FC = () => {
       <Box sx={{ mt: 1.5 }}>
         <NotificationsPanel
           notifications={(notificationsError ? [] : notificationsFromApi).slice(0, visibleCount)}
+          messageKey="invigilator_message"
         />
         {(notificationsError ? [] : notificationsFromApi).length > 0 && (
           <Box
@@ -472,5 +473,4 @@ export const InvigilatorDashboard: React.FC = () => {
     </Box>
   );
 };
-
 

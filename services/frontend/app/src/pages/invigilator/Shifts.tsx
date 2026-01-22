@@ -269,12 +269,7 @@ export const InvigilatorShifts: React.FC = () => {
                           }}
                         />
                       )}
-                      <Chip
-                        icon={<PersonOutlineIcon fontSize="small" sx={{ color: "#b45309 !important" }} />}
-                        label={`Originally: ${invigilatorLabel}`}
-                        size="small"
-                        sx={{ bgcolor: "#fff4e5", color: "#b45309", fontWeight: 700 }}
-                      />
+
                     </Stack>
 
                     {shift.notes && (
@@ -374,4 +369,5 @@ export const InvigilatorShifts: React.FC = () => {
 };
 
 export default InvigilatorShifts;
+
 

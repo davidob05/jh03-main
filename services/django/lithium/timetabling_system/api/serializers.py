@@ -262,10 +262,19 @@ class VenueWriteSerializer(serializers.ModelSerializer):
 
 class NotificationSerializer(serializers.ModelSerializer):
     triggered_by = serializers.SerializerMethodField()
+    invigilator = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
-        fields = ("id", "type", "message", "timestamp", "triggered_by")
+        fields = (
+            "id",
+            "type",
+            "invigilator_message",
+            "admin_message",
+            "timestamp",
+            "triggered_by",
+            "invigilator",
+        )
 
     def get_triggered_by(self, obj):
         user = getattr(obj, "triggered_by", None)
@@ -275,6 +284,15 @@ class NotificationSerializer(serializers.ModelSerializer):
             "id": user.id,
             "email": getattr(user, "email", None),
             "username": getattr(user, "username", None),
+        }
+
+    def get_invigilator(self, obj):
+        inv = getattr(obj, "invigilator", None)
+        if not inv:
+            return None
+        return {
+            "id": inv.id,
+            "name": getattr(inv, "preferred_name", None) or getattr(inv, "full_name", None),
         }
 
 
@@ -530,3 +548,4 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             self._generate_availability(instance, diet_map)
 
         return instance
+
