@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Chip, Divider, Stack, Typography } from "@mui/material";
-import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined, Place, AlternateEmail, AssignmentIndOutlined } from "@mui/icons-material";
+import { AccessTime, EventBusy, CancelOutlined, Update, EditNote, CheckCircleOutline, InfoOutlined, PlaceOutlined, AlternateEmail, AssignmentIndOutlined, CheckCircleOutlined } from "@mui/icons-material";
 import { Panel } from "../Panel";
 
 export type NotificationType =
@@ -29,13 +29,13 @@ const typeStyles: Record<
     label: "Restriction",
     color: "#0d47a1",
     bg: "rgba(13,71,161,0.08)",
-    icon: <EventAvailable fontSize="small" />,
+    icon: <EventBusy fontSize="small" />,
   },
   cancellation: {
     label: "Cancellation",
     color: "#b71c1c",
     bg: "rgba(183,28,28,0.08)",
-    icon: <Cancel fontSize="small" />,
+    icon: <CancelOutlined fontSize="small" />,
   },
   assignment: {
     label: "Assignment",
@@ -47,7 +47,7 @@ const typeStyles: Record<
     label: "Shift Pickup",
     color: "#1b5e20",
     bg: "rgba(27,94,32,0.08)",
-    icon: <CheckCircle fontSize="small" />,
+    icon: <CheckCircleOutline fontSize="small" />,
   },
   examChange: {
     label: "Exam Change",
@@ -65,7 +65,7 @@ const typeStyles: Record<
     label: "Venue Change",
     color: "#f9a825",
     bg: "rgba(249,168,37,0.12)",
-    icon: <Place fontSize="small" />,
+    icon: <PlaceOutlined fontSize="small" />,
   },
   mailMerge: {
     label: "Mail Merge",

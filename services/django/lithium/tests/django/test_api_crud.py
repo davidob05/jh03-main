@@ -227,7 +227,11 @@ class AdminApiCrudTests(TestCase):
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(
             Notification.objects.filter(type="assignment").count(),
-            2,
+            1,
+        )
+        self.assertEqual(
+            Notification.objects.filter(type="cancellation").count(),
+            1,
         )
         self.assertFalse(
             InvigilatorAssignment.objects.filter(pk=assignment_id).exists()
