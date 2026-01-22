@@ -297,6 +297,31 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
         deleted_count, _ = qs.delete()
         return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=["post"], url_path="make-admin", permission_classes=[permissions.IsAdminUser])
+    def make_admin(self, request, pk=None):
+        invigilator = self.get_object()
+        user = getattr(invigilator, "user", None)
+        if not user:
+            return Response(
+                {"detail": "Invigilator has no linked login to promote."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not (user.is_staff and user.is_superuser):
+            user.is_staff = True
+            user.is_superuser = True
+            user.save(update_fields=["is_staff", "is_superuser"])
+
+        return Response(
+            {
+                "detail": "Invigilator promoted to admin.",
+                "user_id": user.id,
+                "is_staff": user.is_staff,
+                "is_superuser": user.is_superuser,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     def perform_update(self, serializer):
         instance = serializer.save()
         name = instance.preferred_name or instance.full_name or "Invigilator"
