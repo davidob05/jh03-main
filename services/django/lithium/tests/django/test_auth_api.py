@@ -57,6 +57,7 @@ class AuthApiTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["user"]["username"], "invig")
         self.assertEqual(response.data["user"]["role"], "invigilator")
+        self.assertIsNotNone(response.data["user"]["invigilator_id"])
 
     def test_token_login_rejects_bad_credentials(self):
         response = self.client.post(
@@ -81,6 +82,7 @@ class AuthApiTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["username"], "invig")
         self.assertEqual(response.data["role"], "invigilator")
+        self.assertIsNotNone(response.data["invigilator_id"])
 
     def test_patch_rejects_duplicate_username(self):
         self.client.force_authenticate(self.admin)
