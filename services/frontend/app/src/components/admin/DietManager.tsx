@@ -117,6 +117,7 @@ export const DietManager: React.FC = () => {
         name: diet.name,
         start_date: diet.start_date || "",
         end_date: diet.end_date || "",
+        restriction_cutoff: diet.restriction_cutoff || "",
         is_active: diet.is_active,
       });
     } else {

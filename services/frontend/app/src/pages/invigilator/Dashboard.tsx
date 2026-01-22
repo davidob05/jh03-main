@@ -114,7 +114,12 @@ export const InvigilatorDashboard: React.FC = () => {
       );
       if (res.status === 404) return [];
       if (!res.ok) throw new Error("Unable to load announcements");
-      return res.json();
+      const data = await res.json();
+      const allRes = await apiFetch(`${apiBaseUrl}/announcements/?audience=all&active=true`);
+      if (allRes.status === 404) return data;
+      if (!allRes.ok) throw new Error("Unable to load announcements");
+      const allData = await allRes.json();
+      return [...data, ...allData];
     },
     retry: false,
   });
@@ -122,7 +127,7 @@ export const InvigilatorDashboard: React.FC = () => {
   const announcements = useMemo(() => {
     const now = new Date();
     const safeData = announcementsError ? [] : announcementsFromApi;
-    return safeData.filter((a) => {
+    const filtered = safeData.filter((a) => {
       if (!a) return false;
       const expires = a.expiresAt ?? a.expires_at;
       if (expires) {
@@ -130,6 +135,13 @@ export const InvigilatorDashboard: React.FC = () => {
         if (!Number.isNaN(exp.getTime()) && exp < now) return false;
       }
       return true;
+    });
+    return filtered.slice().sort((a, b) => {
+      const priorityDiff = (b.priority ?? 0) - (a.priority ?? 0);
+      if (priorityDiff !== 0) return priorityDiff;
+      const aDate = new Date(a.publishedAt ?? a.published_at ?? 0).getTime();
+      const bDate = new Date(b.publishedAt ?? b.published_at ?? 0).getTime();
+      return bDate - aDate;
     });
   }, [announcementsError, announcementsFromApi]);
 
@@ -473,4 +485,3 @@ export const InvigilatorDashboard: React.FC = () => {
     </Box>
   );
 };
-

@@ -871,45 +871,6 @@ class NotificationsView(APIView):
         )
         
 
-class AnnouncementViewSet(viewsets.ModelViewSet):
-    """
-    CRUD for announcements shown on dashboards.
-    Admin-only for mutations; authenticated invigilators/admins can read.
-    """
-
-    queryset = Announcement.objects.all()
-    serializer_class = AnnouncementSerializer
-    throttle_classes: list = []
-
-    def get_permissions(self):
-        if self.request.method in permissions.SAFE_METHODS:
-            return [IsInvigilatorOrAdmin()]
-        return [permissions.IsAdminUser()]
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-
-        audience = self.request.query_params.get("audience")
-        if audience:
-            qs = qs.filter(audience=audience)
-
-        active_flag = self.request.query_params.get("active")
-        if active_flag is not None:
-            should_be_active = str(active_flag).lower() in {"1", "true", "yes"}
-            if should_be_active:
-                now = timezone.now()
-                qs = qs.filter(is_active=True).filter(
-                    models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now)
-                )
-            else:
-                qs = qs.filter(is_active=False)
-
-        return qs
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=_get_request_user(self, serializer))
-
-
 class DietViewSet(viewsets.ModelViewSet):
     queryset = Diet.objects.all().order_by("-is_active", "-start_date", "code")
     serializer_class = DietSerializer

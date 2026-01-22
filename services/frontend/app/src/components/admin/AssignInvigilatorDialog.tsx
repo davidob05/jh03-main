@@ -4,11 +4,9 @@ import {
   DialogContent,
   DialogTitle,
   Checkbox,
-  Button,
   FormControlLabel,
   FormControl,
   InputLabel,
-  InputAdornment,
   InputBase,
   Select,
   MenuItem,
@@ -165,7 +163,7 @@ const AssignInvigilatorDialogBody: React.FC<{
   const [search, setSearch] = useState("");
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
-  const [assignmentInputs, setAssignmentInputs] = useState<Map<number, { start: string; end: string; role: string; confirmed: boolean }>>(new Map());
+  const [assignmentInputs, setAssignmentInputs] = useState<Map<number, { start: string; end: string; role: string }>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -206,7 +204,7 @@ const AssignInvigilatorDialogBody: React.FC<{
 
     // Seed per-invigilator inputs with existing assignments or exam defaults
     setAssignmentInputs(() => {
-      const next = new Map<number, { start: string; end: string; role: string; confirmed: boolean }>();
+      const next = new Map<number, { start: string; end: string; role: string }>();
       const defaultStart = examWindow?.start ? examWindow.start.format("YYYY-MM-DDTHH:mm") : "";
       const defaultEnd = examWindow?.end ? examWindow.end.format("YYYY-MM-DDTHH:mm") : "";
       assignedAssignments.forEach((a) => {
@@ -216,7 +214,6 @@ const AssignInvigilatorDialogBody: React.FC<{
           start: start.isValid() ? start.format("YYYY-MM-DDTHH:mm") : defaultStart,
           end: end.isValid() ? end.format("YYYY-MM-DDTHH:mm") : defaultEnd,
           role: a.role || "",
-          confirmed: Boolean(a.confirmed),
         });
       });
       invigilators.forEach((i) => {
@@ -225,7 +222,6 @@ const AssignInvigilatorDialogBody: React.FC<{
             start: defaultStart,
             end: defaultEnd,
             role: "",
-            confirmed: false,
           });
         }
       });
@@ -268,7 +264,6 @@ const AssignInvigilatorDialogBody: React.FC<{
       start: examWindow?.start?.format("YYYY-MM-DDTHH:mm") || "",
       end: examWindow?.end?.format("YYYY-MM-DDTHH:mm") || "",
       role: "",
-      confirmed: false,
     };
 
   const selectionDelta = useMemo(() => {
@@ -288,8 +283,6 @@ const AssignInvigilatorDialogBody: React.FC<{
       const currentEnd = dayjs(assignment.assigned_end);
       const role = input.role || "";
       const currentRole = assignment.role || "";
-      const confirmed = Boolean(input.confirmed);
-      const currentConfirmed = Boolean(assignment.confirmed);
       const startChanged = inputStart.isValid() && currentStart.isValid()
         ? !inputStart.isSame(currentStart, "minute")
         : input.start !== "";
@@ -297,7 +290,7 @@ const AssignInvigilatorDialogBody: React.FC<{
         ? !inputEnd.isSame(currentEnd, "minute")
         : input.end !== "";
 
-      if (startChanged || endChanged || role !== currentRole || confirmed !== currentConfirmed) {
+      if (startChanged || endChanged || role !== currentRole) {
         toUpdate.push(id);
       }
     });
@@ -352,7 +345,6 @@ const AssignInvigilatorDialogBody: React.FC<{
               assigned_start: start.toISOString(),
               assigned_end: end.toISOString(),
               break_time_minutes: 0,
-              confirmed: input.confirmed,
             }),
           });
           if (!response.ok) {
@@ -384,7 +376,6 @@ const AssignInvigilatorDialogBody: React.FC<{
               role: input.role,
               assigned_start: start.toISOString(),
               assigned_end: end.toISOString(),
-              confirmed: input.confirmed,
             }),
           });
           if (!response.ok) {
@@ -454,6 +445,28 @@ const AssignInvigilatorDialogBody: React.FC<{
     },
   });
 
+  const confirmMutation = useMutation({
+    mutationFn: async (assignmentId: number) => {
+      const res = await apiFetch(`${apiBaseUrl}/invigilator-assignments/${assignmentId}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmed: true }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to confirm assignment.");
+      }
+      return { assignmentId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
+      onAssigned?.();
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof Error ? err.message : "Failed to confirm assignment.");
+    },
+  });
+
   const canUpdate = Boolean(examVenue)
     && selectionDelta.hasChanges;
 
@@ -470,10 +483,10 @@ const AssignInvigilatorDialogBody: React.FC<{
     });
   };
 
-  const updateInput = (id: number, patch: Partial<{ start: string; end: string; role: string; confirmed: boolean }>) => {
+  const updateInput = (id: number, patch: Partial<{ start: string; end: string; role: string }>) => {
     setAssignmentInputs((prev) => {
       const next = new Map(prev);
-      const current = next.get(id) || { start: "", end: "", role: "", confirmed: false };
+      const current = next.get(id) || { start: "", end: "", role: "" };
       next.set(id, { ...current, ...patch });
       return next;
     });
@@ -575,7 +588,11 @@ const AssignInvigilatorDialogBody: React.FC<{
               const conflict = hasConflict(invigilator.id);
               const assignment = assignmentByInvigilator.get(invigilator.id);
               const isCancelled = Boolean(assignment?.cancel);
-              const isCancelledConfirmed = isCancelled && Boolean(assignment?.confirmed);
+              const isConfirmed = Boolean(assignment?.confirmed);
+              const isCancelledConfirmed = isCancelled && isConfirmed;
+              const showConfirmationBanner = assigned && !isCancelled;
+              const showPendingBanner = showConfirmationBanner && !isConfirmed;
+              const showConfirmedBanner = showConfirmationBanner && isConfirmed;
               const canEditAssignment = isSelected && !isCancelledConfirmed;
               let availabilityLabel: string | null = null;
               if (slotInfo && invigilator.availabilities) {
@@ -617,7 +634,11 @@ const AssignInvigilatorDialogBody: React.FC<{
                 solid: true,
               });
               if (conflict) statusChips.push({ label: "Has conflict", tone: "error", solid: true });
-              if (availabilityLabel) {
+              if (isConfirmed && !isCancelled) {
+                statusChips.push({ label: "Confirmed", tone: "success", solid: false });
+              } else if (isCancelled) {
+                statusChips.push({ label: "Not available", tone: "warning", solid: false });
+              } else if (availabilityLabel) {
                 const available = availabilityLabel.toLowerCase().startsWith("available");
                 statusChips.push({ label: available ? "Available" : "Unavailable", tone: available ? "success" : "warning", solid: !available });
               }
@@ -713,6 +734,41 @@ const AssignInvigilatorDialogBody: React.FC<{
                       <ExpandMore />
                     </IconButton>
                   </Box>
+                  {(showPendingBanner || showConfirmedBanner) && (
+                    <Box
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 2,
+                        bgcolor: showConfirmedBanner ? alpha("#2e7d32", 0.12) : alpha("#ed6c02", 0.12),
+                        borderBottom: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          color={showConfirmedBanner ? "#166534" : "#b45309"}
+                        >
+                          {showConfirmedBanner ? "Confirmed" : "Pending confirmation"}
+                        </Typography>
+                      </Box>
+                      {showPendingBanner && assignment && (
+                        <PillButton
+                          variant="contained"
+                          color="success"
+                          disabled={confirmMutation.isPending}
+                          onClick={() => confirmMutation.mutate(assignment.id)}
+                        >
+                          Confirm
+                        </PillButton>
+                      )}
+                    </Box>
+                  )}
                   {assignment?.cancel && (
                     <Box
                       sx={{
@@ -732,23 +788,25 @@ const AssignInvigilatorDialogBody: React.FC<{
                           {isCancelledConfirmed ? "Cancelled" : "Cancellation requested"}
                         </Typography>
                       </Box>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <PillButton
-                          variant="contained"
-                          color="error"
-                          disabled={cancellationMutation.isPending || isCancelledConfirmed}
-                          onClick={() => cancellationMutation.mutate({ assignmentId: assignment.id, action: "approve" })}
-                        >
-                          Approve
-                        </PillButton>
-                        <PillButton
-                          variant="outlined"
-                          disabled={cancellationMutation.isPending || isCancelledConfirmed}
-                          onClick={() => cancellationMutation.mutate({ assignmentId: assignment.id, action: "reject" })}
-                        >
-                          Reject
-                        </PillButton>
-                      </Stack>
+                      {!isCancelledConfirmed && (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <PillButton
+                            variant="contained"
+                            color="error"
+                            disabled={cancellationMutation.isPending}
+                            onClick={() => cancellationMutation.mutate({ assignmentId: assignment.id, action: "approve" })}
+                          >
+                            Approve
+                          </PillButton>
+                          <PillButton
+                            variant="outlined"
+                            disabled={cancellationMutation.isPending}
+                            onClick={() => cancellationMutation.mutate({ assignmentId: assignment.id, action: "reject" })}
+                          >
+                            Reject
+                          </PillButton>
+                        </Stack>
+                      )}
                     </Box>
                   )}
                   <Collapse in={expandedIds.has(invigilator.id)} timeout="auto" unmountOnExit>
@@ -844,17 +902,6 @@ const AssignInvigilatorDialogBody: React.FC<{
                               ))}
                             </Select>
                           </FormControl>
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={getInputFor(invigilator.id).confirmed}
-                                onChange={(e) => updateInput(invigilator.id, { confirmed: e.target.checked })}
-                                disabled={!canEditAssignment}
-                              />
-                            }
-                            label="Confirmed"
-                            sx={{ m: 0 }}
-                          />
                           {assignment?.cancel && assignment.cancel_cause && (
                             <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "pre-line" }}>
                               Reason: {assignment.cancel_cause}
