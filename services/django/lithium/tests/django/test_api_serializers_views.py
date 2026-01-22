@@ -278,6 +278,27 @@ class InvigilatorSerializerTests(TestCase):
 
         self.assertTrue(data["user_is_staff"])
         self.assertTrue(data["user_is_superuser"])
+        self.assertFalse(data["user_is_senior_admin"])
+
+    def test_invigilator_serializer_exposes_senior_admin_flag(self):
+        User = get_user_model()
+        admin_user = User.objects.create_user(
+            username="senior",
+            email="senior@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+            is_senior_admin=True,
+        )
+        invig = Invigilator.objects.create(
+            preferred_name="Senior",
+            full_name="Senior Example",
+            user=admin_user,
+        )
+
+        data = InvigilatorSerializer(instance=invig).data
+
+        self.assertTrue(data["user_is_senior_admin"])
 
     def test_generate_availability_skips_diet_without_dates(self):
         diet_no_dates, _ = Diet.objects.update_or_create(

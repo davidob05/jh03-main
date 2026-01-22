@@ -34,6 +34,7 @@ const invigilatorResponse = {
   user_id: 5,
   user_is_staff: false,
   user_is_superuser: false,
+  user_is_senior_admin: false,
   preferred_name: "Morgan",
   full_name: "Morgan Example",
   mobile: null,
@@ -84,5 +85,11 @@ describe("AdminInvigilatorProfile", () => {
     const trigger = await screen.findByText("Make them an admin");
     await user.click(trigger);
     expect(await screen.findByText("Make this invigilator an admin?")).toBeInTheDocument();
+  });
+
+  it("disables remove admin when current user is not senior admin", async () => {
+    renderPage();
+    const removeButton = await screen.findByText("Remove admin");
+    expect(removeButton).toBeDisabled();
   });
 });
