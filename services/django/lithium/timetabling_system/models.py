@@ -344,7 +344,6 @@ class Invigilator(models.Model):
 
     mobile = models.CharField(max_length=30, blank=True, null=True)
     mobile_text_only = models.CharField(max_length=30, blank=True, null=True)
-    janet_txt = models.CharField(max_length=30, blank=True, null=True)
     alt_phone = models.CharField(max_length=30, blank=True, null=True)
 
     university_email = models.EmailField(blank=True, null=True)

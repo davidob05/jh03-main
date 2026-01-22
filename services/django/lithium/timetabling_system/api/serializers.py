@@ -451,7 +451,6 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "full_name",
             "mobile",
             "mobile_text_only",
-            "janet_txt",
             "alt_phone",
             "university_email",
             "personal_email",

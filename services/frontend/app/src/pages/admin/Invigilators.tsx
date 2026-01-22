@@ -72,7 +72,6 @@ interface Invigilator {
   full_name: string | null;
   mobile: string | null;
   mobile_text_only: string | null;
-  janet_txt: string | null;
   alt_phone: string | null;
   university_email: string | null;
   personal_email: string | null;

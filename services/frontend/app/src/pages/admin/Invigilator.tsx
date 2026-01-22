@@ -79,7 +79,6 @@ interface InvigilatorData {
   full_name: string;
   mobile: string | null;
   mobile_text_only: string | null;
-  janet_txt: string | null;
   alt_phone: string | null;
   university_email: string | null;
   personal_email: string | null;
@@ -318,21 +317,6 @@ export const AdminInvigilatorProfile: React.FC = () => {
                           sx={{ textDecoration: "none", color: "primary.main" }}
                         >
                           {data.mobile_text_only}
-                        </Typography>
-                      </Box>
-                    </Tooltip>
-                  )}
-                  {data.janet_txt && (
-                    <Tooltip title="Janet txt contact">
-                      <Box>
-                        <Typography variant="body2" color="text.secondary">Janet txt</Typography>
-                        <Typography
-                          variant="body1"
-                          component="a"
-                          href={`sms:${data.janet_txt}`}
-                          sx={{ textDecoration: "none", color: "primary.main" }}
-                        >
-                          {data.janet_txt}
                         </Typography>
                       </Box>
                     </Tooltip>

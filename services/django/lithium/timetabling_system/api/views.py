@@ -758,7 +758,7 @@ class NotificationsView(APIView):
                     ]
                 )
             if "sms" in methods:
-                sms_candidate = getattr(invigilator, "janet_txt", None) or getattr(invigilator, "mobile_text_only", None)
+                sms_candidate = getattr(invigilator, "mobile_text_only", None)
                 if sms_candidate and "@" in sms_candidate:
                     sms_recipients.append(sms_candidate)
                 else:
@@ -799,7 +799,7 @@ class NotificationsView(APIView):
             errors.append("No email addresses found for selected invigilators.")
         if "sms" in methods and not sms_recipients:
             errors.append(
-                "No SMS-capable addresses (e.g. janet_txt/mobile_text_only with @) found for selected invigilators."
+                "No SMS-capable addresses (e.g. mobile_text_only with @) found for selected invigilators."
             )
         if skipped_sms and "sms" in methods:
             errors.append(f"Skipped SMS for: {', '.join(skipped_sms)} (missing SMS address).")

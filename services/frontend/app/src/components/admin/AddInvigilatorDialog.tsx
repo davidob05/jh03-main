@@ -83,7 +83,6 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [mobile, setMobile] = useState("");
   const [mobileTextOnly, setMobileTextOnly] = useState("");
-  const [janetTxt, setJanetTxt] = useState("");
   const [altPhone, setAltPhone] = useState("");
   const [universityEmail, setUniversityEmail] = useState("");
   const [personalEmail, setPersonalEmail] = useState("");
@@ -163,7 +162,6 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
           full_name: fullName,
           mobile,
           mobile_text_only: mobileTextOnly,
-          janet_txt: janetTxt,
           alt_phone: altPhone,
           university_email: universityEmail,
           personal_email: personalEmail,
@@ -223,7 +221,6 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
             <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required />
             <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required />
             <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth />
-            <TextField label="Janet txt" value={janetTxt} onChange={e => setJanetTxt(e.target.value)} fullWidth required />
             <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth />
             <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required />
             <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required />

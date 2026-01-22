@@ -86,7 +86,6 @@ interface InvigilatorData {
   full_name: string;
   mobile: string | null;
   mobile_text_only: string | null;
-  janet_txt: string | null;
   alt_phone: string | null;
   university_email: string | null;
   personal_email: string | null;
@@ -111,7 +110,6 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
   const [fullName, setFullName] = useState("");
   const [mobile, setMobile] = useState("");
   const [mobileTextOnly, setMobileTextOnly] = useState("");
-  const [janetTxt, setJanetTxt] = useState("");
   const [altPhone, setAltPhone] = useState("");
   const [universityEmail, setUniversityEmail] = useState("");
   const [personalEmail, setPersonalEmail] = useState("");
@@ -172,7 +170,6 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
     setFullName(data.full_name || "");
     setMobile(data.mobile || "");
     setMobileTextOnly(data.mobile_text_only || "");
-    setJanetTxt(data.janet_txt || "");
     setAltPhone(data.alt_phone || "");
     setUniversityEmail(data.university_email || "");
     setPersonalEmail(data.personal_email || "");
@@ -205,7 +202,6 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
           full_name: fullName,
           mobile,
           mobile_text_only: mobileTextOnly,
-          janet_txt: janetTxt,
           alt_phone: altPhone,
           university_email: universityEmail,
           personal_email: personalEmail,
@@ -248,7 +244,6 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
             <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required />
             <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required />
             <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth />
-            <TextField label="Janet txt" value={janetTxt} onChange={e => setJanetTxt(e.target.value)} fullWidth required />
             <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth />
             <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required />
             <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required />
