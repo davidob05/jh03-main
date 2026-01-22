@@ -11,6 +11,7 @@ class CustomUserCreationForm(AdminUserCreationForm):
             "username",
             "phone",
             "avatar",
+            "is_senior_admin",
         )
 
 
@@ -23,4 +24,5 @@ class CustomUserChangeForm(UserChangeForm):
             "username",
             "phone",
             "avatar",
+            "is_senior_admin",
         )
