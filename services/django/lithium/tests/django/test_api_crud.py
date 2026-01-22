@@ -67,7 +67,7 @@ class AdminApiCrudTests(TestCase):
         self.assertEqual(exam.exam_name, "Updated Algorithms")
         note = Notification.objects.get()
         self.assertEqual(note.type, "examChange")
-        self.assertIn("Updated Algorithms", note.message)
+        self.assertIn("Updated Algorithms", note.admin_message)
 
     def test_venue_create_and_update_log_notifications(self):
         create_response = self.client.post(
@@ -87,7 +87,7 @@ class AdminApiCrudTests(TestCase):
         )
         self.assertIn(
             "Main Hall",
-            Notification.objects.filter(type="venueChange").latest("id").message,
+            Notification.objects.filter(type="venueChange").latest("id").admin_message,
         )
 
         update_response = self.client.patch(
@@ -170,7 +170,7 @@ class AdminApiCrudTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         note = Notification.objects.get()
         self.assertEqual(note.type, "invigilatorUpdate")
-        self.assertIn("Pat", note.message)
+        self.assertIn("Pat", note.admin_message)
 
     def test_invigilator_assignment_create_and_delete_log_notifications(self):
         exam = Exam.objects.create(
@@ -215,7 +215,7 @@ class AdminApiCrudTests(TestCase):
 
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(
-            Notification.objects.filter(type="shiftPickup").count(),
+            Notification.objects.filter(type="assignment").count(),
             1,
         )
         assignment_id = create_response.data["id"]
@@ -226,8 +226,8 @@ class AdminApiCrudTests(TestCase):
 
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(
-            Notification.objects.filter(type="cancellation").count(),
-            1,
+            Notification.objects.filter(type="assignment").count(),
+            2,
         )
         self.assertFalse(
             InvigilatorAssignment.objects.filter(pk=assignment_id).exists()

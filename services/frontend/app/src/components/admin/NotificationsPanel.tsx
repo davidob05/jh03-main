@@ -1,11 +1,12 @@
 import React from "react";
 import { Box, Chip, Divider, Stack, Typography } from "@mui/material";
-import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined, Place, AlternateEmail } from "@mui/icons-material";
+import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined, Place, AlternateEmail, AssignmentIndOutlined } from "@mui/icons-material";
 import { Panel } from "../Panel";
 
 export type NotificationType =
   | "availability"
   | "cancellation"
+  | "assignment"
   | "shiftPickup"
   | "examChange"
   | "invigilatorUpdate"
@@ -35,6 +36,12 @@ const typeStyles: Record<
     color: "#b71c1c",
     bg: "rgba(183,28,28,0.08)",
     icon: <Cancel fontSize="small" />,
+  },
+  assignment: {
+    label: "Assignment",
+    color: "#00897b",
+    bg: "rgba(0,137,123,0.08)",
+    icon: <AssignmentIndOutlined fontSize="small" />,
   },
   shiftPickup: {
     label: "Shift Pickup",

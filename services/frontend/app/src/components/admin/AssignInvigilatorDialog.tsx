@@ -331,13 +331,16 @@ const AssignInvigilatorDialogBody: React.FC<{
           if (!start.isValid() || !end.isValid()) {
             throw new Error(`Invalid start or end time for ${displayName(invigilators.find((i) => i.id === invigilatorId) || { id: invigilatorId, preferred_name: null, full_name: null, resigned: false })}.`);
           }
+          if (!input.role) {
+            throw new Error(`Select a role for ${displayName(invigilators.find((i) => i.id === invigilatorId) || { id: invigilatorId, preferred_name: null, full_name: null, resigned: false })}.`);
+          }
           const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               invigilator: invigilatorId,
               exam_venue: examVenue.examvenue_id,
-              role: input.role || null,
+              role: input.role,
               assigned_start: start.toISOString(),
               assigned_end: end.toISOString(),
               break_time_minutes: 0,
@@ -363,11 +366,14 @@ const AssignInvigilatorDialogBody: React.FC<{
           if (!start.isValid() || !end.isValid()) {
             throw new Error(`Invalid start or end time for ${displayName(invigilators.find((i) => i.id === invigilatorId) || { id: invigilatorId, preferred_name: null, full_name: null, resigned: false })}.`);
           }
+          if (!input.role) {
+            throw new Error(`Select a role for ${displayName(invigilators.find((i) => i.id === invigilatorId) || { id: invigilatorId, preferred_name: null, full_name: null, resigned: false })}.`);
+          }
           const response = await apiFetch(`${apiBaseUrl}/invigilator-assignments/${assignment.id}/`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              role: input.role || null,
+              role: input.role,
               assigned_start: start.toISOString(),
               assigned_end: end.toISOString(),
             }),

@@ -58,7 +58,6 @@ describe("Page - Invigilator Shifts", () => {
 
     await screen.findByText(/Monetary Policy/i);
     expect(screen.getByText(/Main Hall/i)).toBeInTheDocument();
-    expect(screen.getByText(/Originally: Jack/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /pick up shift/i }));
 

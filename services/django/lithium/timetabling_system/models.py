@@ -248,6 +248,7 @@ class Notification(models.Model):
     class NotificationType(models.TextChoices):
         AVAILABILITY = "availability", "Availability"
         CANCELLATION = "cancellation", "Cancellation"
+        ASSIGNMENT = "assignment", "Assignment"
         SHIFT_PICKUP = "shiftPickup", "Shift pickup"
         EXAM_CHANGE = "examChange", "Exam change"
         VENUE_CHANGE = "venueChange", "Venue change"

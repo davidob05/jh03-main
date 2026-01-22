@@ -575,9 +575,9 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         if original_invigilator:
             admin_details = f"{admin_details} (covering for {original_invigilator})"
         Notification.objects.create(
-            type=Notification.NotificationType.SHIFT_PICKUP,
-            admin_message=f"{name} picked up a shift for {admin_details}.",
-            invigilator_message=f"You picked up a shift for {invigilator_details}.",
+            type=Notification.NotificationType.ASSIGNMENT,
+            admin_message=f"{name} has been assigned to a shift for {admin_details}.",
+            invigilator_message=f"You have been assigned to a shift for {invigilator_details}.",
             invigilator=instance.invigilator,
             triggered_by=_get_request_user(self, serializer),
         )
@@ -586,7 +586,19 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
         exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
-        log_notification("cancellation", f"{name} cancelled a shift for {exam_name}.", user=_get_request_user(self))
+        venue_name = instance.exam_venue.venue.venue_name if instance.exam_venue and instance.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(instance.assigned_start).strftime("%d %b %Y at %H:%M")
+            if instance.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        Notification.objects.create(
+            type=Notification.NotificationType.ASSIGNMENT,
+            admin_message=f"{name} has been unassigned from {details}.",
+            invigilator_message=f"You have been unassigned from {details}.",
+            invigilator=instance.invigilator,
+            triggered_by=_get_request_user(self),
+        )
         return super().perform_destroy(instance)
 
 
