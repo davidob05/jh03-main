@@ -38,7 +38,6 @@ import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
 import { PillButton } from '../../components/PillButton';
 import { Panel } from '../../components/Panel';
 import { VENUE_TYPES } from '../../components/admin/venueTypes';
-import { useAppDispatch, useAppSelector, setVenuesPrefs } from '../../state/store';
 
 interface ExamVenueData {
   exam_name: string;
@@ -285,9 +284,12 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
 
 export const AdminVenues: React.FC = () => {
   const queryClient = useQueryClient();
-  const dispatch = useAppDispatch();
-  const { order, orderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.venues);
+  const [order, setOrder] = React.useState<Order>('asc');
+  const [orderBy, setOrderBy] = React.useState<keyof RowData>('name');
   const [selected, setSelected] = React.useState<readonly string[]>([]);
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(5);
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<string, boolean>>({});
   const [addOpen, setAddOpen] = React.useState(false);
   const [successOpen, setSuccessOpen] = React.useState(false);
@@ -406,9 +408,10 @@ export const AdminVenues: React.FC = () => {
     setSelected([]);
   };
 
-  const handleRequestSort = (_event: React.MouseEvent<unknown>, property: keyof RowData) => {
+  const handleRequestSort = (event: React.MouseEvent<unknown>, property: keyof RowData) => {
     const isAsc = orderBy === property && order === 'asc';
-    dispatch(setVenuesPrefs({ order: isAsc ? 'desc' : 'asc', orderBy: property }));
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
   };
 
   const handleClick = (event: React.MouseEvent<unknown>, id: string) => {
@@ -429,7 +432,8 @@ export const AdminVenues: React.FC = () => {
   };
 
   const handleSearchChange = (q: string) => {
-    dispatch(setVenuesPrefs({ searchQuery: q, page: 0 }));
+    setSearchQuery(q);
+    setPage(0);
   };
 
   const handleVenueTypeChange = (venueName: string, nextType: string, currentType: string) => {
@@ -466,11 +470,6 @@ export const AdminVenues: React.FC = () => {
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [order, orderBy, page, rowsPerPage, filteredRows],
   );
-
-  React.useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1);
-    if (page > maxPage) dispatch(setVenuesPrefs({ page: maxPage }));
-  }, [filteredRows.length, rowsPerPage, page, dispatch]);
 
   const summary = React.useMemo(() => {
     const total = venuesData.length;
@@ -684,9 +683,10 @@ export const AdminVenues: React.FC = () => {
           count={filteredRows.length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={(_e, newPage) => dispatch(setVenuesPrefs({ page: newPage }))}
+          onPageChange={(e, newPage) => setPage(newPage)}
           onRowsPerPageChange={(e) => {
-            dispatch(setVenuesPrefs({ rowsPerPage: parseInt(e.target.value, 10), page: 0 }));
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
           }}
         />
       </Panel>

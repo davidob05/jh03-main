@@ -28,7 +28,6 @@ import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
-import { useAppDispatch, useAppSelector, setCalendarPrefs } from "../../state/store";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -145,14 +144,12 @@ const minutesSinceMidnight = (dateTime: string) => {
 };
 
 export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
-  const dispatch = useAppDispatch();
-  const { viewMode, currentDate: currentDateIso, searchQuery, page } = useAppSelector((s) => s.adminTables.calendar);
-  const currentDate = useMemo(() => {
-    const d = new Date(currentDateIso);
-    return Number.isNaN(d.getTime()) ? new Date() : d;
-  }, [currentDateIso]);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<"grid" | "timeline">("grid");
+  const [searchQuery, setSearchQuery] = useState("");
   const [popupOpen, setPopupOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<ExamDetails | null>(null);
+  const [page, setPage] = useState(1);
   const itemsPerPage = 6;
 
   const fallbackExams = initialExams ?? examData;
@@ -164,7 +161,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
     isError: queryError,
     error,
   } = useQuery<ExamDetails[], Error>({
-    queryKey: ["exams-calendar"],
+    queryKey: ["exams"],
     queryFn: fetchExams,
     enabled: shouldFetch,
     retry: false,
@@ -283,7 +280,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             <InputBase
               placeholder="Search exams..."
               value={searchQuery}
-              onChange={(e) => dispatch(setCalendarPrefs({ searchQuery: e.target.value, page: 1 }))}
+              onChange={(e) => setSearchQuery(e.target.value)}
               sx={{ width: 300 }}
             />
           </Paper>
@@ -296,8 +293,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             onChange={(e) => {
               if (!e.target.value) return;
               const picked = new Date(e.target.value);
-              if (!Number.isNaN(picked.getTime()))
-                dispatch(setCalendarPrefs({ currentDate: picked.toISOString(), page: 1 }));
+              if (!Number.isNaN(picked.getTime())) setCurrentDate(picked);
             }}
             InputLabelProps={{ shrink: true }}
             sx={{ minWidth: 180 }}
@@ -308,12 +304,16 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             size="medium"
             startIcon={<ArrowBack />}
             onClick={() =>
-              dispatch(setCalendarPrefs({ currentDate: new Date(currentDate.getTime() - 24 * 3600 * 1000).toISOString(), page: 1 }))
+              setCurrentDate((d) => {
+                const nd = new Date(d);
+                nd.setDate(d.getDate() - 1);
+                return nd;
+              })
             }
           >
             Previous
           </PillButton>
-          <PillButton variant="contained" size="medium" startIcon={<Today />} onClick={() => dispatch(setCalendarPrefs({ currentDate: new Date().toISOString(), page: 1 }))}>
+          <PillButton variant="contained" size="medium" startIcon={<Today />} onClick={() => setCurrentDate(new Date())}>
             Today
           </PillButton>
           <PillButton
@@ -321,14 +321,18 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             size="medium"
             endIcon={<ArrowForward />}
             onClick={() =>
-              dispatch(setCalendarPrefs({ currentDate: new Date(currentDate.getTime() + 24 * 3600 * 1000).toISOString(), page: 1 }))
+              setCurrentDate((d) => {
+                const nd = new Date(d);
+                nd.setDate(d.getDate() + 1);
+                return nd;
+              })
             }
           >
             Next
           </PillButton>
         </Stack>
 
-        <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && dispatch(setCalendarPrefs({ viewMode: v }))} color="primary">
+        <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && setViewMode(v)} color="primary">
           <ToggleButton value="grid" data-testid="grid-btn">
             <GridView />
           </ToggleButton>
@@ -422,7 +426,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
 
           {totalPages > 1 && (
             <Stack direction="row" justifyContent="center" mt={6}>
-              <Pagination count={totalPages} page={page} onChange={(_, v) => dispatch(setCalendarPrefs({ page: v }))} color="primary" size="large" />
+              <Pagination count={totalPages} page={page} onChange={(_, v) => setPage(v)} color="primary" size="large" />
             </Stack>
           )}
         </>

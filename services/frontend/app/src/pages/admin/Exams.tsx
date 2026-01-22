@@ -34,7 +34,6 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
-import { useAppDispatch, useAppSelector, setExamsPrefs } from '../../state/store';
 
 interface ExamData {
   exam_id: number;
@@ -225,14 +224,17 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEdit
 }
 
 export const AdminExams: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const { order, orderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.exams);
+  const [order, setOrder] = React.useState<Order>('asc');
+  const [orderBy, setOrderBy] = React.useState<keyof RowData>('code');
   const [selected, setSelected] = React.useState<readonly number[]>([]);
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(5);
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: examsData = [], isLoading, isError, error, refetch } = useQuery<ExamData[], Error>({ queryKey: ['exams-table'], queryFn: fetchExams });
+  const { data: examsData = [], isLoading, isError, error, refetch } = useQuery<ExamData[], Error>({ queryKey: ['exams'], queryFn: fetchExams });
 
   const rows = React.useMemo<RowData[]>(() => examsData.map((exam) => {
     const coreVenue = getPrimaryExamVenue(exam);
@@ -277,7 +279,8 @@ export const AdminExams: React.FC = () => {
 
   const handleRequestSort = (event: React.MouseEvent<unknown>, property: keyof RowData) => {
     const isAsc = orderBy === property && order === 'asc';
-    dispatch(setExamsPrefs({ order: isAsc ? 'desc' : 'asc', orderBy: property }));
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
   };
 
   const handleClick = (event: React.MouseEvent<unknown>, id: number) => {
@@ -290,12 +293,9 @@ export const AdminExams: React.FC = () => {
     setSelected(newSelected);
   };
 
-  const handleChangePage = (_event: unknown, newPage: number) => dispatch(setExamsPrefs({ page: newPage }));
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const next = parseInt(event.target.value, 10);
-    dispatch(setExamsPrefs({ rowsPerPage: next, page: 0 }));
-  };
-  const handleSearchChange = (query: string) => { dispatch(setExamsPrefs({ searchQuery: query, page: 0 })); };
+  const handleChangePage = (event: unknown, newPage: number) => setPage(newPage);
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
+  const handleSearchChange = (query: string) => { setSearchQuery(query); setPage(0); };
   const handleEditSelected = () => {
     if (selected.length === 1) navigate(`/admin/exam/${selected[0]}`);
   };
@@ -314,11 +314,7 @@ export const AdminExams: React.FC = () => {
         throw new Error(text || "Bulk delete failed");
       }
       setSelected([]);
-      await Promise.all([
-        refetch(),
-        queryClient.invalidateQueries({ queryKey: ['exams-table'] }),
-        queryClient.invalidateQueries({ queryKey: ['exams-calendar'] }),
-      ]);
+      await Promise.all([refetch(), queryClient.invalidateQueries({ queryKey: ['exams'] })]);
     } catch (err: any) {
       alert(err?.message || "Delete failed");
     }
@@ -339,11 +335,6 @@ export const AdminExams: React.FC = () => {
 
   const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredRows.length) : 0;
   const visibleRows = React.useMemo(() => [...filteredRows].sort(getComparator(order, orderBy)).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage), [order, orderBy, page, rowsPerPage, filteredRows]);
-
-  React.useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1);
-    if (page > maxPage) dispatch(setExamsPrefs({ page: maxPage }));
-  }, [filteredRows.length, rowsPerPage, page, dispatch]);
 
   if (isLoading) 
     return (
