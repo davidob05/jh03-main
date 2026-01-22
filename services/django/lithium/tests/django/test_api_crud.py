@@ -172,6 +172,44 @@ class AdminApiCrudTests(TestCase):
         self.assertEqual(note.type, "invigilatorUpdate")
         self.assertIn("Pat", note.message)
 
+    def test_make_invigilator_admin_promotes_linked_user(self):
+        User = get_user_model()
+        invigilator_user = User.objects.create_user(
+            username="invigilator_user",
+            email="invigilator@example.com",
+            password="secret",
+            is_staff=False,
+            is_superuser=False,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Morgan",
+            full_name="Morgan Example",
+            user=invigilator_user,
+        )
+
+        response = self.client.post(
+            reverse("invigilator-make-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        invigilator_user.refresh_from_db()
+        self.assertTrue(invigilator_user.is_staff)
+        self.assertTrue(invigilator_user.is_superuser)
+
+    def test_make_invigilator_admin_requires_linked_user(self):
+        invigilator = Invigilator.objects.create(
+            preferred_name="NoLogin",
+            full_name="No Login Example",
+        )
+
+        response = self.client.post(
+            reverse("invigilator-make-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_invigilator_assignment_create_and_delete_log_notifications(self):
         exam = Exam.objects.create(
             exam_name="Physics",
