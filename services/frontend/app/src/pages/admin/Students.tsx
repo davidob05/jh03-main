@@ -25,12 +25,13 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
+  TablePagination,
   Toolbar,
   Typography,
   Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon } from "@mui/icons-material";
+import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon, ArrowForward as ArrowForwardIcon } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
@@ -152,8 +153,8 @@ const deleteStudentProvision = async (row: StudentProvisionRow): Promise<void> =
 type SectionProps = {
   title: string;
   subtitle: string;
-  search: string;
-  onSearchChange: (value: string) => void;
+  appliedSearch: string;
+  onSearchSubmit: (value: string) => void;
   query: ReturnType<typeof useQuery<StudentProvisionRow[], Error>>;
   emptyLabel: string;
   order: Order;
@@ -227,7 +228,7 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
     mutation.mutate(selectedVenueId);
   };
 
-  const disableSave = selectedVenueId === currentExamVenueId || mutation.isLoading || !studentExamId;
+  const disableSave = selectedVenueId === currentExamVenueId || mutation.isPending || !studentExamId;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -301,9 +302,9 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
         {saveError ? <Alert severity="error" sx={{ mt: 2 }}>{saveError}</Alert> : null}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={mutation.isLoading}>Cancel</Button>
+        <Button onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
         <Button variant="contained" onClick={handleSave} disabled={disableSave}>
-          {mutation.isLoading ? "Saving..." : "Save"}
+          {mutation.isPending ? "Saving..." : "Save"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -313,8 +314,8 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
 const StudentTableSection: React.FC<SectionProps> = ({
   title,
   subtitle,
-  search,
-  onSearchChange,
+  appliedSearch,
+  onSearchSubmit,
   query,
   emptyLabel,
   order,
@@ -323,12 +324,15 @@ const StudentTableSection: React.FC<SectionProps> = ({
 }) => {
   const rows = query.data || [];
   const rowKey = useCallback((row: StudentProvisionRow) => `${row.student_id}::${row.exam_id}`, []);
+  const [searchDraft, setSearchDraft] = useState(appliedSearch);
   const [selected, setSelected] = useState<string[]>([]);
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
   const [venueDialog, setVenueDialog] = useState<VenueDialogState | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTargets, setDeleteTargets] = useState<StudentProvisionRow[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation<void, Error, StudentProvisionRow[]>({
@@ -353,7 +357,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = appliedSearch.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((row) => {
       const haystack = [
@@ -374,7 +378,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [rows, search]);
+  }, [rows, appliedSearch]);
 
   const sorted = useMemo(() => {
     const comparator = (a: StudentProvisionRow, b: StudentProvisionRow) => {
@@ -392,7 +396,11 @@ const StudentTableSection: React.FC<SectionProps> = ({
     rows.forEach((row) => map.set(rowKey(row), row));
     return map;
   }, [rows, rowKey]);
-  const visibleKeys = useMemo(() => filtered.map(rowKey), [filtered, rowKey]);
+  const paginated = useMemo(
+    () => sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    [sorted, page, rowsPerPage]
+  );
+  const visibleKeys = useMemo(() => paginated.map(rowKey), [paginated, rowKey]);
   const visibleKeySet = useMemo(() => new Set(visibleKeys), [visibleKeys]);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const selectedVisibleCount = useMemo(
@@ -403,7 +411,13 @@ const StudentTableSection: React.FC<SectionProps> = ({
 
   useEffect(() => {
     setSelected((prev) => prev.filter((key) => visibleKeySet.has(key)));
-  }, [visibleKeySet]);
+    const maxPage = Math.max(0, Math.ceil(sorted.length / rowsPerPage) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [visibleKeySet, sorted.length, rowsPerPage, page]);
+
+  useEffect(() => {
+    setSearchDraft(appliedSearch);
+  }, [appliedSearch]);
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelected(event.target.checked ? visibleKeys : []);
@@ -465,9 +479,23 @@ const StudentTableSection: React.FC<SectionProps> = ({
               sx={{ backgroundColor: "action.hover", fontWeight: 600 }}
             />
           ) : null}
-          <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5, minWidth: 240 }}>
+          <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5, minWidth: 260 }}>
             <SearchIcon sx={{ color: "action.active", mr: 1 }} />
-            <InputBase placeholder="Search students..." value={search} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: "100%" }} />
+            <InputBase
+              placeholder="Search students..."
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSearchSubmit(searchDraft.trim());
+                }
+              }}
+              sx={{ width: "100%" }}
+            />
+            <IconButton aria-label="Apply search" color="primary" onClick={() => onSearchSubmit(searchDraft.trim())}>
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
           </Box>
           <Button
             variant="outlined"
@@ -500,6 +528,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
           <Typography color="error" variant="body1">{query.error?.message || "Failed to load students"}</Typography>
         </Box>
       ) : (
+        <>
         <TableContainer>
           <Table size="small">
             <TableHead>
@@ -554,7 +583,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {sorted.map((row) => {
+              {paginated.map((row) => {
                 const statusColor = row.matches_needs ? "success" : "warning";
                 const statusLabel = row.matches_needs ? "Allocated" : row.allocation_issue || "Needs allocation";
                 const key = rowKey(row);
@@ -697,6 +726,19 @@ const StudentTableSection: React.FC<SectionProps> = ({
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          component="div"
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          count={sorted.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={(_e, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+        />
+        </>
       )}
       {venueDialog ? (
         <ChangeVenueDialog
@@ -750,6 +792,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
 export const AdminStudents: React.FC = () => {
   const dispatch = useAppDispatch();
   const { searchQuery: allSearch, sortOrder, sortBy } = useAppSelector((s) => s.adminTables.students);
+  const applySearch = (value: string) => dispatch(setStudentsPrefs({ searchQuery: value.trim() }));
 
   const unallocatedQuery = useQuery<StudentProvisionRow[], Error>({
     queryKey: ["student-provisions", "unallocated"],
@@ -785,8 +828,8 @@ export const AdminStudents: React.FC = () => {
         <StudentTableSection
           title="All students with provisions"
           subtitle="Full list of students and their provision requirements."
-          search={allSearch}
-          onSearchChange={(v) => dispatch(setStudentsPrefs({ searchQuery: v }))}
+          appliedSearch={allSearch}
+          onSearchSubmit={applySearch}
           query={allQuery}
           emptyLabel="No student provision records found."
           order={sortOrder}

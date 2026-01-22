@@ -30,7 +30,7 @@ import {
   MenuItem,
   TextField,
 } from '@mui/material';
-import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, AddLocationAlt as AddLocationAltIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, AddLocationAlt as AddLocationAltIcon, ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
 import { Link } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
@@ -214,12 +214,13 @@ interface EnhancedTableToolbarProps {
   numSelected: number;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onSearchSubmit: () => void;
   onAddVenue: () => void;
   onDeleteSelected: () => void;
   deleteLoading: boolean;
 }
 
-const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddVenue, onDeleteSelected, deleteLoading }: EnhancedTableToolbarProps) => {
+const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onSearchSubmit, onAddVenue, onDeleteSelected, deleteLoading }: EnhancedTableToolbarProps) => {
   return (
     <Toolbar
       sx={[
@@ -251,8 +252,17 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
               placeholder="Search venues…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              sx={{ width: 250 }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSearchSubmit();
+                }
+              }}
+              sx={{ width: 220 }}
             />
+            <IconButton aria-label="Apply search" color="primary" onClick={onSearchSubmit} sx={{ ml: 1 }}>
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
           </Box>
         </Box>
       )}
@@ -286,7 +296,13 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
 export const AdminVenues: React.FC = () => {
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
-  const { order, orderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.venues);
+  const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.venues);
+  const allowedSortKeys = ['name', 'capacity', 'type', 'accessibility', 'provisionCapabilities'] as const;
+  type VenueSortKey = typeof allowedSortKeys[number];
+  const orderBy: VenueSortKey = allowedSortKeys.includes(rawOrderBy as VenueSortKey)
+    ? (rawOrderBy as VenueSortKey)
+    : 'name';
+  const [searchDraft, setSearchDraft] = React.useState(searchQuery);
   const [selected, setSelected] = React.useState<readonly string[]>([]);
   const [openRows, setOpenRows] = React.useState<Record<string, boolean>>({});
   const [addOpen, setAddOpen] = React.useState(false);
@@ -295,6 +311,7 @@ export const AdminVenues: React.FC = () => {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [venueTypeOverrides, setVenueTypeOverrides] = React.useState<Record<string, string>>({});
   const [updatingVenueIds, setUpdatingVenueIds] = React.useState<Record<string, boolean>>({});
+  React.useEffect(() => setSearchDraft(searchQuery), [searchQuery]);
 
   const {
     data: venuesData = [],
@@ -327,8 +344,8 @@ export const AdminVenues: React.FC = () => {
     [venuesData, venueTypeOverrides],
   );
 
-  const updateVenueTypeMutation = useMutation({
-    mutationFn: async (payload: { venueName: string; venueType: string; previousType?: string }) => {
+  const updateVenueTypeMutation = useMutation<any, Error, { venueName: string; venueType: string; previousType?: string }>({
+    mutationFn: async (payload) => {
       const res = await apiFetch(`${apiBaseUrl}/venues/${encodeURIComponent(payload.venueName)}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -349,7 +366,7 @@ export const AdminVenues: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['venues'] });
       queryClient.invalidateQueries({ queryKey: ['venue', payload.venueName] });
     },
-    onError: (err: any, payload: { venueName: string; previousType?: string } | undefined) => {
+    onError: (err: any, payload) => {
       if (payload?.venueName) {
         if (payload.previousType) {
           setVenueTypeOverrides((prev) => ({ ...prev, [payload.venueName]: payload.previousType }));
@@ -429,7 +446,7 @@ export const AdminVenues: React.FC = () => {
   };
 
   const handleSearchChange = (q: string) => {
-    dispatch(setVenuesPrefs({ searchQuery: q, page: 0 }));
+    setSearchDraft(q);
   };
 
   const handleVenueTypeChange = (venueName: string, nextType: string, currentType: string) => {
@@ -462,7 +479,7 @@ export const AdminVenues: React.FC = () => {
   const visibleRows = React.useMemo(
     () =>
       [...filteredRows]
-        .sort(getComparator(order, orderBy))
+        .sort(getComparator(order, orderBy as keyof RowData))
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [order, orderBy, page, rowsPerPage, filteredRows],
   );
@@ -538,8 +555,9 @@ export const AdminVenues: React.FC = () => {
       <Panel disableDivider sx={{ width: '100%', mb: 2, p: 0, overflow: 'hidden' }}>
         <EnhancedTableToolbar
           numSelected={selected.length}
-          searchQuery={searchQuery}
+          searchQuery={searchDraft}
           onSearchChange={handleSearchChange}
+          onSearchSubmit={() => dispatch(setVenuesPrefs({ searchQuery: searchDraft.trim(), page: 0 }))}
           onAddVenue={() => setAddOpen(true)}
           onDeleteSelected={() => bulkDeleteMutation.mutate([...selected])}
           deleteLoading={bulkDeleteMutation.isPending}

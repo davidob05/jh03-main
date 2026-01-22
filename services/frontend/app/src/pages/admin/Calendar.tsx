@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -14,6 +14,7 @@ import {
   Divider,
   Tooltip,
   CircularProgress,
+  IconButton,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -147,6 +148,7 @@ const minutesSinceMidnight = (dateTime: string) => {
 export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
   const dispatch = useAppDispatch();
   const { viewMode, currentDate: currentDateIso, searchQuery, page } = useAppSelector((s) => s.adminTables.calendar);
+  const [searchDraft, setSearchDraft] = useState(searchQuery);
   const currentDate = useMemo(() => {
     const d = new Date(currentDateIso);
     return Number.isNaN(d.getTime()) ? new Date() : d;
@@ -216,6 +218,10 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
     return acc;
   }, {} as Record<string, ExamDetails[]>);
 
+  useEffect(() => {
+    setSearchDraft(searchQuery);
+  }, [searchQuery]);
+
   const { startMinutes, endMinutes } = useMemo(() => {
     const defaultStart = 8 * 60;
     const defaultEnd = 20 * 60;
@@ -282,10 +288,19 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
             <Search sx={{ color: "action.active", mr: 1 }} />
             <InputBase
               placeholder="Search exams..."
-              value={searchQuery}
-              onChange={(e) => dispatch(setCalendarPrefs({ searchQuery: e.target.value, page: 1 }))}
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  dispatch(setCalendarPrefs({ searchQuery: searchDraft.trim(), page: 1 }));
+                }
+              }}
               sx={{ width: 300 }}
             />
+            <IconButton aria-label="Apply search" color="primary" onClick={() => dispatch(setCalendarPrefs({ searchQuery: searchDraft.trim(), page: 1 }))}>
+              <ArrowForward />
+            </IconButton>
           </Paper>
 
           <TextField

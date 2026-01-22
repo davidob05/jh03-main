@@ -26,7 +26,7 @@ import {
   Stack,
 } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
-import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -179,11 +179,12 @@ interface EnhancedTableToolbarProps {
   numSelected: number;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onSearchSubmit: () => void;
   onEditSelected: () => void;
   onDeleteSelected: () => void;
 }
 
-function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEditSelected, onDeleteSelected }: EnhancedTableToolbarProps) {
+function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onSearchSubmit, onEditSelected, onDeleteSelected }: EnhancedTableToolbarProps) {
   return (
     <Toolbar sx={[{ pl: { sm: 2 }, pr: { xs: 1, sm: 1 } }, numSelected > 0 && { bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity) }]}>
       {numSelected > 0 ? (
@@ -191,10 +192,24 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEdit
           {numSelected} selected
         </Typography>
       ) : (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 100%' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', backgroundColor: 'action.hover', borderRadius: 1, px: 2, py: 0.5 }}>
             <SearchIcon sx={{ color: 'action.active', mr: 1 }} />
-            <InputBase placeholder="Search exams..." value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: 250 }} />
+            <InputBase
+              placeholder="Search exams..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSearchSubmit();
+                }
+              }}
+              sx={{ width: 220 }}
+            />
+            <IconButton aria-label="Apply search" color="primary" onClick={onSearchSubmit} sx={{ ml: 1 }}>
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
           </Box>
         </Box>
       )}
@@ -226,11 +241,18 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEdit
 
 export const AdminExams: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { order, orderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.exams);
+  const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.exams);
+  const allowedSortKeys = ['code', 'subject', 'coreVenue', 'startTime', 'endTime'] as const;
+  type ExamSortKey = typeof allowedSortKeys[number];
+  const orderBy: ExamSortKey = allowedSortKeys.includes(rawOrderBy as ExamSortKey)
+    ? (rawOrderBy as ExamSortKey)
+    : 'code';
+  const [searchDraft, setSearchDraft] = React.useState(searchQuery);
   const [selected, setSelected] = React.useState<readonly number[]>([]);
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  React.useEffect(() => setSearchDraft(searchQuery), [searchQuery]);
 
   const { data: examsData = [], isLoading, isError, error, refetch } = useQuery<ExamData[], Error>({ queryKey: ['exams-table'], queryFn: fetchExams });
 
@@ -295,7 +317,8 @@ export const AdminExams: React.FC = () => {
     const next = parseInt(event.target.value, 10);
     dispatch(setExamsPrefs({ rowsPerPage: next, page: 0 }));
   };
-  const handleSearchChange = (query: string) => { dispatch(setExamsPrefs({ searchQuery: query, page: 0 })); };
+  const applySearch = () => dispatch(setExamsPrefs({ searchQuery: searchDraft.trim(), page: 0 }));
+  const handleSearchChange = (query: string) => { setSearchDraft(query); };
   const handleEditSelected = () => {
     if (selected.length === 1) navigate(`/admin/exam/${selected[0]}`);
   };
@@ -338,7 +361,7 @@ export const AdminExams: React.FC = () => {
   }, [rows, searchQuery]);
 
   const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredRows.length) : 0;
-  const visibleRows = React.useMemo(() => [...filteredRows].sort(getComparator(order, orderBy)).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage), [order, orderBy, page, rowsPerPage, filteredRows]);
+  const visibleRows = React.useMemo(() => [...filteredRows].sort(getComparator(order, orderBy as keyof RowData)).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage), [order, orderBy, page, rowsPerPage, filteredRows]);
 
   React.useEffect(() => {
     const maxPage = Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1);
@@ -395,8 +418,9 @@ export const AdminExams: React.FC = () => {
         <Panel disableDivider sx={{ p: 0, overflow: 'hidden'}}>
           <EnhancedTableToolbar
             numSelected={selected.length}
-            searchQuery={searchQuery}
+            searchQuery={searchDraft}
             onSearchChange={handleSearchChange}
+            onSearchSubmit={applySearch}
             onEditSelected={handleEditSelected}
             onDeleteSelected={handleDeleteSelected}
           />
