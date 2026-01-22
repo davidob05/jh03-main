@@ -75,6 +75,9 @@ interface Diet {
 
 interface InvigilatorData {
   id: number;
+  user_id?: number | null;
+  user_is_staff?: boolean;
+  user_is_superuser?: boolean;
   preferred_name: string | null;
   full_name: string;
   mobile: string | null;
@@ -113,6 +116,8 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -190,6 +195,8 @@ export const AdminInvigilatorProfile: React.FC = () => {
     };
   }, [data?.contracted_hours, totalAssignedHours]);
 
+  const canPromote = Boolean(data?.user_id) && !data?.user_is_superuser;
+
   const handleDelete = async () => {
     if (!id) return;
     try {
@@ -207,6 +214,26 @@ export const AdminInvigilatorProfile: React.FC = () => {
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
+    }
+  };
+
+  const handlePromote = async () => {
+    if (!id) return;
+    try {
+      setPromoting(true);
+      setPromoteError(null);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/make-admin/`, { method: "POST" });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to promote invigilator");
+      }
+      setSuccessMessage("Invigilator promoted to admin.");
+      setSuccessOpen(true);
+      await refetch();
+    } catch (err: any) {
+      setPromoteError(err?.message || "Failed to promote invigilator.");
+    } finally {
+      setPromoting(false);
     }
   };
 
@@ -242,20 +269,35 @@ export const AdminInvigilatorProfile: React.FC = () => {
           </Box>
         </Tooltip>
 
-        <ToggleButtonGroup
-          value={availabilityView}
-          exclusive
-          color="primary"
-          onChange={(_, v) => v && setAvailabilityView(v)}
-        >
-          <ToggleButton value="list">
-            <GridView />
-          </ToggleButton>
-          <ToggleButton value="calendar">
-            <CalendarViewMonth />
-          </ToggleButton>
-        </ToggleButtonGroup>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <ToggleButtonGroup
+            value={availabilityView}
+            exclusive
+            color="primary"
+            onChange={(_, v) => v && setAvailabilityView(v)}
+          >
+            <ToggleButton value="list">
+              <GridView />
+            </ToggleButton>
+            <ToggleButton value="calendar">
+              <CalendarViewMonth />
+            </ToggleButton>
+          </ToggleButtonGroup>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={handlePromote}
+            disabled={!canPromote || promoting}
+          >
+            {data.user_is_superuser ? "Already admin" : "Make them an admin"}
+          </Button>
+        </Stack>
       </Stack>
+      {promoteError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {promoteError}
+        </Alert>
+      )}
 
       {/* Container for left and right columns */}
       <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
