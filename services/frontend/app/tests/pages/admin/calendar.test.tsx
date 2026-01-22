@@ -159,6 +159,12 @@ for (let d = firstDate; d <= lastDate; d.setDate(d.getDate() + 1)) {
 }
 
 describe("Pages - calendar", () => {
+  const parseHeaderDate = (text: string) => {
+    const datePart = text.trim().split(" ").pop() || "";
+    const [day, month, year] = datePart.split("/").map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   // Rendering tests
   it("renders the title", () => {
     renderCalendar();
@@ -170,10 +176,8 @@ describe("Pages - calendar", () => {
     vi.setSystemTime(new Date("2025-11-15T09:00:00"));
     renderCalendar();
     const header = screen.getByTestId("date-header");
-    expect(header).toHaveTextContent(/Saturday/i);
-    expect(header).toHaveTextContent(/15/);
-    expect(header).toHaveTextContent(/November/);
-    expect(header).toHaveTextContent(/2025/);
+    expect(header).toHaveTextContent(/Sat/i);
+    expect(header).toHaveTextContent(/15\/11\/2025/);
   });
 
   // Runs once for each day, test that only exams on that day are displayed
@@ -183,8 +187,8 @@ describe("Pages - calendar", () => {
 
     renderCalendar();
     const targetDate = new Date(targetDateStr);
-    const headerText = screen.getByTestId("date-header").textContent!;
-    const currentDate = new Date(headerText);
+    const headerText = screen.getByTestId("date-header").textContent || "";
+    const currentDate = parseHeaderDate(headerText);
     const dayDiff = Math.round((targetDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
     const nextButton = screen.getByRole("button", { name: /Next/i });
     const prevButton = screen.getByRole("button", { name: /Previous/i });
@@ -224,10 +228,8 @@ describe("Pages - calendar", () => {
     renderCalendar();
     fireEvent.click(screen.getByRole("button", { name: /Next/i }));
     const dateHeader = screen.getByTestId("date-header");
-    expect(dateHeader).toHaveTextContent(/Sunday/i);
-    expect(dateHeader).toHaveTextContent(/16/);
-    expect(dateHeader).toHaveTextContent(/November/);
-    expect(dateHeader).toHaveTextContent(/2025/);
+    expect(dateHeader).toHaveTextContent(/Sun/i);
+    expect(dateHeader).toHaveTextContent(/16\/11\/2025/);
   });
 
   it("moves to the previous day when clicked", () => {
@@ -236,10 +238,8 @@ describe("Pages - calendar", () => {
     renderCalendar();
     fireEvent.click(screen.getByRole("button", { name: /Previous/i }));
     const dateHeader = screen.getByTestId("date-header");
-    expect(dateHeader).toHaveTextContent(/Friday/i);
-    expect(dateHeader).toHaveTextContent(/14/);
-    expect(dateHeader).toHaveTextContent(/November/);
-    expect(dateHeader).toHaveTextContent(/2025/);
+    expect(dateHeader).toHaveTextContent(/Fri/i);
+    expect(dateHeader).toHaveTextContent(/14\/11\/2025/);
   });
 
   it("set calendar to today when today clicked", () => {
@@ -248,10 +248,8 @@ describe("Pages - calendar", () => {
     renderCalendar();
     fireEvent.click(screen.getByRole("button", { name: /Today/i }));
     const dateHeader = screen.getByTestId("date-header");
-    expect(dateHeader).toHaveTextContent(/Saturday/i);
-    expect(dateHeader).toHaveTextContent(/15/);
-    expect(dateHeader).toHaveTextContent(/November/);
-    expect(dateHeader).toHaveTextContent(/2025/);
+    expect(dateHeader).toHaveTextContent(/Sat/i);
+    expect(dateHeader).toHaveTextContent(/15\/11\/2025/);
   });
 
   // Style

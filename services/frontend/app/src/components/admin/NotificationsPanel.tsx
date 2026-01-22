@@ -1,11 +1,13 @@
 import React from "react";
 import { Box, Chip, Divider, Stack, Typography } from "@mui/material";
-import { AccessTime, EventAvailable, Cancel, Update, EditNote, CheckCircle, InfoOutlined, Place, AlternateEmail } from "@mui/icons-material";
+import { AccessTime, EventBusy, CancelOutlined, Update, EditNote, CheckCircleOutline, InfoOutlined, PlaceOutlined, AlternateEmail, AssignmentIndOutlined, CheckCircleOutlined } from "@mui/icons-material";
 import { Panel } from "../Panel";
+import { formatDateTime } from "../../utils/dates";
 
 export type NotificationType =
   | "availability"
   | "cancellation"
+  | "assignment"
   | "shiftPickup"
   | "examChange"
   | "invigilatorUpdate"
@@ -15,7 +17,8 @@ export type NotificationType =
 export interface NotificationItem {
   id: number;
   type: NotificationType;
-  message: string;
+  invigilator_message?: string;
+  admin_message?: string;
   timestamp: string;
 }
 
@@ -27,19 +30,25 @@ const typeStyles: Record<
     label: "Restriction",
     color: "#0d47a1",
     bg: "rgba(13,71,161,0.08)",
-    icon: <EventAvailable fontSize="small" />,
+    icon: <EventBusy fontSize="small" />,
   },
   cancellation: {
     label: "Cancellation",
     color: "#b71c1c",
     bg: "rgba(183,28,28,0.08)",
-    icon: <Cancel fontSize="small" />,
+    icon: <CancelOutlined fontSize="small" />,
+  },
+  assignment: {
+    label: "Assignment",
+    color: "#00897b",
+    bg: "rgba(0,137,123,0.08)",
+    icon: <AssignmentIndOutlined fontSize="small" />,
   },
   shiftPickup: {
     label: "Shift Pickup",
     color: "#1b5e20",
     bg: "rgba(27,94,32,0.08)",
-    icon: <CheckCircle fontSize="small" />,
+    icon: <CheckCircleOutline fontSize="small" />,
   },
   examChange: {
     label: "Exam Change",
@@ -57,7 +66,7 @@ const typeStyles: Record<
     label: "Venue Change",
     color: "#f9a825",
     bg: "rgba(249,168,37,0.12)",
-    icon: <Place fontSize="small" />,
+    icon: <PlaceOutlined fontSize="small" />,
   },
   mailMerge: {
     label: "Mail Merge",
@@ -67,19 +76,10 @@ const typeStyles: Record<
   },
 };
 
-const formatDate = (iso: string) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }> = ({ notifications }) => {
+export const NotificationsPanel: React.FC<{
+  notifications: NotificationItem[];
+  messageKey?: "invigilator_message" | "admin_message";
+}> = ({ notifications, messageKey = "invigilator_message" }) => {
   return (
     <Panel
       title="Notifications"
@@ -117,6 +117,11 @@ export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }>
         ) : (
           notifications.map((n) => {
             const style = typeStyles[n.type];
+            const message =
+              (messageKey === "admin_message" ? n.admin_message : n.invigilator_message) ||
+              n.invigilator_message ||
+              n.admin_message ||
+              "";
             return (
               <Box
                 key={n.id}
@@ -145,12 +150,12 @@ export const NotificationsPanel: React.FC<{ notifications: NotificationItem[] }>
                       }}
                     />
                     <Typography variant="body2" sx={{ color: "text.primary" }}>
-                      {n.message}
+                      {message || "No message provided."}
                     </Typography>
                   </Stack>
                   <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary" }}>
                     <AccessTime fontSize="small" />
-                    <Typography variant="caption">{formatDate(n.timestamp)}</Typography>
+                    <Typography variant="caption">{formatDateTime(n.timestamp)}</Typography>
                   </Stack>
                 </Stack>
               </Box>

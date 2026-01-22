@@ -28,6 +28,7 @@ import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { apiBaseUrl, apiFetch, clearAuthSession, getAuthToken, setAuthSession } from "../../utils/api";
+import { formatDateTime } from "../../utils/dates";
 
 export const InvigilatorProfile: React.FC = () => {
   const queryClient = useQueryClient();
@@ -126,7 +127,7 @@ export const InvigilatorProfile: React.FC = () => {
     setPhotoPreview(userData.avatar || null);
     setAvatarData(userData.avatar || null);
     setShowPhotoSave(false);
-    setLastLogin(userData.last_login ? new Date(userData.last_login).toLocaleString() : null);
+    setLastLogin(userData.last_login ? formatDateTime(userData.last_login) : null);
     setLastUpdated("Just now");
   }, [userData]);
 
@@ -501,10 +502,10 @@ export const InvigilatorProfile: React.FC = () => {
                             {!s.is_active && <Chip size="small" sx={{ fontWeight: 600 }} color="default" label="Revoked" />}
                           </Stack>
                           <Typography variant="body2" color="text.secondary">
-                            Last active: {s.last_seen ? new Date(s.last_seen).toLocaleString() : "N/A"}
+                            Last active: {s.last_seen ? formatDateTime(s.last_seen) : "N/A"}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            Created: {s.created_at ? new Date(s.created_at).toLocaleString() : "N/A"}
+                            Created: {s.created_at ? formatDateTime(s.created_at) : "N/A"}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             IP: {s.ip_address || "Unknown"}

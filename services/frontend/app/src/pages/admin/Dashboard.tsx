@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Fab, Grid, IconButton, Paper, Stack, Tooltip, Typography, CircularProgress } from "@mui/material";
+import { Box, Fab, Grid, IconButton, Stack, Tooltip, Typography, CircularProgress } from "@mui/material";
 import AddCommentIcon from "@mui/icons-material/AddComment";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDate } from "../../utils/dates";
 import { NotificationsPanel, NotificationItem } from "../../components/admin/NotificationsPanel";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
@@ -42,6 +43,14 @@ interface ExamData {
 
 interface InvigilatorData {
   id: number;
+  contracted_hours?: number | null;
+  assignments?: {
+    exam_venue: number;
+    assigned_start: string;
+    assigned_end: string;
+    break_time_minutes?: number | null;
+    cancel?: boolean;
+  }[];
 }
 
 interface VenueData {
@@ -96,7 +105,18 @@ export const AdminDashboard: React.FC = () => {
 
     const upcomingExamIds = new Set<number>();
     const unallocatedExamVenueIds = new Set<number>();
+    const assignedByVenue = new Map<number, number>();
     const now = new Date();
+
+    invigilators.forEach((invigilator) => {
+      (invigilator.assignments || []).forEach((assignment) => {
+        if (assignment.cancel) return;
+        assignedByVenue.set(
+          assignment.exam_venue,
+          (assignedByVenue.get(assignment.exam_venue) || 0) + 1
+        );
+      });
+    });
 
     exams.forEach((exam) => {
       exam.exam_venues?.forEach((ev) => {
@@ -110,14 +130,40 @@ export const AdminDashboard: React.FC = () => {
       });
     });
 
+    let slotsToAllocate = 0;
+    exams.forEach((exam) => {
+      exam.exam_venues?.forEach((ev) => {
+        if (!ev.start_time) return;
+        const start = new Date(ev.start_time);
+        if (!(start > now)) return;
+        if ((assignedByVenue.get(ev.examvenue_id) || 0) === 0) {
+          slotsToAllocate += 1;
+        }
+      });
+    });
+
+    const contractsFulfilled = invigilators.reduce((count, invigilator) => {
+      const contracted = invigilator.contracted_hours;
+      if (contracted == null || contracted <= 0) return count;
+      const assignedHours = (invigilator.assignments || []).reduce((sum, assignment) => {
+        if (assignment.cancel) return sum;
+        const start = new Date(assignment.assigned_start).getTime();
+        const end = new Date(assignment.assigned_end).getTime();
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return sum;
+        const durationMinutes = (end - start) / 60000 - (assignment.break_time_minutes || 0);
+        return sum + Math.max(durationMinutes, 0) / 60;
+      }, 0);
+      return assignedHours >= contracted ? count + 1 : count;
+    }, 0);
+
     return {
       totalExams,
       totalInvigilators,
       totalVenues,
       upcomingExams: upcomingExamIds.size,
       examsForAllocation: unallocatedExamVenueIds.size,
-      slotsToAllocate: null,
-      contractsFulfilled: null,
+      slotsToAllocate,
+      contractsFulfilled,
     };
   }, [exams, invigilators, venues]);
 
@@ -150,7 +196,7 @@ export const AdminDashboard: React.FC = () => {
   const announcements = useMemo(() => {
     const now = new Date();
     const safeData = announcementsError ? [] : announcementsFromApi;
-    return safeData.filter((a) => {
+    const filtered = safeData.filter((a) => {
       if (!a) return false;
       const expires = a.expiresAt ?? a.expires_at;
       if (expires) {
@@ -158,6 +204,13 @@ export const AdminDashboard: React.FC = () => {
         if (!Number.isNaN(exp.getTime()) && exp < now) return false;
       }
       return true;
+    });
+    return filtered.slice().sort((a, b) => {
+      const priorityDiff = (b.priority ?? 0) - (a.priority ?? 0);
+      if (priorityDiff !== 0) return priorityDiff;
+      const aDate = new Date(a.publishedAt ?? a.published_at ?? 0).getTime();
+      const bDate = new Date(b.publishedAt ?? b.published_at ?? 0).getTime();
+      return bDate - aDate;
     });
   }, [announcementsError, announcementsFromApi]);
 
@@ -236,6 +289,7 @@ export const AdminDashboard: React.FC = () => {
               flex: 1,
               width: "100%",
               height: "100%",
+              position: "relative",
               overflow: "hidden",
               color: "#fff",
               backgroundImage: heroImage
@@ -262,11 +316,7 @@ export const AdminDashboard: React.FC = () => {
                 }}
               >
                 <Typography variant="overline" sx={{ letterSpacing: 0.6, opacity: 0.9 }}>
-                  {new Date(publishedAtDisplay).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  {formatDate(publishedAtDisplay)}
                 </Typography>
                 <Typography variant="body1" sx={{ color: "#e8ecf1" }}>
                   {activeAnnouncement.body}
@@ -347,23 +397,23 @@ export const AdminDashboard: React.FC = () => {
             { label: "Contracts Fulfilled", value: stats.contractsFulfilled ?? "…", tone: "#2e7d32" },
           ].map((item, idx) => (
             <Grid item xs={12} sm={6} md={3} key={idx}>
-              <Paper
-                elevation={0}
+              <Box
                 sx={{
                   p: 2,
                   borderRadius: 3,
                   border: "1px solid",
                   borderColor: "divider",
-                  backgroundColor: "#fff",
+                  backgroundColor: "#f8f8f8",
+                  textAlign: "center",
                 }}
               >
-                <Typography variant="subtitle2" sx={{ color: item.tone, fontWeight: 700, mb: 0.5 }}>
+                <Typography variant="subtitle1" sx={{ color: item.tone, fontWeight: 700, mb: 0.5 }}>
                   {item.label}
                 </Typography>
                 <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
                   {item.value}
                 </Typography>
-              </Paper>
+              </Box>
             </Grid>
           ))}
         </Grid>
@@ -373,7 +423,10 @@ export const AdminDashboard: React.FC = () => {
       <DietManager />
 
       {/* Notifications */}
-      <NotificationsPanel notifications={notifications.slice(0, visibleCount)} />
+      <NotificationsPanel
+        notifications={notifications.slice(0, visibleCount)}
+        messageKey="admin_message"
+      />
       {notifications.length > 0 && (
         <Box sx={{ textAlign: "center", mt: 3, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
           <PillButton

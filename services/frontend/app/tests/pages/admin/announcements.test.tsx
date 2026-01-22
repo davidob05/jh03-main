@@ -59,7 +59,7 @@ describe("AdminDashboard announcements panel", () => {
   it("loads 'all' audience announcements and renders the carousel", async () => {
     renderPage();
 
-    await screen.findByText("First admin announcement.");
+    await screen.findByText("Second admin announcement.");
 
     const sawAnnouncementsCall = apiFetchMock.mock.calls.some(
       (args) => typeof args[0] === "string" && args[0].includes("/announcements/?audience=all&active=true")
@@ -69,19 +69,21 @@ describe("AdminDashboard announcements panel", () => {
 
   it("cycles to the next announcement", async () => {
     renderPage();
-    await screen.findByText("First admin announcement.");
+    await screen.findByText("Second admin announcement.");
 
     fireEvent.click(screen.getByLabelText("Next announcement"));
 
     await waitFor(() => {
-      expect(screen.getByText("Second admin announcement.")).toBeInTheDocument();
+      expect(screen.getByText("First admin announcement.")).toBeInTheDocument();
     });
   });
 
   it("wraps to the previous announcement from the first item", async () => {
     renderPage();
-    await screen.findByText("First admin announcement.");
+    await screen.findByText("Second admin announcement.");
 
+    fireEvent.click(screen.getByLabelText("Next announcement"));
+    await screen.findByText("First admin announcement.");
     fireEvent.click(screen.getByLabelText("Previous announcement"));
 
     await waitFor(() => {
@@ -138,18 +140,18 @@ describe("AdminDashboard announcements panel", () => {
     renderPage();
 
     expect(screen.getByText(/Loading announcements/i)).toBeInTheDocument();
-    await screen.findByText("First admin announcement.");
+    await screen.findByText("Second admin announcement.");
   });
 
   it("allows dot navigation to a specific announcement", async () => {
     renderPage();
-    await screen.findByText("First admin announcement.");
+    await screen.findByText("Second admin announcement.");
 
     const dots = screen.getAllByLabelText(/Go to announcement/i);
     fireEvent.click(dots[1]);
 
     await waitFor(() => {
-      expect(screen.getByText("Second admin announcement.")).toBeInTheDocument();
+      expect(screen.getByText("First admin announcement.")).toBeInTheDocument();
     });
   });
 });

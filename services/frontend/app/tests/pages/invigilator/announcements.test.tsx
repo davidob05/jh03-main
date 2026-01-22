@@ -59,7 +59,7 @@ describe("InvigilatorDashboard announcements panel", () => {
   it("loads invigilator announcements", async () => {
     renderPage();
 
-    await screen.findByText("First invigilator announcement.");
+    await screen.findByText("Second invigilator announcement.");
 
     const sawAnnouncementsCall = apiFetchMock.mock.calls.some(
       (args) => typeof args[0] === "string" && args[0].includes("/announcements/?audience=invigilator&active=true")
@@ -69,19 +69,21 @@ describe("InvigilatorDashboard announcements panel", () => {
 
   it("navigates between announcements", async () => {
     renderPage();
-    await screen.findByText("First invigilator announcement.");
+    await screen.findByText("Second invigilator announcement.");
 
     fireEvent.click(screen.getByLabelText("Next announcement"));
 
     await waitFor(() => {
-      expect(screen.getByText("Second invigilator announcement.")).toBeInTheDocument();
+      expect(screen.getByText("First invigilator announcement.")).toBeInTheDocument();
     });
   });
 
   it("wraps to previous from the first announcement", async () => {
     renderPage();
-    await screen.findByText("First invigilator announcement.");
+    await screen.findByText("Second invigilator announcement.");
 
+    fireEvent.click(screen.getByLabelText("Next announcement"));
+    await screen.findByText("First invigilator announcement.");
     fireEvent.click(screen.getByLabelText("Previous announcement"));
 
     await waitFor(() => {
@@ -138,18 +140,18 @@ describe("InvigilatorDashboard announcements panel", () => {
     renderPage();
 
     expect(screen.getByText(/Loading announcements/i)).toBeInTheDocument();
-    await screen.findByText("First invigilator announcement.");
+    await screen.findByText("Second invigilator announcement.");
   });
 
   it("allows dot navigation to a specific announcement", async () => {
     renderPage();
-    await screen.findByText("First invigilator announcement.");
+    await screen.findByText("Second invigilator announcement.");
 
     const dots = screen.getAllByLabelText(/Go to announcement/i);
     fireEvent.click(dots[1]);
 
     await waitFor(() => {
-      expect(screen.getByText("Second invigilator announcement.")).toBeInTheDocument();
+      expect(screen.getByText("First invigilator announcement.")).toBeInTheDocument();
     });
   });
 });

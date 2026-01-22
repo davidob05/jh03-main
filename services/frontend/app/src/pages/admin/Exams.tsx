@@ -24,16 +24,19 @@ import {
   Chip,
   Divider,
   Stack,
+  Fab,
 } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
-import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
+import { formatDateTime } from '../../utils/dates';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
+import { EditExamDialog } from "../../components/admin/EditExamDialog";
 
 interface ExamData {
   exam_id: number;
@@ -102,13 +105,6 @@ const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
   const venues = exam.exam_venues || [];
   return venues.find((v) => v.core) || venues[0];
 };
-
-function formatDateTime(dateTime: string): string {
-  if (!dateTime) return 'N/A';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 function calculateDuration(startTime: string, endTime: string): string {
   if (!startTime || !endTime) return 'N/A';
@@ -231,6 +227,7 @@ export const AdminExams: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
+  const [addOpen, setAddOpen] = React.useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -353,7 +350,7 @@ export const AdminExams: React.FC = () => {
             <Typography variant="h4" fontWeight={700}>Exams</Typography>
             <Typography variant="body2" color="text.secondary">Manage exam schedules, venues, and timings.</Typography>
           </Box>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1.5}>
             <Chip
               label={`${summary.total} Exams`}
               size="medium"
@@ -367,8 +364,8 @@ export const AdminExams: React.FC = () => {
               label={`${summary.upcoming} Upcoming`}
               size="medium"
               sx={{
-                backgroundColor: "#def3dbff",
-                color: "secondary.main",
+                backgroundColor: alpha("#2e7d32", 0.12),
+                color: "success.main",
                 fontWeight: 600,
               }}
             />
@@ -468,6 +465,30 @@ export const AdminExams: React.FC = () => {
           <Divider />
           <TablePagination rowsPerPageOptions={[5, 10, 25]} component="div" count={filteredRows.length} rowsPerPage={rowsPerPage} page={page} onPageChange={handleChangePage} onRowsPerPageChange={handleChangeRowsPerPage} />
         </Panel>
+
+        <EditExamDialog
+          open={addOpen}
+          examId={null}
+          onClose={() => setAddOpen(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["exams"] });
+          }}
+        />
+
+        <Box
+          sx={{
+            position: "fixed",
+            bottom: 32,
+            right: 32,
+            zIndex: 1000,
+          }}
+        >
+          <Tooltip title="Add exam">
+            <Fab color="primary" onClick={() => setAddOpen(true)}>
+              <AddIcon />
+            </Fab>
+          </Tooltip>
+        </Box>
       </Box>
     </LocalizationProvider>
   );

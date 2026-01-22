@@ -16,7 +16,6 @@ const invigilator = {
   full_name: "Pat Invig",
   mobile: "07123",
   mobile_text_only: "",
-  janet_txt: "07123",
   alt_phone: "",
   university_email: "pat@example.com",
   personal_email: "pat@example.org",

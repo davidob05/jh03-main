@@ -63,6 +63,7 @@ import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialo
 import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { NotifyDialog } from '../../components/admin/NotifyDialog';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
+import { formatMonthYear } from '../../utils/dates';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 
@@ -72,7 +73,6 @@ interface Invigilator {
   full_name: string | null;
   mobile: string | null;
   mobile_text_only: string | null;
-  janet_txt: string | null;
   alt_phone: string | null;
   university_email: string | null;
   personal_email: string | null;
@@ -135,7 +135,7 @@ export const AdminInvigilators: React.FC = () => {
   const itemsPerPage = viewMode === 'grid' ? 12 : 10;
 
   // Calendar state
-  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(dayjs());
+  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
 
   // Searching state
@@ -574,7 +574,7 @@ export const AdminInvigilators: React.FC = () => {
             {/* Three Independent Calendars */}
             <Box sx={{ display: 'flex', p: 3, gap: 3, flex: 1, overflow: 'hidden' }}>
               {[-1, 0, 1].map((offset) => {
-                const monthDate = dayjs('2025-12-01').add(currentMonthIndex + offset, 'month');
+                const monthDate = dayjs().startOf("month").add(currentMonthIndex + offset, "month");
                 const isCurrentMonth = offset === 0;
 
                 return (
@@ -591,12 +591,13 @@ export const AdminInvigilators: React.FC = () => {
                     }}
                   >
                     <Typography variant="h6" align="center" gutterBottom sx={{ fontWeight: 600 }}>
-                      {monthDate.format('MMMM YYYY')}
+                      {formatMonthYear(monthDate)}
                     </Typography>
 
                     <StaticDatePicker
                       displayStaticWrapperAs="desktop"
-                      value={monthDate}
+                      value={null}
+                      referenceDate={monthDate}
                       onChange={(newValue) => {
                         setSelectedDate(newValue);
                         setCalendarModalOpen(true);
@@ -713,11 +714,11 @@ export const AdminInvigilators: React.FC = () => {
           <Grid container spacing={3}>
             {paginated.map(i => (
               // @ts-ignore
-              <Grid component="div" item xs={12} sm={6} md={4} lg={3} key={i.id}>
+              <Grid component="div" item xs={12} sm={6} md={4} lg={3} key={i.id} sx={{ display: "flex", justifyContent: "center" }}>
                 <Panel
                   disableDivider
                   sx={{
-                    width: '100%',
+                    width: 200,
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
@@ -763,7 +764,11 @@ export const AdminInvigilators: React.FC = () => {
                               fontSize: '1.15rem',
                               lineHeight: 1.3,
                               fontFamily: theme => theme.typography.fontFamily,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
                             }}
+                            title={names.main}
                           >
                             {names.main}
                           </MUILink>
@@ -772,7 +777,15 @@ export const AdminInvigilators: React.FC = () => {
                             <Typography
                               variant="body2"
                               color="text.secondary"
-                              sx={{ mt: 0.5, display: 'block', fontFamily: theme => theme.typography.fontFamily}}
+                              sx={{
+                                mt: 0.5,
+                                display: 'block',
+                                fontFamily: theme => theme.typography.fontFamily,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                              title={names.sub}
                             >
                               ({names.sub})
                             </Typography>
@@ -781,7 +794,18 @@ export const AdminInvigilators: React.FC = () => {
                       );
                     })()}
 
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontFamily: theme => theme.typography.fontFamily}}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mt: 1,
+                        fontFamily: theme => theme.typography.fontFamily,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      title={i.university_email || i.personal_email || 'No email'}
+                    >
                       {i.university_email || i.personal_email || 'No email'}
                     </Typography>
                   </Box>

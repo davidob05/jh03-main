@@ -21,6 +21,7 @@ import dayjs from "dayjs";
 import { Panel } from "../Panel";
 import { PillButton } from "../PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDate } from "../../utils/dates";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 
 export interface Diet {
@@ -117,6 +118,7 @@ export const DietManager: React.FC = () => {
         name: diet.name,
         start_date: diet.start_date || "",
         end_date: diet.end_date || "",
+        restriction_cutoff: diet.restriction_cutoff || "",
         is_active: diet.is_active,
       });
     } else {
@@ -196,12 +198,12 @@ export const DietManager: React.FC = () => {
                 </Typography>
                 <Typography variant="body2">
                   {diet.start_date && diet.end_date
-                    ? `${diet.start_date} → ${diet.end_date}`
+                    ? `${formatDate(diet.start_date)} → ${formatDate(diet.end_date)}`
                     : "No date range set"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {diet.restriction_cutoff
-                    ? `Restriction cutoff: ${diet.restriction_cutoff}`
+                    ? `Restriction cutoff: ${formatDate(diet.restriction_cutoff)}`
                     : "Restriction cutoff: Not set"}
                 </Typography>
                 <Typography variant="caption" color={diet.is_active ? "success.main" : "text.secondary"}>
