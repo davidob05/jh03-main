@@ -12,6 +12,26 @@ import { Panel } from "../../components/Panel";
 import { AddAnnouncementDialog } from "../../components/admin/AddAnnouncementDialog";
 import { DietManager } from "../../components/admin/DietManager";
 
+const fileSafe = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const downloadProvisionExport = async (school?: string) => {
+  const params = new URLSearchParams();
+  if (school) params.set("school", school);
+  const url = `${apiBaseUrl}/provisions/export/${params.toString() ? `?${params.toString()}` : ""}`;
+  const res = await apiFetch(url);
+  if (!res.ok) throw new Error("Failed to export provisions");
+  const blob = await res.blob();
+  const link = document.createElement("a");
+  link.href = window.URL.createObjectURL(blob);
+  link.download = school ? `provisions_${fileSafe(school)}.csv` : "provisions.csv";
+  link.click();
+  window.URL.revokeObjectURL(link.href);
+};
+
 type Announcement = {
   id: number;
   title: string;
@@ -52,6 +72,8 @@ export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
   const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
+  const [selectedSchool, setSelectedSchool] = useState<string>("");
+  const [exporting, setExporting] = useState(false);
 
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
@@ -192,10 +214,44 @@ export const AdminDashboard: React.FC = () => {
     placeholderAnnouncement.publishedAt ||
     new Date().toISOString();
 
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      await downloadProvisionExport(selectedSchool || undefined);
+    } catch (err) {
+      console.error(err);
+      alert("Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
       <Typography variant="h4" fontWeight={700}>Dashboard</Typography>
       <Typography variant="body2" color="text.secondary">Browse and manage the exam scheduling system.</Typography>
+
+      <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mt: 2, mb: 2 }}>
+        <input
+          placeholder="School filter (optional)"
+          value={selectedSchool}
+          onChange={(e) => setSelectedSchool(e.target.value)}
+          style={{
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid #d0d7de",
+            minWidth: 0,
+          }}
+        />
+        <PillButton
+          variant="contained"
+          disabled={exporting}
+          onClick={handleExport}
+          sx={{ alignSelf: { xs: "stretch", md: "center" } }}
+        >
+          {exporting ? "Exporting..." : "Export provisions CSV"}
+        </PillButton>
+      </Stack>
 
       <Stack direction={{ xs: "column", md: "row" }} spacing={2.5} sx={{ mt: 1.5, mb: 3 }} alignItems="stretch">
         <Box sx={{ flex: 1, minWidth: 0 }}>

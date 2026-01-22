@@ -66,6 +66,73 @@ from .serializers import (
 )
 
 
+class ProvisionExportView(APIView):
+    """
+    Admin CSV export of provision allocations, optionally filtered by school.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        school = request.query_params.get("school")
+        provisions_qs = Provisions.objects.select_related("student", "exam")
+        if school:
+            provisions_qs = provisions_qs.filter(exam__exam_school__iexact=school)
+
+        # Map student+exam to their allocated ExamVenue (with venue)
+        student_exam_map = {
+            (se.student_id, se.exam_id): se
+            for se in StudentExam.objects.select_related("exam_venue__venue", "student", "exam")
+        }
+
+        buffer = StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            [
+                "Date",
+                "Start Time",
+                "End Time",
+                "Exam Code",
+                "Exam Name",
+                "School",
+                "Student Name",
+                "Provisions",
+                "Additional Info",
+                "Venue",
+            ]
+        )
+
+        for provision in provisions_qs:
+            student_exam = student_exam_map.get((provision.student_id, provision.exam_id))
+            exam_venue = getattr(student_exam, "exam_venue", None) if student_exam else None
+            venue = getattr(exam_venue, "venue", None)
+            start = getattr(exam_venue, "start_time", None)
+            length = getattr(exam_venue, "exam_length", None)
+            end = start + timedelta(minutes=length) if start and length else None
+
+            writer.writerow(
+                [
+                    start.date().isoformat() if start else "",
+                    start.time().isoformat(timespec="minutes") if start else "",
+                    end.time().isoformat(timespec="minutes") if end else "",
+                    provision.exam.course_code,
+                    provision.exam.exam_name,
+                    provision.exam.exam_school,
+                    provision.student.student_name,
+                    ", ".join(provision.provisions or []),
+                    provision.notes or "",
+                    venue.venue_name if venue else "",
+                ]
+            )
+
+        response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+        filename_parts = ["provisions_export"]
+        if school:
+            filename_parts.append(slugify(str(school)))
+        response["Content-Disposition"] = f'attachment; filename="{ "_".join(filename_parts) }.csv"'
+        return response
+
+
 def log_notification(type_: str, message: str, when=None, user=None):
     try:
         Notification.objects.create(
