@@ -61,6 +61,7 @@ describe("AddInvigilatorDialog - diets", () => {
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
 
     // Step 2 qualifications -> skip
+    expect(screen.getByText(/Detached Duty/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
     // Step 3 restrictions -> skip
     fireEvent.click(screen.getByRole("button", { name: /next/i }));

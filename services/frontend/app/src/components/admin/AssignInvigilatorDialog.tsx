@@ -128,6 +128,7 @@ const qualificationLabels: Record<string, string> = {
   SENIOR_INVIGILATOR: "Senior Invigilator",
   AKT_TRAINED: "AKT Trained",
   CHECK_IN: "Check-In",
+  DETACHED_DUTY: "Detached Duty",
 };
 const restrictionLabels: Record<string, string> = {
   accessibility_required: "Accessibility required",

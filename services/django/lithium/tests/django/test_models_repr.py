@@ -53,6 +53,10 @@ class ModelStringTests(TestCase):
             invigilator=invigilator,
             qualification=InvigilatorQualificationChoices.SENIOR_INVIGILATOR,
         )
+        detached = InvigilatorQualification.objects.create(
+            invigilator=invigilator,
+            qualification=InvigilatorQualificationChoices.DETACHED_DUTY,
+        )
         restriction = InvigilatorRestriction.objects.create(
             invigilator=invigilator,
             diet=DietChoices.DEC_2025,
@@ -65,6 +69,7 @@ class ModelStringTests(TestCase):
         self.assertIn("Algorithms", str(exam))
         self.assertIn("Alice -", str(student_exam))
         self.assertIn("Senior Invigilator", str(qualification))
+        self.assertIn("Detached Duty", str(detached))
         self.assertIn("DEC_2025", str(restriction))
 
         # Unsaved assignment should gracefully handle missing start/end times

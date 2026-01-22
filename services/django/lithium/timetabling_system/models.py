@@ -94,6 +94,7 @@ class InvigilatorQualificationChoices(models.TextChoices):
     SENIOR_INVIGILATOR = 'SENIOR_INVIGILATOR', 'Senior Invigilator (SI)'
     AKT_TRAINED = 'AKT_TRAINED', 'AKT Trained'
     CHECK_IN = 'CHECK_IN', 'Check-In'
+    DETACHED_DUTY = 'DETACHED_DUTY', 'Detached Duty'
     # Add more qualifications as needed
 
 

@@ -46,6 +46,7 @@ const allQualifications: Record<string, string> = {
   SENIOR_INVIGILATOR: "Senior Invigilator",
   AKT_TRAINED: "AKT Trained",
   CHECK_IN: "Check-In",
+  DETACHED_DUTY: "Detached Duty",
 };
 
 interface InvigilatorAvailability {
@@ -378,7 +379,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 <Typography variant="h6" fontWeight={700} mb={3}>
                   Qualifications
                 </Typography>
-                <Stack direction="row" spacing={1.5} flexWrap="wrap" gap={1}>
+                <Stack direction="row" flexWrap="wrap" sx={{ columnGap: 1, rowGap: 1.5 }}>
                   {Object.entries(allQualifications).map(([key, label]) => {
                     const hasQual = data.qualifications?.some((q) => q.qualification === key);
                     return (

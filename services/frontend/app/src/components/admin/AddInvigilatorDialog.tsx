@@ -32,6 +32,7 @@ const QUALIFICATION_CHOICES = [
   { value: "SENIOR_INVIGILATOR", label: "Senior Invigilator", help: "Can lead an exam room and supervise assistants" },
   { value: "AKT_TRAINED", label: "AKT Trained", help: "Approved for AKT duties" },
   { value: "CHECK_IN", label: "Check-In", help: "Can support candidate check-in" },
+  { value: "DETACHED_DUTY", label: "Detached Duty", help: "Eligible for detached duty assignments" },
 ];
 
 const RESTRICTION_CHOICES = [

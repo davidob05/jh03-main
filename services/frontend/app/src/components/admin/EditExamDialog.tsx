@@ -67,7 +67,7 @@ type EditableVenue = {
 
 type Props = {
   open: boolean;
-  examId: number | null;
+  examId?: number | null;
   onClose: () => void;
   onSuccess?: (name: string) => void;
 };
@@ -117,6 +117,7 @@ const toIsoString = (localValue: string) => {
 
 export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
+  const isCreate = !examId;
   const { data: venues } = useQuery<VenueOption[], Error>({
     queryKey: ["venues"],
     queryFn: fetchVenues,
@@ -238,6 +239,22 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
     );
   }, [exam, coreVenue]);
 
+  useEffect(() => {
+    if (!open || !isCreate) return;
+    setName("");
+    setCode("");
+    setExamType("");
+    setStudents("");
+    setSchool("");
+    setContact("");
+    setMainVenue("");
+    setMainStart("");
+    setMainLength("");
+    setMainProvisions([]);
+    setInitialExtraIds(new Set());
+    setExtraVenues([]);
+  }, [open, isCreate]);
+
   const addExtraVenue = () => {
     setExtraVenues((prev) => [
       ...prev,
@@ -274,7 +291,67 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!examId) throw new Error("Missing exam id");
+      if (!examId) {
+        const examRes = await apiFetch(`${apiBaseUrl}/exams/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            exam_name: name,
+            course_code: code,
+            exam_type: examType,
+            no_students: students === "" ? 0 : Number(students),
+            exam_school: school,
+            school_contact: contact ?? "",
+          }),
+        });
+        if (!examRes.ok) {
+          const text = await examRes.text();
+          throw new Error(text || "Failed to create exam");
+        }
+        const created = await examRes.json();
+        const createdId = created.exam_id ?? created.id;
+        if (!createdId) throw new Error("Exam created without id.");
+
+        if (mainVenue) {
+          const mainRes = await apiFetch(`${apiBaseUrl}/exam-venues/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              exam: createdId,
+              venue_name: mainVenue,
+              start_time: toIsoString(mainStart) || null,
+              exam_length: mainLength === "" ? null : mainLength,
+              core: true,
+              provision_capabilities: mainProvisions,
+            }),
+          });
+          if (!mainRes.ok) {
+            const text = await mainRes.text();
+            throw new Error(text || "Failed to set main venue");
+          }
+        }
+
+        for (const v of extraVenues) {
+          const payload = {
+            exam: createdId,
+            venue_name: v.venue_name || null,
+            start_time: toIsoString(v.start_time) || null,
+            exam_length: v.exam_length,
+            core: false,
+            provision_capabilities: v.provision_capabilities || [],
+          };
+          const postRes = await apiFetch(`${apiBaseUrl}/exam-venues/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!postRes.ok) {
+            const text = await postRes.text();
+            throw new Error(text || "Failed to add additional venue");
+          }
+        }
+        return { id: createdId };
+      }
 
       // Update exam details
       const examRes = await apiFetch(`${apiBaseUrl}/exams/${examId}/`, {
@@ -306,7 +383,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
             start_time: toIsoString(mainStart) || null,
             exam_length: mainLength === "" ? null : mainLength,
             core: true,
-            provision_capabilities: [],
+            provision_capabilities: mainProvisions,
           }),
         });
         if (!mainRes.ok) {
@@ -334,7 +411,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
           start_time: toIsoString(v.start_time) || null,
           exam_length: v.exam_length,
           core: false,
-          provision_capabilities: [],
+          provision_capabilities: v.provision_capabilities || [],
         };
         if (typeof v.id === "number") {
           const putRes = await apiFetch(`${apiBaseUrl}/exam-venues/${v.id}/`, {
@@ -360,7 +437,9 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["exam", examId] });
+      if (examId) {
+        queryClient.invalidateQueries({ queryKey: ["exam", examId] });
+      }
       queryClient.invalidateQueries({ queryKey: ["exams"] });
       onSuccess?.(name);
       onClose();
@@ -374,7 +453,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
   return (
     <Dialog open={open} onClose={mutation.isPending ? undefined : onClose} fullWidth maxWidth="md">
       <DialogTitle>
-        Edit Exam
+        {isCreate ? "Add Exam" : "Edit Exam"}
         <IconButton
           aria-label="close"
           onClick={() => {
@@ -387,13 +466,13 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
       </DialogTitle>
 
       <DialogContent dividers>
-        {isLoading && (
+        {!isCreate && isLoading && (
           <Stack alignItems="center" py={2}>
             <CircularProgress />
           </Stack>
         )}
-        {isError && <Alert severity="error">Failed to load exam: {error?.message}</Alert>}
-        {!isLoading && !isError && (
+        {!isCreate && isError && <Alert severity="error">Failed to load exam: {error?.message}</Alert>}
+        {(isCreate || (!isLoading && !isError)) && (
           <Stack spacing={3}>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField label="Exam name" value={name} onChange={(e) => setName(e.target.value)} fullWidth required />
@@ -416,7 +495,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
 
             <Stack spacing={1}>
               <Typography variant="subtitle1" fontWeight={700}>Main venue</Typography>
-              {coreVenue && (
+              {!isCreate && coreVenue && (
                 <Alert severity="info" sx={{ mb: 1 }}>
                   Main venue already assigned ({coreVenue.venue_name || "Unassigned"}). Editing core venues is not supported.
                 </Alert>
