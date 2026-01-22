@@ -344,6 +344,28 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
             return qs.none()
         return qs.filter(invigilator=invigilator)
 
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        was_confirmed = bool(instance.confirmed)
+        updated = serializer.save()
+        if not was_confirmed and bool(updated.confirmed):
+            name = updated.invigilator.preferred_name or updated.invigilator.full_name or "Invigilator"
+            exam_name = updated.exam_venue.exam.exam_name if updated.exam_venue and updated.exam_venue.exam else "an exam"
+            venue_name = updated.exam_venue.venue.venue_name if updated.exam_venue and updated.exam_venue.venue else "Venue TBC"
+            start_str = (
+                timezone.localtime(updated.assigned_start).strftime("%d %b %Y at %H:%M")
+                if updated.assigned_start else "start time TBC"
+            )
+            details = f"{exam_name} at {venue_name} on {start_str}"
+            Notification.objects.create(
+                type=Notification.NotificationType.ASSIGNMENT,
+                admin_message=f"{name} has confirmed their assignment for {details}.",
+                invigilator_message=f"Your assignment has been confirmed for {details}.",
+                invigilator=updated.invigilator,
+                triggered_by=_get_request_user(self, serializer),
+            )
+        return updated
+
     @action(detail=False, methods=["get"], url_path="available-covers", permission_classes=[IsInvigilatorOrAdmin])
     def available_covers(self, request):
         """
