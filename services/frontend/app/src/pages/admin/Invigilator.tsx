@@ -517,17 +517,6 @@ export const AdminInvigilatorProfile: React.FC = () => {
                           />
                         </Box>
                       </Tooltip>
-                      <Tooltip title={restrictionsUnion.has("sec") ? "Can work at the SEC" : "Cannot work at the SEC"}>
-                        <Box>
-                          <BooleanCheckboxRow
-                            label="SEC"
-                            value={restrictionsUnion.has("sec")}
-                            onChange={() => {}}
-                            yesLabel="Can work at the SEC"
-                            noLabel="Cannot work at the SEC"
-                          />
-                        </Box>
-                      </Tooltip>
                       <Tooltip
                         title={
                           restrictionsUnion.has("osce_golden_jubilee")

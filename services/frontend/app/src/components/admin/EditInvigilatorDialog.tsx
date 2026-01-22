@@ -39,7 +39,6 @@ const RESTRICTION_CHOICES = [
   { value: "purple_cluster", label: "Purple cluster", yes: "Can work in Purple Cluster", no: "Cannot work in Purple Cluster" },
   { value: "computer_cluster", label: "Computer cluster", yes: "Can work in computer clusters", no: "Cannot work in computer clusters" },
   { value: "vet_school", label: "Vet School", yes: "Can work at the Vet School", no: "Cannot work at the Vet School" },
-  { value: "sec", label: "Scottish Event Campus", yes: "Can work at the SEC", no: "Cannot work at the SEC" },
   { value: "osce_golden_jubilee", label: "OSCE - Golden Jubilee", yes: "Can work at Golden Jubilee", no: "Cannot work at Golden Jubilee" },
   { value: "osce_wolfson", label: "OSCE - Wolfson", yes: "Can work at Wolfson", no: "Cannot work at Wolfson" },
   { value: "osce_queen_elizabeth", label: "OSCE - Queen Elizabeth", yes: "Can work at Queen Elizabeth", no: "Cannot work at Queen Elizabeth" },
@@ -302,7 +301,7 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
 
             {/* Locations & OSCE Sites */}
             <CollapsibleSection title="Locations & OSCE Sites" defaultExpanded={false}>
-              {["vet_school", "sec", "osce_golden_jubilee", "osce_wolfson", "osce_queen_elizabeth"].map(r => {
+              {["vet_school", "osce_golden_jubilee", "osce_wolfson", "osce_queen_elizabeth"].map(r => {
                 const choice = RESTRICTION_CHOICES.find(c => c.value === r);
                 if (!choice) return null;
                 return (

@@ -49,7 +49,6 @@ describe("AddInvigilatorDialog - diets", () => {
     fireEvent.change(screen.getByLabelText(/Full Name/i), { target: { value: "Pat Invig" } });
     const [mobileInput] = screen.getAllByLabelText(/Mobile\b/i);
     fireEvent.change(mobileInput, { target: { value: "07123" } });
-    fireEvent.change(screen.getByLabelText(/Janet txt/i), { target: { value: "07123" } });
     fireEvent.change(screen.getByLabelText(/University Email/i), { target: { value: "pat@example.com" } });
     fireEvent.change(screen.getByLabelText(/Personal Email/i), { target: { value: "pat@example.org" } });
     const nextBtnStep0 = screen.getByRole("button", { name: /next/i });
