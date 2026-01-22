@@ -655,9 +655,9 @@ export const AdminInvigilatorProfile: React.FC = () => {
 
               <Grid container spacing={3}>
                 {sortedAvailabilityEntries.slice(0, availabilityLimit).map(([date, slots]) => (
-                  <Grid item xs={12} key={date}>
-                    <Panel sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2, mb: 0 }}>
-                      <Typography variant="subtitle1" fontWeight={600} mb={2}>
+                  <Grid item xs={12} key={date} sx={{ display: "flex", justifyContent: "center" }}>
+                    <Panel sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2, mb: 0, width: { xs: "100%", sm: 350 } }}>
+                      <Typography variant="subtitle1" fontWeight={600} mb={2} noWrap title={dayjs(date).format("dddd, D MMMM YYYY")}>
                         {dayjs(date).format("dddd, D MMMM YYYY")}
                       </Typography>
                       <Stack direction="row" spacing={1.5} flexWrap="wrap">

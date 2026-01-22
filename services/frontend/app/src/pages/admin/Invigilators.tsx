@@ -713,11 +713,11 @@ export const AdminInvigilators: React.FC = () => {
           <Grid container spacing={3}>
             {paginated.map(i => (
               // @ts-ignore
-              <Grid component="div" item xs={12} sm={6} md={4} lg={3} key={i.id}>
+              <Grid component="div" item xs={12} sm={6} md={4} lg={3} key={i.id} sx={{ display: "flex", justifyContent: "center" }}>
                 <Panel
                   disableDivider
                   sx={{
-                    width: '100%',
+                    width: 200,
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
@@ -763,7 +763,11 @@ export const AdminInvigilators: React.FC = () => {
                               fontSize: '1.15rem',
                               lineHeight: 1.3,
                               fontFamily: theme => theme.typography.fontFamily,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
                             }}
+                            title={names.main}
                           >
                             {names.main}
                           </MUILink>
@@ -772,7 +776,15 @@ export const AdminInvigilators: React.FC = () => {
                             <Typography
                               variant="body2"
                               color="text.secondary"
-                              sx={{ mt: 0.5, display: 'block', fontFamily: theme => theme.typography.fontFamily}}
+                              sx={{
+                                mt: 0.5,
+                                display: 'block',
+                                fontFamily: theme => theme.typography.fontFamily,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                              title={names.sub}
                             >
                               ({names.sub})
                             </Typography>
@@ -781,7 +793,18 @@ export const AdminInvigilators: React.FC = () => {
                       );
                     })()}
 
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontFamily: theme => theme.typography.fontFamily}}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mt: 1,
+                        fontFamily: theme => theme.typography.fontFamily,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      title={i.university_email || i.personal_email || 'No email'}
+                    >
                       {i.university_email || i.personal_email || 'No email'}
                     </Typography>
                   </Box>
