@@ -34,6 +34,7 @@ import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIco
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { useAppDispatch, useAppSelector, setStudentsPrefs } from "../../state/store";
 
 type StudentProvisionRow = {
   student_id: string;
@@ -155,6 +156,9 @@ type SectionProps = {
   onSearchChange: (value: string) => void;
   query: ReturnType<typeof useQuery<StudentProvisionRow[], Error>>;
   emptyLabel: string;
+  order: Order;
+  orderBy: keyof StudentProvisionRow;
+  onSortChange: (order: Order, orderBy: keyof StudentProvisionRow) => void;
 };
 
 type VenueDialogState = {
@@ -313,11 +317,12 @@ const StudentTableSection: React.FC<SectionProps> = ({
   onSearchChange,
   query,
   emptyLabel,
+  order,
+  orderBy,
+  onSortChange,
 }) => {
   const rows = query.data || [];
   const rowKey = useCallback((row: StudentProvisionRow) => `${row.student_id}::${row.exam_id}`, []);
-  const [order, setOrder] = useState<Order>("asc");
-  const [orderBy, setOrderBy] = useState<keyof StudentProvisionRow>("student_name");
   const [selected, setSelected] = useState<string[]>([]);
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
   const [venueDialog, setVenueDialog] = useState<VenueDialogState | null>(null);
@@ -344,8 +349,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
   });
   const handleRequestSort = (_: React.MouseEvent<unknown>, property: keyof StudentProvisionRow) => {
     const isAsc = orderBy === property && order === "asc";
-    setOrder(isAsc ? "desc" : "asc");
-    setOrderBy(property);
+    onSortChange(isAsc ? "desc" : "asc", property);
   };
 
   const filtered = useMemo(() => {
@@ -744,8 +748,8 @@ const StudentTableSection: React.FC<SectionProps> = ({
 };
 
 export const AdminStudents: React.FC = () => {
-  const [unallocatedSearch, setUnallocatedSearch] = useState("");
-  const [allSearch, setAllSearch] = useState("");
+  const dispatch = useAppDispatch();
+  const { searchQuery: allSearch, sortOrder, sortBy } = useAppSelector((s) => s.adminTables.students);
 
   const unallocatedQuery = useQuery<StudentProvisionRow[], Error>({
     queryKey: ["student-provisions", "unallocated"],
@@ -782,9 +786,12 @@ export const AdminStudents: React.FC = () => {
           title="All students with provisions"
           subtitle="Full list of students and their provision requirements."
           search={allSearch}
-          onSearchChange={setAllSearch}
+          onSearchChange={(v) => dispatch(setStudentsPrefs({ searchQuery: v }))}
           query={allQuery}
           emptyLabel="No student provision records found."
+          order={sortOrder}
+          orderBy={sortBy as keyof StudentProvisionRow}
+          onSortChange={(nextOrder, nextOrderBy) => dispatch(setStudentsPrefs({ sortOrder: nextOrder, sortBy: nextOrderBy }))}
         />
       </Stack>
     </Box>
