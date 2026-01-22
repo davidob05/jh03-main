@@ -775,11 +775,14 @@ export const InvigilatorTimetable: React.FC = () => {
             </Stack>
 
             <TextField
-              label="Reason (optional)"
+              label="Reason"
+              required
               multiline
               minRows={3}
               value={cancelNote}
               onChange={(e) => setCancelNote(e.target.value)}
+              helperText={!cancelNote.trim() ? "Please provide a brief reason for your request." : " "}
+              FormHelperTextProps={{ sx: { minHeight: 20 } }}
             />
 
             {(drawerMode === "request" ? requestCancelMutation.isError : undoCancelMutation.isError) && (
@@ -794,14 +797,17 @@ export const InvigilatorTimetable: React.FC = () => {
                 variant="contained"
                 color={drawerMode === "undo" ? "primary" : "error"}
                 fullWidth
-                onClick={() =>
-                  drawerAssignment &&
-                  (drawerMode === "undo"
-                    ? undoCancelMutation.mutate({ id: drawerAssignment.id, reason: cancelNote.trim() })
-                    : requestCancelMutation.mutate({ id: drawerAssignment.id, reason: cancelNote.trim() }))
-                }
+                onClick={() => {
+                  if (!drawerAssignment) return;
+                  const trimmedNote = cancelNote.trim();
+                  if (!trimmedNote) return;
+                  return drawerMode === "undo"
+                    ? undoCancelMutation.mutate({ id: drawerAssignment.id, reason: trimmedNote })
+                    : requestCancelMutation.mutate({ id: drawerAssignment.id, reason: trimmedNote });
+                }}
                 disabled={
-                  drawerMode === "undo" ? undoCancelMutation.isPending : requestCancelMutation.isPending
+                  !cancelNote.trim() ||
+                  (drawerMode === "undo" ? undoCancelMutation.isPending : requestCancelMutation.isPending)
                 }
               >
                 {drawerMode === "undo"
