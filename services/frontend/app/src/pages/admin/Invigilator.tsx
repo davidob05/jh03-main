@@ -96,6 +96,7 @@ interface InvigilatorAssignment {
   assigned_start: string;
   assigned_end: string;
   break_time_minutes: number;
+  cancel?: boolean;
 }
 
 const slotLabelMap: Record<string, string> = {
@@ -142,6 +143,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
   }, [data]);
 
   const dietsFromData = useMemo(() => data?.restrictions?.map((r) => r.diet) || [], [data]);
+  const dietsSelected = useMemo(() => new Set(dietsFromData.filter(Boolean)), [dietsFromData]);
 
   const dietOptions = useMemo(() => {
     const base = diets.map((d) => ({ code: d.code, label: formatDietLabel(d) }));
@@ -169,26 +171,45 @@ export const AdminInvigilatorProfile: React.FC = () => {
     [groupedAvailability]
   );
 
-  const totalAssignedHours = useMemo(() => {
+  const assignmentMetrics = useMemo(() => {
     const assignments = data?.assignments || [];
-    return assignments.reduce((sum, assignment) => {
+    let totalHours = 0;
+    let completedHours = 0;
+    let assignedShiftCount = 0;
+    let completedShiftCount = 0;
+    assignments.forEach((assignment) => {
       const start = new Date(assignment.assigned_start).getTime();
       const end = new Date(assignment.assigned_end).getTime();
-      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return sum;
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
+      assignedShiftCount += 1;
       const durationMinutes = (end - start) / 60000 - (assignment.break_time_minutes || 0);
-      return sum + Math.max(durationMinutes, 0) / 60;
-    }, 0);
+      const hours = Math.max(durationMinutes, 0) / 60;
+      totalHours += hours;
+      if (!assignment.cancel) {
+        completedShiftCount += 1;
+        completedHours += hours;
+      }
+    });
+    return {
+      totalHours,
+      completedHours,
+      assignedShiftCount,
+      completedShiftCount,
+    };
   }, [data]);
 
   const contractedHoursReport = useMemo(() => {
     const contracted = data?.contracted_hours ?? null;
-    if (contracted == null && totalAssignedHours === 0) return null;
+    if (contracted == null && assignmentMetrics.totalHours === 0) return null;
     return {
       contracted_hours: contracted ?? 0,
-      total_hours: totalAssignedHours,
-      remaining_hours: contracted != null ? contracted - totalAssignedHours : undefined,
+      total_hours: assignmentMetrics.totalHours,
+      completed_hours: assignmentMetrics.completedHours,
+      assigned_shift_count: assignmentMetrics.assignedShiftCount,
+      completed_shift_count: assignmentMetrics.completedShiftCount,
+      remaining_hours: contracted != null ? contracted - assignmentMetrics.totalHours : undefined,
     };
-  }, [data?.contracted_hours, totalAssignedHours]);
+  }, [data?.contracted_hours, assignmentMetrics]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -401,14 +422,14 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 <Stack spacing={4}>
                   {/* Exam Diets */}
                   <CollapsibleSection title="Exam Diets" defaultExpanded={false}>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} sx={{ rowGap: 1.5 }}>
+                    <Stack direction="row" flexWrap="wrap" sx={{ columnGap: 1, rowGap: 1.5 }}>
                       {dietOptions.map((d) => {
-                        const hasDiet = diets.includes(d.code);
+                        const hasDiet = dietsSelected.has(d.code);
                         return (
                           <Tooltip key={d.code} title={hasDiet ? `Contracted for ${d.label}` : `Not contracted for ${d.label}`}>
                             <Chip
                               label={d.label}
-                              size="small"
+                              size="medium"
                               color={hasDiet ? "primary" : "default"}
                               variant={hasDiet ? "filled" : "outlined"}
                             />
@@ -762,7 +783,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
           )}
 
           {/* Contracted Hours */}
-          <Box sx={{ mt: 4, mr: 6 }}>
+          <Box sx={{ mt: 4, mr: { xs: 0, md: 6 }, width: "100%" }}>
             <ContractedHoursReport
               report={contractedHoursReport}
               loading={false}
