@@ -46,6 +46,7 @@ class AuthApiTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("token", response.data)
         self.assertEqual(response.data["user"]["role"], "admin")
+        self.assertFalse(response.data["user"]["is_senior_admin"])
 
     def test_token_login_accepts_email_and_returns_invigilator_role(self):
         response = self.client.post(
@@ -83,6 +84,7 @@ class AuthApiTests(TestCase):
         self.assertEqual(response.data["username"], "invig")
         self.assertEqual(response.data["role"], "invigilator")
         self.assertIsNotNone(response.data["invigilator_id"])
+        self.assertFalse(response.data["is_senior_admin"])
 
     def test_patch_rejects_duplicate_username(self):
         self.client.force_authenticate(self.admin)
