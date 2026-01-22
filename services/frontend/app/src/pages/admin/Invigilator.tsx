@@ -19,7 +19,7 @@ import {
 import { GridView, CalendarViewMonth, Edit, Delete as DeleteIcon } from "@mui/icons-material";
 import dayjs, { Dayjs } from "dayjs";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ContractedHoursReport } from "../../components/admin/ContractedHoursReport";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
@@ -78,6 +78,7 @@ interface InvigilatorData {
   user_id?: number | null;
   user_is_staff?: boolean;
   user_is_superuser?: boolean;
+  user_is_senior_admin?: boolean;
   preferred_name: string | null;
   full_name: string;
   mobile: string | null;
@@ -119,8 +120,12 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [promoting, setPromoting] = useState(false);
   const [promoteError, setPromoteError] = useState<string | null>(null);
+  const [demoteOpen, setDemoteOpen] = useState(false);
+  const [demoting, setDemoting] = useState(false);
+  const [demoteError, setDemoteError] = useState<string | null>(null);
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, error, refetch } = useQuery<InvigilatorData, Error>({
     queryKey: ["invigilator", id],
@@ -131,6 +136,9 @@ export const AdminInvigilatorProfile: React.FC = () => {
     },
     enabled: Boolean(id),
   });
+
+  const currentUser = queryClient.getQueryData<any>(["me"]);
+  const isSeniorAdmin = Boolean(currentUser?.is_senior_admin);
 
   const { data: diets = [] } = useQuery<Diet[]>({
     queryKey: ["diets"],
@@ -197,6 +205,11 @@ export const AdminInvigilatorProfile: React.FC = () => {
   }, [data?.contracted_hours, totalAssignedHours]);
 
   const canPromote = Boolean(data?.user_id) && !data?.user_is_superuser;
+  const canDemote =
+    Boolean(data?.user_id) &&
+    (data?.user_is_staff || data?.user_is_superuser) &&
+    !data?.user_is_senior_admin &&
+    isSeniorAdmin;
 
   const handleDelete = async () => {
     if (!id) return;
@@ -236,6 +249,27 @@ export const AdminInvigilatorProfile: React.FC = () => {
     } finally {
       setPromoting(false);
       setPromoteOpen(false);
+    }
+  };
+
+  const handleDemote = async () => {
+    if (!id) return;
+    try {
+      setDemoting(true);
+      setDemoteError(null);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/remove-admin/`, { method: "POST" });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to remove admin privileges");
+      }
+      setSuccessMessage("Admin privileges removed.");
+      setSuccessOpen(true);
+      await refetch();
+    } catch (err: any) {
+      setDemoteError(err?.message || "Failed to remove admin privileges.");
+    } finally {
+      setDemoting(false);
+      setDemoteOpen(false);
     }
   };
 
@@ -293,11 +327,24 @@ export const AdminInvigilatorProfile: React.FC = () => {
           >
             {data.user_is_superuser ? "Already admin" : "Make them an admin"}
           </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => setDemoteOpen(true)}
+            disabled={!canDemote || demoting}
+          >
+            Remove admin
+          </Button>
         </Stack>
       </Stack>
       {promoteError && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {promoteError}
+        </Alert>
+      )}
+      {demoteError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {demoteError}
         </Alert>
       )}
 
@@ -874,6 +921,17 @@ export const AdminInvigilatorProfile: React.FC = () => {
           if (!promoting) setPromoteOpen(false);
         }}
         onConfirm={handlePromote}
+      />
+      <DeleteConfirmationDialog
+        open={demoteOpen}
+        title="Remove admin privileges?"
+        description="This will revert the account to a standard invigilator login."
+        confirmText="Remove admin"
+        loading={demoting}
+        onClose={() => {
+          if (!demoting) setDemoteOpen(false);
+        }}
+        onConfirm={handleDemote}
       />
       <Snackbar
         open={successOpen}
