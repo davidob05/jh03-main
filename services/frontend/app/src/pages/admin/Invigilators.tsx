@@ -380,7 +380,7 @@ export const AdminInvigilators: React.FC = () => {
       downloadBlob(blob, filename);
 
       setSuccessMessage(
-        selected.length === 1 ? "Timetable downloaded!" : "Timetables downloaded!"
+        selected.length === 1 ? "Timetable export downloaded." : "Timetables export downloaded."
       );
       setSuccessOpen(true);
       setBulkAction("");
