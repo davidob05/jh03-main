@@ -38,24 +38,27 @@ class NotificationViewTests(TestCase):
         cutoff = timezone.now() - timedelta(days=7, hours=1)
         old = Notification.objects.create(
             type="availability",
-            message="Old",
+            admin_message="Old",
+            invigilator_message="Old",
         )
         Notification.objects.filter(pk=old.pk).update(timestamp=cutoff - timedelta(hours=1))
         n1 = Notification.objects.create(
             type="examChange",
-            message="Recent",
+            admin_message="Recent",
+            invigilator_message="Recent",
         )
         Notification.objects.filter(pk=n1.pk).update(timestamp=timezone.now() - timedelta(days=2))
         n2 = Notification.objects.create(
             type="venueChange",
-            message="Newest",
+            admin_message="Newest",
+            invigilator_message="Newest",
         )
 
         self.client.force_authenticate(self.admin)
         response = self.client.get(reverse("api-notifications"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        messages = [item["message"] for item in response.data]
+        messages = [item["admin_message"] for item in response.data]
         self.assertEqual(messages, ["Newest", "Recent"])
         self.assertNotIn("Old", messages)
         # Ensure ordering matches timestamp desc

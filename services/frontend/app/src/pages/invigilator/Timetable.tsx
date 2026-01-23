@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import dayjs, { Dayjs } from "dayjs";
+import "dayjs/locale/en-gb";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { StaticDatePicker, DatePicker } from "@mui/x-date-pickers";
@@ -25,14 +26,14 @@ import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined
 import AvTimerIcon from "@mui/icons-material/AvTimer";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CheckIcon from "@mui/icons-material/Check";
-import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import CloseIcon from "@mui/icons-material/Close";
-import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateWithWeekday, formatDateTime, formatTime } from "../../utils/dates";
 
 interface Exam {
   id: string;
@@ -40,6 +41,8 @@ interface Exam {
   location: string;
   start: string;
   end: string;
+  assignedStart: string;
+  assignedEnd: string;
   date: string;
   confirmed?: boolean;
   cancel?: boolean;
@@ -49,6 +52,9 @@ interface InvigilatorAssignment {
   id: number;
   exam_name?: string | null;
   venue_name?: string | null;
+  provision_capabilities?: string[] | null;
+  student_provisions?: string[] | null;
+  student_provision_notes?: string[] | null;
   assigned_start: string;
   assigned_end: string;
   exam_start?: string | null;
@@ -71,6 +77,11 @@ const timeToMinutes = (time: string) => {
 
 const minutesToTime = (minutes: number) =>
   dayjs().startOf("day").add(minutes, "minute").format("HH:mm");
+
+const formatProvisionLabel = (value: string) => {
+  const spaced = value.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+};
 
 export const InvigilatorTimetable: React.FC = () => {
   const today = dayjs();
@@ -106,20 +117,24 @@ export const InvigilatorTimetable: React.FC = () => {
         const assignedStart = a.assigned_start ? dayjs(a.assigned_start) : null;
         const assignedEnd = a.assigned_end ? dayjs(a.assigned_end) : null;
 
-        const fallbackStart = a.exam_start ? dayjs(a.exam_start) : null;
-        const fallbackEnd =
-          fallbackStart && a.exam_length != null
-            ? fallbackStart.add(a.exam_length, "minute")
+        const examStart = a.exam_start ? dayjs(a.exam_start) : null;
+        const examEnd =
+          examStart && a.exam_length != null
+            ? examStart.add(a.exam_length, "minute")
             : null;
 
-        const start = assignedStart && assignedStart.isValid() ? assignedStart : fallbackStart;
-        const end = assignedEnd && assignedEnd.isValid() ? assignedEnd : fallbackEnd;
+        const start = examStart && examStart.isValid() ? examStart : assignedStart;
+        const end = examEnd && examEnd.isValid() ? examEnd : assignedEnd;
+        const assignedStartValue = assignedStart && assignedStart.isValid() ? assignedStart : null;
+        const assignedEndValue = assignedEnd && assignedEnd.isValid() ? assignedEnd : null;
         return {
           id: String(a.id),
           title: a.exam_name || "Exam",
           location: a.venue_name || "Venue TBC",
           start: start && start.isValid() ? start.format("HH:mm") : "",
           end: end && end.isValid() ? end.format("HH:mm") : "",
+          assignedStart: assignedStartValue ? assignedStartValue.format("HH:mm") : "",
+          assignedEnd: assignedEndValue ? assignedEndValue.format("HH:mm") : "",
           date: start && start.isValid() ? start.format("YYYY-MM-DD") : "",
           confirmed: Boolean(a.confirmed),
           cancel: Boolean(a.cancel),
@@ -215,9 +230,9 @@ export const InvigilatorTimetable: React.FC = () => {
   const handleNextDay = () => setDay((selectedDate || today).add(1, "day"));
 
   const friendlyDate = selectedDate
-    ? selectedDate.format("dddd, D MMMM")
+    ? formatDateWithWeekday(selectedDate)
     : "Pick a day to see exams";
-  const headerDate = (selectedDate ?? month).format("dddd, D MMMM YYYY");
+  const headerDate = formatDateWithWeekday(selectedDate ?? month);
 
   const openDrawer = (assignment: InvigilatorAssignment, mode: "request" | "undo" = "request") => {
     setDrawerAssignment(assignment);
@@ -232,7 +247,7 @@ export const InvigilatorTimetable: React.FC = () => {
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
       <Box sx={{ p: 3 }}>
         <Stack
           direction={{ xs: "column", md: "row" }}
@@ -376,7 +391,7 @@ export const InvigilatorTimetable: React.FC = () => {
           <Typography color="text.secondary">
             Select a day from the calendar or use the navigation buttons to get started.
             <br />
-            Each exam will show its start and end times, location, and when you are expected to arrive.
+            Each exam shows your assigned arrival and departure times, plus location and status.
           </Typography>
         </Panel>
 
@@ -525,12 +540,19 @@ export const InvigilatorTimetable: React.FC = () => {
                 ) : (
                   <Grid container spacing={2.5}>
                     {examsForSelectedDay.map((event) => {
-                      const start = timeToMinutes(event.start);
-                      const end = timeToMinutes(event.end);
-                      const duration = end - start;
-                      const arrival = Math.max(0, start - 30);
-                      const arrivalTime = minutesToTime(arrival);
-                      const totalDuration = duration + 30;
+                      const examStartMinutes = timeToMinutes(event.start);
+                      const examEndMinutes = timeToMinutes(event.end);
+                      const assignedStartMinutes = timeToMinutes(event.assignedStart);
+                      const assignedEndMinutes = timeToMinutes(event.assignedEnd);
+                      const hasAssignedTimes = Boolean(event.assignedStart) && Boolean(event.assignedEnd);
+                      const hasExamTimes = Boolean(event.start) && Boolean(event.end);
+                      const duration = hasAssignedTimes
+                        ? Math.max(0, assignedEndMinutes - assignedStartMinutes)
+                        : hasExamTimes
+                        ? Math.max(0, examEndMinutes - examStartMinutes)
+                        : null;
+                      const arrivalTime = event.assignedStart || "TBC";
+                      const departureTime = event.assignedEnd || "TBC";
                       const isConfirmed = event.confirmed === true;
                       const isCancelled = event.cancel === true;
                       const statusChip = (() => {
@@ -607,14 +629,14 @@ export const InvigilatorTimetable: React.FC = () => {
                                 Start
                               </Typography>
                               <Typography fontWeight={700} fontSize="1.15rem">
-                                {event.start}
+                                {event.start || "TBC"}
                               </Typography>
                               <Divider sx={{ width: "100%", my: 0.5 }} />
                               <Typography variant="body2" color="text.secondary">
                                 End
                               </Typography>
                               <Typography fontWeight={700} fontSize="1.15rem">
-                                {event.end}
+                                {event.end || "TBC"}
                               </Typography>
                             </Stack>
 
@@ -672,45 +694,35 @@ export const InvigilatorTimetable: React.FC = () => {
                                       }}
                                     />
                                   </Tooltip>
-                                  {canRequestCancel && (
-                                    <Tooltip title="Request cancellation">
-                                      <span>
-                                        <IconButton
-                                          size="small"
-                                          color="error"
-                                          aria-label="Request cancellation"
-                                          data-testid={`request-cancel-${event.id}`}
-                                          onClick={() =>
-                                            correspondingAssignment && openDrawer(correspondingAssignment, "request")
-                                          }
-                                        >
-                                          <EventBusyOutlinedIcon fontSize="small" />
-                                        </IconButton>
-                                      </span>
-                                    </Tooltip>
-                                  )}
-                                  {!canRequestCancel && canUndoCancel && (
-                                    <Tooltip title="Withdraw cancellation request">
+                                  {correspondingAssignment && (
+                                    <Tooltip title="View shift details">
                                       <span>
                                         <IconButton
                                           size="small"
                                           color="primary"
-                                          aria-label="Withdraw cancellation"
-                                          data-testid={`undo-cancel-${event.id}`}
+                                          aria-label="View shift details"
+                                          data-testid={`view-details-${event.id}`}
                                           onClick={() =>
-                                            correspondingAssignment && openDrawer(correspondingAssignment, "undo")
+                                            openDrawer(
+                                              correspondingAssignment,
+                                              correspondingAssignment.cancel ? "undo" : "request"
+                                            )
                                           }
                                         >
-                                          <UndoOutlinedIcon fontSize="small" />
+                                          <InfoOutlinedIcon fontSize="small" />
                                         </IconButton>
                                       </span>
                                     </Tooltip>
                                   )}
                                 </Stack>
-                                <Tooltip title="Total duration including required early arrival">
+                                <Tooltip title="Total scheduled duration">
                                   <Chip
                                     size="small"
-                                    label={`${totalDuration} minutes`}
+                                    label={
+                                      duration != null
+                                        ? `${duration} minutes`
+                                        : "Duration TBC"
+                                    }
                                     icon={<AccessTimeIcon fontSize="small" sx={{ color: "#42307d !important" }} />}
                                     sx={{
                                       bgcolor: "#ede9fe",
@@ -720,10 +732,23 @@ export const InvigilatorTimetable: React.FC = () => {
                                     }}
                                   />
                                 </Tooltip>
-                                <Tooltip title="Arrive 30 minutes before the exam starts">
+                                <Tooltip title="Arrival time">
                                   <Chip
-                                    icon={<AvTimerIcon fontSize="small" sx={{ color: "#b45309 !important" }} />}
+                                    icon={<AvTimerIcon fontSize="small" sx={{ color: "#1b5e20 !important" }} />}
                                     label={`Arrive by ${arrivalTime}`}
+                                    size="small"
+                                    sx={{
+                                      bgcolor: "#e8f5e9",
+                                      color: "#1b5e20",
+                                      fontWeight: 700,
+                                      "& .MuiChip-icon": { color: "#1b5e20" },
+                                    }}
+                                  />
+                                </Tooltip>
+                                <Tooltip title="Departure time">
+                                  <Chip
+                                    icon={<AvTimerIcon fontSize="small" sx={{ color: "#b45309 !important", transform: "scaleX(-1)" }} />}
+                                    label={`Depart at ${departureTime}`}
                                     size="small"
                                     sx={{
                                       bgcolor: "#fff4e5",
@@ -756,7 +781,7 @@ export const InvigilatorTimetable: React.FC = () => {
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="h6" fontWeight={700}>
-                {drawerMode === "undo" ? "Withdraw cancellation" : "Request cancellation"}
+                {drawerMode === "undo" ? "Withdraw cancellation" : "Shift details"}
               </Typography>
               <IconButton onClick={closeDrawer} aria-label="Close">
                 <CloseIcon />
@@ -766,53 +791,125 @@ export const InvigilatorTimetable: React.FC = () => {
             <Stack spacing={0.5}>
               <Typography fontWeight={700}>{drawerAssignment.exam_name || "Exam"}</Typography>
               <Typography color="text.secondary">
-                {dayjs(drawerAssignment.assigned_start).format("ddd, D MMM YYYY @ HH:mm")} - 
-                {dayjs(drawerAssignment.assigned_end).format("HH:mm")}
+                {formatDateTime(drawerAssignment.assigned_start)} - {formatTime(drawerAssignment.assigned_end)}
               </Typography>
               <Typography color="text.secondary">
                 {drawerAssignment.venue_name || "Venue TBC"}
               </Typography>
             </Stack>
 
-            <TextField
-              label="Reason (optional)"
-              multiline
-              minRows={3}
-              value={cancelNote}
-              onChange={(e) => setCancelNote(e.target.value)}
-            />
+            {(() => {
+              const now = dayjs();
+              const windowStart = dayjs(drawerAssignment.assigned_start);
+              const windowEnd = dayjs(drawerAssignment.assigned_end);
+              const withinWindow = windowStart.isValid()
+                && windowEnd.isValid()
+                && (now.isAfter(windowStart) || now.isSame(windowStart))
+                && (now.isBefore(windowEnd) || now.isSame(windowEnd));
 
-            {(drawerMode === "request" ? requestCancelMutation.isError : undoCancelMutation.isError) && (
-              <Alert severity="error">
-                {((drawerMode === "request" ? requestCancelMutation.error : undoCancelMutation.error) as Error)
-                  ?.message || "Unable to submit request."}
-              </Alert>
-            )}
+              if (!withinWindow) {
+                return (
+                  <Alert severity="info">
+                    Provisions & notes are available during your assigned shift.
+                  </Alert>
+                );
+              }
 
-            <Stack direction="row" spacing={1} justifyContent="flex-end">
-              <PillButton
-                variant="contained"
-                color={drawerMode === "undo" ? "primary" : "error"}
-                fullWidth
-                onClick={() =>
-                  drawerAssignment &&
-                  (drawerMode === "undo"
-                    ? undoCancelMutation.mutate({ id: drawerAssignment.id, reason: cancelNote.trim() })
-                    : requestCancelMutation.mutate({ id: drawerAssignment.id, reason: cancelNote.trim() }))
-                }
-                disabled={
-                  drawerMode === "undo" ? undoCancelMutation.isPending : requestCancelMutation.isPending
-                }
-              >
-                {drawerMode === "undo"
-                  ? undoCancelMutation.isPending
-                    ? "Submitting..."
-                    : "Withdraw cancellation"
-                  : requestCancelMutation.isPending
-                  ? "Requesting..."
-                  : "Submit request"}
-              </PillButton>
-            </Stack>
+              const hasProvisions = Boolean(drawerAssignment.student_provisions?.length);
+              const notes = (drawerAssignment.student_provision_notes || []).map((note) => note.trim()).filter(Boolean);
+              return (
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={700} mb={1}>
+                    Provisions & notes
+                  </Typography>
+                  {hasProvisions ? (
+                    <Stack direction="row" flexWrap="wrap" sx={{ columnGap: 1, rowGap: 1 }}>
+                      {drawerAssignment.student_provisions?.map((cap) => (
+                        <Chip
+                          key={cap}
+                          label={formatProvisionLabel(cap)}
+                          size="small"
+                          sx={{ bgcolor: "#eef2ff", color: "#1e3a8a", fontWeight: 600 }}
+                        />
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      No provisions listed.
+                    </Typography>
+                  )}
+                  {notes.length > 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      {notes.join(" • ")}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })()}
+
+            {(() => {
+              const canRequestCancel =
+                !drawerAssignment.cancel &&
+                drawerAssignment.assigned_start &&
+                dayjs(drawerAssignment.assigned_start).isAfter(dayjs());
+              const canUndoCancel = Boolean(drawerAssignment.cancel) && !drawerAssignment.cover_filled;
+              if (!canRequestCancel && !canUndoCancel) {
+                return (
+                  <Alert severity="info">
+                    Cancellation requests are not available for this shift.
+                  </Alert>
+                );
+              }
+              return (
+                <>
+                  <TextField
+                    label="Reason"
+                    required
+                    multiline
+                    minRows={3}
+                    value={cancelNote}
+                    onChange={(e) => setCancelNote(e.target.value)}
+                    helperText={!cancelNote.trim() ? "Please provide a brief reason for your request." : " "}
+                    FormHelperTextProps={{ sx: { minHeight: 20 } }}
+                  />
+
+                  {(drawerMode === "request" ? requestCancelMutation.isError : undoCancelMutation.isError) && (
+                    <Alert severity="error">
+                      {((drawerMode === "request" ? requestCancelMutation.error : undoCancelMutation.error) as Error)
+                        ?.message || "Unable to submit request."}
+                    </Alert>
+                  )}
+
+                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <PillButton
+                      variant="contained"
+                      color={drawerMode === "undo" ? "primary" : "error"}
+                      fullWidth
+                      onClick={() => {
+                        if (!drawerAssignment) return;
+                        const trimmedNote = cancelNote.trim();
+                        if (!trimmedNote) return;
+                        return drawerMode === "undo"
+                          ? undoCancelMutation.mutate({ id: drawerAssignment.id, reason: trimmedNote })
+                          : requestCancelMutation.mutate({ id: drawerAssignment.id, reason: trimmedNote });
+                      }}
+                      disabled={
+                        !cancelNote.trim() ||
+                        (drawerMode === "undo" ? undoCancelMutation.isPending : requestCancelMutation.isPending)
+                      }
+                    >
+                      {drawerMode === "undo"
+                        ? undoCancelMutation.isPending
+                          ? "Submitting..."
+                          : "Withdraw cancellation"
+                        : requestCancelMutation.isPending
+                        ? "Requesting..."
+                        : "Submit request"}
+                    </PillButton>
+                  </Stack>
+                </>
+              );
+            })()}
           </Stack>
         ) : (
           <Typography>No shift selected.</Typography>

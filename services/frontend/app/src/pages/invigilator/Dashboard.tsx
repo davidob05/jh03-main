@@ -12,6 +12,7 @@ import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { NotificationItem, NotificationsPanel } from "../../components/admin/NotificationsPanel";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDate, formatTime } from "../../utils/dates";
 
 type Announcement = {
   id: number;
@@ -76,12 +77,10 @@ export const InvigilatorDashboard: React.FC = () => {
     if (!ns) return null;
     const start = ns.start ? new Date(ns.start) : null;
     const end = ns.end ? new Date(ns.end) : null;
-    const formattedDate = start
-      ? start.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-      : "TBC";
+    const formattedDate = formatDate(start, "TBC");
     const formattedTime =
       start && end
-        ? `${start.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} - ${end.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+        ? `${formatTime(start, "Time TBC")} - ${formatTime(end, "Time TBC")}`
         : "Time TBC";
     return {
       date: formattedDate,
@@ -114,7 +113,12 @@ export const InvigilatorDashboard: React.FC = () => {
       );
       if (res.status === 404) return [];
       if (!res.ok) throw new Error("Unable to load announcements");
-      return res.json();
+      const data = await res.json();
+      const allRes = await apiFetch(`${apiBaseUrl}/announcements/?audience=all&active=true`);
+      if (allRes.status === 404) return data;
+      if (!allRes.ok) throw new Error("Unable to load announcements");
+      const allData = await allRes.json();
+      return [...data, ...allData];
     },
     retry: false,
   });
@@ -122,7 +126,7 @@ export const InvigilatorDashboard: React.FC = () => {
   const announcements = useMemo(() => {
     const now = new Date();
     const safeData = announcementsError ? [] : announcementsFromApi;
-    return safeData.filter((a) => {
+    const filtered = safeData.filter((a) => {
       if (!a) return false;
       const expires = a.expiresAt ?? a.expires_at;
       if (expires) {
@@ -130,6 +134,13 @@ export const InvigilatorDashboard: React.FC = () => {
         if (!Number.isNaN(exp.getTime()) && exp < now) return false;
       }
       return true;
+    });
+    return filtered.slice().sort((a, b) => {
+      const priorityDiff = (b.priority ?? 0) - (a.priority ?? 0);
+      if (priorityDiff !== 0) return priorityDiff;
+      const aDate = new Date(a.publishedAt ?? a.published_at ?? 0).getTime();
+      const bDate = new Date(b.publishedAt ?? b.published_at ?? 0).getTime();
+      return bDate - aDate;
     });
   }, [announcementsError, announcementsFromApi]);
 
@@ -329,11 +340,7 @@ export const InvigilatorDashboard: React.FC = () => {
                 }}
               >
                 <Typography variant="overline" sx={{ letterSpacing: 0.6, opacity: 0.9 }}>
-                  {new Date(publishedAtDisplay).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  {formatDate(publishedAtDisplay)}
                 </Typography>
                 <Typography variant="body1" sx={{ color: "#e8ecf1" }}>
                   {activeAnnouncement.body}
@@ -420,7 +427,7 @@ export const InvigilatorDashboard: React.FC = () => {
                 </Typography>
                 <Typography variant="h5" fontWeight={700} sx={{ color: "#0f172a" }}>
                   {statsError
-                    ? "—"
+                    ? "ï¿½"
                     : statsLoading || !stats
                     ? "..."
                     : (stats?.[item.key] ?? 0).toString()}
@@ -434,6 +441,7 @@ export const InvigilatorDashboard: React.FC = () => {
       <Box sx={{ mt: 1.5 }}>
         <NotificationsPanel
           notifications={(notificationsError ? [] : notificationsFromApi).slice(0, visibleCount)}
+          messageKey="invigilator_message"
         />
         {(notificationsError ? [] : notificationsFromApi).length > 0 && (
           <Box
@@ -472,5 +480,3 @@ export const InvigilatorDashboard: React.FC = () => {
     </Box>
   );
 };
-
-

@@ -16,8 +16,9 @@ import {
   IconButton,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
-import dayjs, { Dayjs } from "dayjs";
+import { Dayjs } from "dayjs";
 import { Close } from "@mui/icons-material";
+import { formatDate } from "../../utils/dates";
 
 interface Invigilator {
   id: number;
@@ -86,7 +87,7 @@ export const InvigilatorAvailabilityModal: React.FC<Props> = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ pr: 6 }}>
-        Available on {date.format("D MMMM YYYY")}
+        Available on {formatDate(date)}
         <IconButton
           aria-label="Close"
           onClick={onClose}
@@ -99,7 +100,7 @@ export const InvigilatorAvailabilityModal: React.FC<Props> = ({
       <DialogContent dividers>
         {available.length === 0 ? (
           <Typography color="text.secondary" align="center" py={4}>
-            No invigilators available on {date.format("D MMMM YYYY")}
+            No invigilators available on {formatDate(date)}
           </Typography>
         ) : (
           <List>
@@ -127,6 +128,8 @@ export const InvigilatorAvailabilityModal: React.FC<Props> = ({
                   </ListItemAvatar>
 
                   <ListItemText
+                    primaryTypographyProps={{ component: "div" }}
+                    secondaryTypographyProps={{ component: "div" }}
                     primary={
                       <Box>
                         <MUILink

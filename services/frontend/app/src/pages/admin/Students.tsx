@@ -1,9 +1,10 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -27,11 +28,15 @@ import {
   Toolbar,
   Typography,
   Collapse,
+  Snackbar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Search as SearchIcon, ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
+import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon, Close } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatTime } from "../../utils/dates";
 import { Panel } from "../../components/Panel";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { PillButton } from "../../components/PillButton";
 
 type StudentProvisionRow = {
   student_id: string;
@@ -80,13 +85,6 @@ const formatLabel = (text?: string | null): string => {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
-const formatDateTime = (iso?: string | null): string => {
-  if (!iso) return "TBC";
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return "TBC";
-  return parsed.toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-};
-
 const formatDuration = (minutes?: number | null): string => {
   if (minutes == null || Number.isNaN(minutes)) return "N/A";
   const hrs = Math.floor(minutes / 60);
@@ -99,8 +97,8 @@ const formatTimeWindow = (start?: string | null, minutes?: number | null): strin
   const parsed = new Date(start);
   if (Number.isNaN(parsed.getTime())) return "Time TBC";
   const end = new Date(parsed.getTime() + ((minutes || 0) * 60 * 1000));
-  const startLabel = parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const endLabel = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const startLabel = formatTime(parsed, "Time TBC");
+  const endLabel = formatTime(end, "Time TBC");
   return `${startLabel} - ${endLabel}`;
 };
 
@@ -130,9 +128,23 @@ const updateStudentExamVenue = async (studentExamId: number, examVenueId: number
   return response.json();
 };
 
+const deleteStudentProvision = async (row: StudentProvisionRow): Promise<void> => {
+  const response = await apiFetch(`${apiBaseUrl}/students/provisions/`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      student_exam_id: row.student_exam_id,
+      student_id: row.student_id,
+      exam_id: row.exam_id,
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Delete failed");
+  }
+};
+
 type SectionProps = {
-  title: string;
-  subtitle: string;
   search: string;
   onSearchChange: (value: string) => void;
   query: ReturnType<typeof useQuery<StudentProvisionRow[], Error>>;
@@ -150,11 +162,13 @@ type VenueDialogState = {
 type ChangeVenueDialogProps = VenueDialogState & {
   open: boolean;
   onClose: () => void;
+  onSuccess?: (row: StudentProvisionRow, venueLabel: string) => void;
 };
 
 const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
   open,
   onClose,
+  onSuccess,
   studentExamId,
   examId,
   currentExamVenueId,
@@ -191,6 +205,9 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
         });
       updateCache(["student-provisions", "all"]);
       updateCache(["student-provisions", "unallocated"], true);
+      const matchedVenue = venues.find((venue) => venue.examvenue_id === selectedVenueId);
+      const venueLabel = matchedVenue?.venue_name || "Unassigned venue";
+      onSuccess?.(updatedRow, venueLabel);
       onClose();
     },
     onError: (err: any) => setSaveError(err?.message || "Failed to update venue"),
@@ -209,9 +226,16 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
+      <DialogTitle sx={{ pr: 6 }}>
         Change venue for {studentName}
         <Typography variant="body2" color="text.secondary">{examName}</Typography>
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", right: 12, top: 10 }}
+        >
+          <Close />
+        </IconButton>
       </DialogTitle>
       <DialogContent dividers>
         {isLoading ? (
@@ -279,29 +303,49 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
         {saveError ? <Alert severity="error" sx={{ mt: 2 }}>{saveError}</Alert> : null}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={mutation.isLoading}>Cancel</Button>
-        <Button variant="contained" onClick={handleSave} disabled={disableSave}>
+        <PillButton variant="contained" onClick={handleSave} disabled={disableSave}>
           {mutation.isLoading ? "Saving..." : "Save"}
-        </Button>
+        </PillButton>
       </DialogActions>
     </Dialog>
   );
 };
 
 const StudentTableSection: React.FC<SectionProps> = ({
-  title,
-  subtitle,
   search,
   onSearchChange,
   query,
   emptyLabel,
 }) => {
   const rows = query.data || [];
+  const rowKey = useCallback((row: StudentProvisionRow) => `${row.student_id}::${row.exam_id}`, []);
   const [order, setOrder] = useState<Order>("asc");
   const [orderBy, setOrderBy] = useState<keyof StudentProvisionRow>("student_name");
+  const [selected, setSelected] = useState<string[]>([]);
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
   const [venueDialog, setVenueDialog] = useState<VenueDialogState | null>(null);
+  const [venueSnackbar, setVenueSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTargets, setDeleteTargets] = useState<StudentProvisionRow[]>([]);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
+  const deleteMutation = useMutation<void, Error, StudentProvisionRow[]>({
+    mutationFn: async (targets: StudentProvisionRow[]) => {
+      for (const target of targets) {
+        await deleteStudentProvision(target);
+      }
+    },
+    onSuccess: (_data, targets) => {
+      const deletedKeys = new Set(targets.map(rowKey));
+      setSelected((prev) => prev.filter((key) => !deletedKeys.has(key)));
+      setDeleteOpen(false);
+      setDeleteTargets([]);
+      setDeleteError(null);
+      queryClient.invalidateQueries({ queryKey: ["student-provisions"] });
+    },
+    onError: (err: any) => setDeleteError(err?.message || "Delete failed"),
+  });
   const handleRequestSort = (_: React.MouseEvent<unknown>, property: keyof StudentProvisionRow) => {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
@@ -343,6 +387,32 @@ const StudentTableSection: React.FC<SectionProps> = ({
     return [...filtered].sort(comparator);
   }, [filtered, order, orderBy]);
 
+  const rowMap = useMemo(() => {
+    const map = new Map<string, StudentProvisionRow>();
+    rows.forEach((row) => map.set(rowKey(row), row));
+    return map;
+  }, [rows, rowKey]);
+  const visibleKeys = useMemo(() => filtered.map(rowKey), [filtered, rowKey]);
+  const visibleKeySet = useMemo(() => new Set(visibleKeys), [visibleKeys]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectedVisibleCount = useMemo(
+    () => visibleKeys.reduce((count, key) => count + (selectedSet.has(key) ? 1 : 0), 0),
+    [visibleKeys, selectedSet]
+  );
+  const allVisibleSelected = visibleKeys.length > 0 && selectedVisibleCount === visibleKeys.length;
+
+  useEffect(() => {
+    setSelected((prev) => prev.filter((key) => visibleKeySet.has(key)));
+  }, [visibleKeySet]);
+
+  const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelected(event.target.checked ? visibleKeys : []);
+  };
+
+  const handleRowSelect = (key: string) => {
+    setSelected((prev) => (prev.includes(key) ? prev.filter((value) => value !== key) : [...prev, key]));
+  };
+
   const openVenueDialogForRow = (row: StudentProvisionRow) => {
     if (!row.student_exam_id) return;
     setVenueDialog({
@@ -354,87 +424,146 @@ const StudentTableSection: React.FC<SectionProps> = ({
     });
   };
 
+  const openDeleteDialogForRow = (row: StudentProvisionRow) => {
+    setDeleteTargets([row]);
+    setDeleteError(null);
+    setDeleteOpen(true);
+  };
+
+  const openDeleteDialogForSelection = () => {
+    const targets = selected.map((key) => rowMap.get(key)).filter(Boolean) as StudentProvisionRow[];
+    if (!targets.length) return;
+    setDeleteTargets(targets);
+    setDeleteError(null);
+    setDeleteOpen(true);
+  };
+
+  const deleteCount = deleteTargets.length;
+  const deleteTarget = deleteTargets[0];
+
+  if (query.isLoading) {
+    return (
+      <Box sx={{ p: 6, textAlign: "center" }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }}>Loading students...</Typography>
+      </Box>
+    );
+  }
+
+  if (query.isError) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography color="error" variant="body1">{query.error?.message || "Failed to load students"}</Typography>
+      </Box>
+    );
+  }
+
   return (
     <Panel disableDivider sx={{ p: 0, overflow: "hidden" }}>
       <Toolbar
         sx={[
           { pl: { sm: 2 }, pr: { xs: 1, sm: 1 } },
-          { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", rowGap: 1 },
+          selected.length > 0 && { bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity) },
         ]}
       >
-        <Box>
-          <Typography variant="h6" fontWeight={700}>{title}</Typography>
-          <Typography variant="body2" color="text.secondary">{subtitle}</Typography>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5, minWidth: 240 }}>
-          <SearchIcon sx={{ color: "action.active", mr: 1 }} />
-          <InputBase placeholder="Search students..." value={search} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: "100%" }} />
-        </Box>
+        {selected.length > 0 ? (
+          <>
+            <Typography sx={{ flex: "1 1 100%" }} color="inherit" variant="subtitle1" component="div">
+              {selected.length} selected
+            </Typography>
+            <PillButton
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={openDeleteDialogForSelection}
+              disabled={deleteMutation.isPending}
+            >
+              Delete
+            </PillButton>
+          </>
+        ) : (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: "1 1 100%" }}>
+            <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5 }}>
+              <SearchIcon sx={{ color: "action.active", mr: 1 }} />
+              <InputBase placeholder="Search students..." value={search} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: 250 }} />
+            </Box>
+          </Box>
+        )}
       </Toolbar>
       <Divider />
-      {query.isLoading ? (
-        <Box sx={{ p: 4, textAlign: "center" }}>
-          <CircularProgress size={48} />
-          <Typography sx={{ mt: 2 }}>Loading students…</Typography>
-        </Box>
-      ) : query.isError ? (
-        <Box sx={{ p: 3 }}>
-          <Typography color="error" variant="body1">{query.error?.message || "Failed to load students"}</Typography>
-        </Box>
-      ) : (
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sortDirection={orderBy === "student_name" ? order : false}>
-                  <TableSortLabel
-                    active={orderBy === "student_name"}
-                    direction={orderBy === "student_name" ? order : "asc"}
-                    onClick={(e) => handleRequestSort(e, "student_name")}
-                  >
-                    Student
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sortDirection={orderBy === "course_code" ? order : false}>
-                  <TableSortLabel
-                    active={orderBy === "course_code"}
-                    direction={orderBy === "course_code" ? order : "asc"}
-                    onClick={(e) => handleRequestSort(e, "course_code")}
-                  >
-                    Exam Code
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sortDirection={orderBy === "venue_name" ? order : false}>
-                  <TableSortLabel
-                    active={orderBy === "venue_name"}
-                    direction={orderBy === "venue_name" ? order : "asc"}
-                    onClick={(e) => handleRequestSort(e, "venue_name")}
-                  >
-                    Venue
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sortDirection={orderBy === "matches_needs" ? order : false}>
-                  <TableSortLabel
-                    active={orderBy === "matches_needs"}
-                    direction={orderBy === "matches_needs" ? order : "asc"}
-                    onClick={(e) => handleRequestSort(e, "matches_needs")}
-                  >
-                    Status
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell align="center">Details</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sorted.map((row) => {
-                const statusColor = row.matches_needs ? "success" : "warning";
-                const statusLabel = row.matches_needs ? "Allocated" : row.allocation_issue || "Needs allocation";
-                const key = `${row.student_id}-${row.exam_id}`;
+      <TableContainer>
+        <Table sx={{ minWidth: 750 }} size="medium">
+          <TableHead>
+            <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  color="primary"
+                  indeterminate={selectedVisibleCount > 0 && !allVisibleSelected}
+                  checked={allVisibleSelected}
+                  onChange={handleSelectAllClick}
+                  inputProps={{ "aria-label": "select all students" }}
+                  disabled={!visibleKeys.length || deleteMutation.isPending}
+                />
+              </TableCell>
+              <TableCell padding="none" sortDirection={orderBy === "student_name" ? order : false}>
+                <TableSortLabel
+                  active={orderBy === "student_name"}
+                  direction={orderBy === "student_name" ? order : "asc"}
+                  onClick={(e) => handleRequestSort(e, "student_name")}
+                >
+                  Student
+                </TableSortLabel>
+              </TableCell>
+              <TableCell sortDirection={orderBy === "course_code" ? order : false}>
+                <TableSortLabel
+                  active={orderBy === "course_code"}
+                  direction={orderBy === "course_code" ? order : "asc"}
+                  onClick={(e) => handleRequestSort(e, "course_code")}
+                >
+                  Exam Code
+                </TableSortLabel>
+              </TableCell>
+              <TableCell sortDirection={orderBy === "venue_name" ? order : false}>
+                <TableSortLabel
+                  active={orderBy === "venue_name"}
+                  direction={orderBy === "venue_name" ? order : "asc"}
+                  onClick={(e) => handleRequestSort(e, "venue_name")}
+                >
+                  Venue
+                </TableSortLabel>
+              </TableCell>
+              <TableCell sortDirection={orderBy === "matches_needs" ? order : false}>
+                <TableSortLabel
+                  active={orderBy === "matches_needs"}
+                  direction={orderBy === "matches_needs" ? order : "asc"}
+                  onClick={(e) => handleRequestSort(e, "matches_needs")}
+                >
+                  Status
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="center">Details</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sorted.map((row) => {
+              const statusColor = row.matches_needs ? "success" : "warning";
+              const statusLabel = row.matches_needs ? "Allocated" : row.allocation_issue || "needs allocation";
+              const key = rowKey(row);
                 const isOpen = openRows[key] || false;
+                const isSelected = selectedSet.has(key);
                 return (
                   <React.Fragment key={key}>
-                    <TableRow hover>
-                      <TableCell>
+                    <TableRow hover role="checkbox" aria-checked={isSelected} selected={isSelected}>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          color="primary"
+                          checked={isSelected}
+                          onChange={() => handleRowSelect(key)}
+                          inputProps={{ "aria-label": `select ${row.student_name}` }}
+                          disabled={deleteMutation.isPending}
+                        />
+                      </TableCell>
+                      <TableCell padding="none">
                         <Typography fontWeight={600}>{row.student_name}</Typography>
                         <Typography variant="body2" color="text.secondary">{row.student_id}</Typography>
                       </TableCell>
@@ -478,7 +607,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={5}>
+                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
                         <Collapse in={isOpen} timeout="auto" unmountOnExit>
                           <Box sx={{ margin: 2, display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
                             <Box>
@@ -524,14 +653,14 @@ const StudentTableSection: React.FC<SectionProps> = ({
                               ) : null}
                             </Box>
                             <Box sx={{ gridColumn: { xs: "1", sm: "1 / -1" }, display: "flex", justifyContent: "flex-end" }}>
-                              <Button
+                              <PillButton
                                 variant="outlined"
                                 size="small"
                                 onClick={() => openVenueDialogForRow(row)}
                                 disabled={!row.student_exam_id}
                               >
                                 Change venue
-                              </Button>
+                              </PillButton>
                             </Box>
                           </Box>
                         </Collapse>
@@ -542,7 +671,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
               })}
               {!filtered.length && (
                 <TableRow>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={6}>
                     <Typography variant="body2" color="text.secondary">{emptyLabel}</Typography>
                   </TableCell>
                 </TableRow>
@@ -550,14 +679,78 @@ const StudentTableSection: React.FC<SectionProps> = ({
             </TableBody>
           </Table>
         </TableContainer>
-      )}
       {venueDialog ? (
         <ChangeVenueDialog
           open
           onClose={() => setVenueDialog(null)}
+          onSuccess={(row, venueLabel) => {
+            setVenueSnackbar({
+              open: true,
+              message: `Updated ${row.student_name}'s venue to ${venueLabel}.`,
+            });
+          }}
           {...venueDialog}
         />
       ) : null}
+      <DeleteConfirmationDialog
+        open={deleteOpen}
+        title={deleteCount > 1 ? "Delete student records?" : "Delete student record?"}
+        description={
+          <>
+            {deleteCount > 1 ? (
+              <>
+                This will permanently delete <strong>{deleteCount}</strong> student provision records.
+              </>
+            ) : (
+              <>
+                This will permanently delete the provision record for{" "}
+                <strong>{deleteTarget?.student_name || "this student"}</strong>{" "}
+                {deleteTarget?.course_code
+                  ? `in ${deleteTarget.course_code} • ${deleteTarget.exam_name}.`
+                  : "in this exam."}
+              </>
+            )}
+            {deleteError ? (
+              <Typography sx={{ mt: 2 }} color="error">
+                {deleteError}
+              </Typography>
+            ) : null}
+          </>
+        }
+        confirmText={deleteCount > 1 ? `Delete ${deleteCount}` : "Delete"}
+        loading={deleteMutation.isPending}
+        onClose={() => {
+          if (!deleteMutation.isPending) {
+            setDeleteOpen(false);
+            setDeleteTargets([]);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={() => {
+          if (deleteTargets.length) deleteMutation.mutate(deleteTargets);
+        }}
+      />
+      <Snackbar
+        open={venueSnackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setVenueSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setVenueSnackbar((prev) => ({ ...prev, open: false }))}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {venueSnackbar.message}
+        </Alert>
+      </Snackbar>
     </Panel>
   );
 };
@@ -575,6 +768,24 @@ export const AdminStudents: React.FC = () => {
     queryFn: () => fetchStudentProvisions(false),
   });
 
+  if (unallocatedQuery.isLoading || allQuery.isLoading) {
+    return (
+      <Box sx={{ p: 6, textAlign: "center" }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }}>Loading students...</Typography>
+      </Box>
+    );
+  }
+
+  if (unallocatedQuery.isError || allQuery.isError) {
+    const err = unallocatedQuery.error || allQuery.error;
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography color="error" variant="body1">{err?.message || "Failed to load students"}</Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ width: "100%", maxWidth: 1200, p: { xs: 2, md: 4 }, mx: "auto" }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" rowGap={1.5}>
@@ -584,12 +795,12 @@ export const AdminStudents: React.FC = () => {
         </Box>
         <Stack direction="row" spacing={1}>
           <Chip
-            label={`${unallocatedQuery.data?.length ?? 0} Needs allocation`}
+            label={`${unallocatedQuery.data?.length ?? 0} needs allocation`}
             size="medium"
             sx={{ backgroundColor: "#fff3e0", color: "warning.dark", fontWeight: 600 }}
           />
           <Chip
-            label={`${allQuery.data?.length ?? 0} With provisions`}
+            label={`${allQuery.data?.length ?? 0} with provisions`}
             size="medium"
             sx={{ backgroundColor: "#e3f2fd", color: "primary.main", fontWeight: 600 }}
           />
@@ -598,8 +809,6 @@ export const AdminStudents: React.FC = () => {
 
       <Stack spacing={3}>
         <StudentTableSection
-          title="All students with provisions"
-          subtitle="Full list of students and their provision requirements."
           search={allSearch}
           onSearchChange={setAllSearch}
           query={allQuery}

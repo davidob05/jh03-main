@@ -31,6 +31,7 @@ const QUALIFICATION_CHOICES = [
   { value: "SENIOR_INVIGILATOR", label: "Senior Invigilator", help: "Can lead an exam room and supervise assistants" },
   { value: "AKT_TRAINED", label: "AKT Trained", help: "Approved for AKT duties" },
   { value: "CHECK_IN", label: "Check-In", help: "Can support candidate check-in" },
+  { value: "DETACHED_DUTY", label: "Detached Duty", help: "Eligible for detached duty assignments" },
 ];
 
 const RESTRICTION_CHOICES = [
@@ -39,10 +40,9 @@ const RESTRICTION_CHOICES = [
   { value: "purple_cluster", label: "Purple cluster", yes: "Can work in Purple Cluster", no: "Cannot work in Purple Cluster" },
   { value: "computer_cluster", label: "Computer cluster", yes: "Can work in computer clusters", no: "Cannot work in computer clusters" },
   { value: "vet_school", label: "Vet School", yes: "Can work at the Vet School", no: "Cannot work at the Vet School" },
-  { value: "sec", label: "Scottish Event Campus", yes: "Can work at the SEC", no: "Cannot work at the SEC" },
-  { value: "osce_golden_jubilee", label: "OSCE - Golden Jubilee", yes: "Can work at Golden Jubilee", no: "Cannot work at Golden Jubilee" },
-  { value: "osce_wolfson", label: "OSCE - Wolfson", yes: "Can work at Wolfson", no: "Cannot work at Wolfson" },
-  { value: "osce_queen_elizabeth", label: "OSCE - Queen Elizabeth", yes: "Can work at Queen Elizabeth", no: "Cannot work at Queen Elizabeth" },
+  { value: "osce_golden_jubilee", label: "Golden Jubilee", yes: "Can work at Golden Jubilee", no: "Cannot work at Golden Jubilee" },
+  { value: "osce_wolfson", label: "Wolfson", yes: "Can work at Wolfson", no: "Cannot work at Wolfson" },
+  { value: "osce_queen_elizabeth", label: "Queen Elizabeth", yes: "Can work at Queen Elizabeth", no: "Cannot work at Queen Elizabeth" },
   { value: "approved_exemption", label: "Approved exemption", yes: "Has approved exemption", no: "No exemption" },
 ];
 
@@ -86,7 +86,6 @@ interface InvigilatorData {
   full_name: string;
   mobile: string | null;
   mobile_text_only: string | null;
-  janet_txt: string | null;
   alt_phone: string | null;
   university_email: string | null;
   personal_email: string | null;
@@ -111,7 +110,6 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
   const [fullName, setFullName] = useState("");
   const [mobile, setMobile] = useState("");
   const [mobileTextOnly, setMobileTextOnly] = useState("");
-  const [janetTxt, setJanetTxt] = useState("");
   const [altPhone, setAltPhone] = useState("");
   const [universityEmail, setUniversityEmail] = useState("");
   const [personalEmail, setPersonalEmail] = useState("");
@@ -172,7 +170,6 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
     setFullName(data.full_name || "");
     setMobile(data.mobile || "");
     setMobileTextOnly(data.mobile_text_only || "");
-    setJanetTxt(data.janet_txt || "");
     setAltPhone(data.alt_phone || "");
     setUniversityEmail(data.university_email || "");
     setPersonalEmail(data.personal_email || "");
@@ -205,7 +202,6 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
           full_name: fullName,
           mobile,
           mobile_text_only: mobileTextOnly,
-          janet_txt: janetTxt,
           alt_phone: altPhone,
           university_email: universityEmail,
           personal_email: personalEmail,
@@ -248,7 +244,6 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
             <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required />
             <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required />
             <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth />
-            <TextField label="Janet txt" value={janetTxt} onChange={e => setJanetTxt(e.target.value)} fullWidth required />
             <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth />
             <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required />
             <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required />
@@ -307,7 +302,7 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
 
             {/* Locations & OSCE Sites */}
             <CollapsibleSection title="Locations & OSCE Sites" defaultExpanded={false}>
-              {["vet_school", "sec", "osce_golden_jubilee", "osce_wolfson", "osce_queen_elizabeth"].map(r => {
+              {["vet_school", "osce_golden_jubilee", "osce_wolfson", "osce_queen_elizabeth"].map(r => {
                 const choice = RESTRICTION_CHOICES.find(c => c.value === r);
                 if (!choice) return null;
                 return (
