@@ -147,6 +147,10 @@ class InvigilatorTimetableExportView(APIView):
             invigilator_id = request.data.get("invigilator_id")
             invigilator_ids = [invigilator_id] if invigilator_id is not None else []
 
+        only_confirmed = bool(request.data.get("only_confirmed", False))
+        include_cancelled = bool(request.data.get("include_cancelled", False))
+        include_provisions = bool(request.data.get("include_provisions", False))
+
         cleaned_ids = []
         for raw_id in invigilator_ids:
             if not str(raw_id).strip():
@@ -169,39 +173,58 @@ class InvigilatorTimetableExportView(APIView):
                 "exam_venue__exam",
                 "exam_venue__venue",
             )
-            .filter(invigilator_id__in=invigilator_ids, cancel=False)
+            .filter(invigilator_id__in=invigilator_ids)
             .order_by("invigilator_id", "assigned_start")
         )
+
+        if only_confirmed:
+            assignments = assignments.filter(confirmed=True, cancel=False)
+        else:
+            assignments = assignments.filter(
+                models.Q(cancel=False) | models.Q(cancel=True, confirmed=False)
+            )
+        if include_cancelled:
+            cancelled_qs = (
+                InvigilatorAssignment.objects.select_related(
+                    "invigilator",
+                    "invigilator__user",
+                    "exam_venue__exam",
+                    "exam_venue__venue",
+                )
+                .filter(invigilator_id__in=invigilator_ids, cancel=True, confirmed=True)
+            )
+            assignments = (assignments | cancelled_qs).order_by("invigilator_id", "assigned_start")
 
         exam_venue_ids = list(
             assignments.values_list("exam_venue_id", flat=True).distinct()
         )
-        student_exam_rows = list(
-            StudentExam.objects.filter(exam_venue_id__in=exam_venue_ids).values(
-                "exam_venue_id",
-                "student_id",
-                "exam_id",
-            )
-        )
-        provision_lookup = {
-            (p.student_id, p.exam_id): p
-            for p in Provisions.objects.filter(
-                exam_id__in={row["exam_id"] for row in student_exam_rows},
-                student_id__in={row["student_id"] for row in student_exam_rows},
-            )
-        }
-
         provisions_by_venue: dict[int, set[str]] = {}
         notes_by_venue: dict[int, list[str]] = {}
-        for row in student_exam_rows:
-            provision = provision_lookup.get((row["student_id"], row["exam_id"]))
-            if not provision:
-                continue
-            venue_id = row["exam_venue_id"]
-            if provision.provisions:
-                provisions_by_venue.setdefault(venue_id, set()).update(provision.provisions)
-            if provision.notes:
-                notes_by_venue.setdefault(venue_id, []).append(provision.notes)
+        if include_provisions and exam_venue_ids:
+            student_exam_rows = list(
+                StudentExam.objects.filter(exam_venue_id__in=exam_venue_ids).values(
+                    "exam_venue_id",
+                    "student_id",
+                    "exam_id",
+                )
+            )
+            provision_lookup = {
+                (p.student_id, p.exam_id): p
+                for p in Provisions.objects.filter(
+                    exam_id__in={row["exam_id"] for row in student_exam_rows},
+                    student_id__in={row["student_id"] for row in student_exam_rows},
+                )
+            }
+
+            for row in student_exam_rows:
+                provision = provision_lookup.get((row["student_id"], row["exam_id"]))
+                if not provision:
+                    continue
+                venue_id = row["exam_venue_id"]
+                if provision.provisions:
+                    provisions_by_venue.setdefault(venue_id, set()).update(provision.provisions)
+                if provision.notes:
+                    notes_by_venue.setdefault(venue_id, []).append(provision.notes)
 
         def _format_dt(value):
             if not value:
@@ -212,29 +235,28 @@ class InvigilatorTimetableExportView(APIView):
         def _csv_for(assignments_list):
             buffer = StringIO()
             writer = csv.writer(buffer)
-            writer.writerow(
-                [
-                    "invigilator_id",
-                    "invigilator_name",
-                    "username",
-                    "assignment_id",
-                    "exam_venue_id",
-                    "venue_name",
-                    "exam_name",
-                    "course_code",
-                    "exam_school",
-                    "exam_start",
-                    "exam_end",
-                    "exam_length_minutes",
-                    "assigned_start",
-                    "assigned_end",
-                    "role",
-                    "break_time_minutes",
-                    "assignment_notes",
-                    "student_provisions",
-                    "provision_notes",
-                ]
-            )
+            headers = [
+                "invigilator_id",
+                "invigilator_name",
+                "username",
+                "assignment_id",
+                "exam_venue_id",
+                "venue_name",
+                "exam_name",
+                "course_code",
+                "exam_school",
+                "exam_start",
+                "exam_end",
+                "exam_length_minutes",
+                "assigned_start",
+                "assigned_end",
+                "role",
+                "break_time_minutes",
+                "assignment_notes",
+            ]
+            if include_provisions:
+                headers.extend(["student_provisions", "provision_notes"])
+            writer.writerow(headers)
 
             for assignment in assignments_list:
                 invigilator = assignment.invigilator
@@ -252,29 +274,28 @@ class InvigilatorTimetableExportView(APIView):
                     if note not in unique_notes:
                         unique_notes.append(note)
 
-                writer.writerow(
-                    [
-                        invigilator.id if invigilator else "",
-                        invigilator.preferred_name or invigilator.full_name if invigilator else "",
-                        getattr(invigilator.user, "username", "") if invigilator and invigilator.user else "",
-                        assignment.id,
-                        assignment.exam_venue_id,
-                        venue.venue_name if venue else "",
-                        exam.exam_name if exam else "",
-                        exam.course_code if exam else "",
-                        exam.exam_school if exam else "",
-                        _format_dt(exam_start),
-                        _format_dt(exam_end),
-                        exam_length if exam_length is not None else "",
-                        _format_dt(assignment.assigned_start),
-                        _format_dt(assignment.assigned_end),
-                        assignment.role or "",
-                        assignment.break_time_minutes or 0,
-                        assignment.notes or "",
-                        ", ".join(venue_provisions),
-                        " | ".join(unique_notes),
-                    ]
-                )
+                row = [
+                    invigilator.id if invigilator else "",
+                    invigilator.preferred_name or invigilator.full_name if invigilator else "",
+                    getattr(invigilator.user, "username", "") if invigilator and invigilator.user else "",
+                    assignment.id,
+                    assignment.exam_venue_id,
+                    venue.venue_name if venue else "",
+                    exam.exam_name if exam else "",
+                    exam.course_code if exam else "",
+                    exam.exam_school if exam else "",
+                    _format_dt(exam_start),
+                    _format_dt(exam_end),
+                    exam_length if exam_length is not None else "",
+                    _format_dt(assignment.assigned_start),
+                    _format_dt(assignment.assigned_end),
+                    assignment.role or "",
+                    assignment.break_time_minutes or 0,
+                    assignment.notes or "",
+                ]
+                if include_provisions:
+                    row.extend([", ".join(venue_provisions), " | ".join(unique_notes)])
+                writer.writerow(row)
             return buffer.getvalue()
 
         if len(invigilator_ids) == 1:
