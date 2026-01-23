@@ -59,7 +59,7 @@ describe ("Components - ContractedHoursReport", () => {
         expect(screen.getByText("Remaining")).toBeInTheDocument();
         expect(screen.getByText("4 hours")).toBeInTheDocument();
     });
-    it("shows 'Over Contract' when remaining_hours < 0", () => {
+  it("shows 'Contract fulfilled' when remaining_hours < 0", () => {
         renderComponent({
         report: {
             total_hours: 10,
@@ -67,7 +67,7 @@ describe ("Components - ContractedHoursReport", () => {
             remaining_hours: -2
         }
         });
-    expect(screen.getByText("Over Contract")).toBeInTheDocument();
+    expect(screen.getByText("Contract fulfilled")).toBeInTheDocument();
     expect(screen.getByText("2 hours")).toBeInTheDocument();
     });
     it("does not render remaining section when remaining_hours is undefined", () => {
@@ -78,6 +78,6 @@ describe ("Components - ContractedHoursReport", () => {
         }
         });
         expect(screen.queryByText("Remaining")).not.toBeInTheDocument();
-        expect(screen.queryByText("Over Contract")).not.toBeInTheDocument();
+    expect(screen.queryByText("Contract fulfilled")).not.toBeInTheDocument();
     });
 });
