@@ -333,7 +333,7 @@ export const InvigilatorRestrictions: React.FC = () => {
                             return (
                               <PillButton
                                 key={slot.slot}
-                                variant={available ? "contained" : "outlined"}
+                                variant="contained"
                                 color="success"
                                 size="medium"
                                 onClick={() => !cutoffReached && toggleSlot(day.date, slot.slot)}
@@ -341,20 +341,21 @@ export const InvigilatorRestrictions: React.FC = () => {
                                 sx={{
                                   borderRadius: 10,
                                   minWidth: 120,
+                                  minHeight: 36,
                                   justifyContent: "center",
-                                  borderWidth: 1.5,
-                                  borderColor: available ? "success.main" : "success.main",
-                                  backgroundColor: available ? "success.main" : "transparent",
-                                  color: available ? "#fff" : "success.dark",
+                                  border: "1.5px solid transparent",
+                                  boxSizing: "border-box",
+                                  backgroundColor: available ? "success.main" : "#d4edda",
+                                  color: available ? "#fff" : "#155724",
                                   opacity: cutoffReached ? 0.6 : 1,
+                                  boxShadow: "none",
                                   "&:hover": {
                                     backgroundColor: cutoffReached
                                       ? undefined
                                       : available
                                       ? "success.dark"
-                                      : "success.light",
-                                    color: available ? "#fff" : "success.dark",
-                                    borderColor: "success.dark",
+                                      : "#c6e9cf",
+                                    color: available ? "#fff" : "#155724",
                                   },
                                 }}
                               >

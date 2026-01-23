@@ -640,9 +640,17 @@ export const AdminInvigilatorProfile: React.FC = () => {
                           <Tooltip key={i} title={s.available ? "Available for this slot" : "Unavailable for this slot"}>
                             <Chip
                               label={slotLabelMap[s.slot] || s.slot}
-                              color={s.available ? "success" : "default"}
-                              variant={s.available ? "filled" : "outlined"}
                               size="medium"
+                              sx={{
+                                borderRadius: 999,
+                                border: "1.5px solid transparent",
+                                boxSizing: "border-box",
+                                minWidth: 120,
+                                minHeight: 36,
+                                bgcolor: s.available ? "success.main" : "#d4edda",
+                                color: s.available ? "#fff" : "#155724",
+                                fontWeight: 600,
+                              }}
                             />
                           </Tooltip>
                         ))}
@@ -741,9 +749,17 @@ export const AdminInvigilatorProfile: React.FC = () => {
                       <Chip
                         key={i}
                         label={slotLabelMap[slot.slot] || slot.slot}
-                        color={slot.available ? "success" : "default"}
-                        variant={slot.available ? "filled" : "outlined"}
                         size="medium"
+                        sx={{
+                          borderRadius: 999,
+                          border: "1.5px solid transparent",
+                          boxSizing: "border-box",
+                          minWidth: 120,
+                          minHeight: 36,
+                          bgcolor: slot.available ? "success.main" : "#d4edda",
+                          color: slot.available ? "#fff" : "#155724",
+                          fontWeight: 600,
+                        }}
                       />
                     ))}
                     {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).length === 0 && (

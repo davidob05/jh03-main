@@ -111,7 +111,7 @@ export const ContractedHoursReport: React.FC<ContractedHoursReportProps> = ({
                     report.remaining_hours < 0 ? "error.main" : "success.main"
                   }
                 >
-                  {report.remaining_hours < 0 ? "Over Contract" : "Remaining"}
+                  {report.remaining_hours < 0 ? "Contract fulfilled" : "Remaining"}
                 </Typography>
                 <Typography
                   variant="body1"

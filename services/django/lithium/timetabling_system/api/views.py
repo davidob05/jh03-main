@@ -877,6 +877,19 @@ class DietViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAdminUser]
     throttle_classes: list = []
 
+    def destroy(self, request, *args, **kwargs):
+        diet = self.get_object()
+        code = diet.code
+        start_date = diet.start_date
+        end_date = diet.end_date
+        with transaction.atomic():
+            if code:
+                InvigilatorRestriction.objects.filter(diet=code).delete()
+            if start_date and end_date:
+                InvigilatorAvailability.objects.filter(date__gte=start_date, date__lte=end_date).delete()
+            diet.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
         
 def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
     student_exam = student_exam or StudentExam(student=provision.student, exam=provision.exam, exam_venue=None)
@@ -983,6 +996,19 @@ class DietViewSet(viewsets.ModelViewSet):
     serializer_class = DietSerializer
     permission_classes = [permissions.IsAdminUser]
     throttle_classes: list = []
+
+    def destroy(self, request, *args, **kwargs):
+        diet = self.get_object()
+        code = diet.code
+        start_date = diet.start_date
+        end_date = diet.end_date
+        with transaction.atomic():
+            if code:
+                InvigilatorRestriction.objects.filter(diet=code).delete()
+            if start_date and end_date:
+                InvigilatorAvailability.objects.filter(date__gte=start_date, date__lte=end_date).delete()
+            diet.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
     
 def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):

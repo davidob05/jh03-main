@@ -132,9 +132,9 @@ const restrictionLabels: Record<string, string> = {
   purple_cluster: "Purple cluster",
   computer_cluster: "Computer cluster",
   vet_school: "Vet School",
-  osce_golden_jubilee: "OSCE - Golden Jubilee",
-  osce_wolfson: "OSCE - Wolfson",
-  osce_queen_elizabeth: "OSCE - Queen Elizabeth",
+  osce_golden_jubilee: "Golden Jubilee",
+  osce_wolfson: "Wolfson",
+  osce_queen_elizabeth: "Queen Elizabeth",
   approved_exemption: "Approved exemption",
 };
 
