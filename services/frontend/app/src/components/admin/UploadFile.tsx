@@ -109,7 +109,7 @@ export const UploadFile: React.FC = () => {
     <Panel
       title="Upload data"
       disableDivider
-      sx={{ mt: 1, mb: 0, height: "100%" }}
+      sx={{ mb: 0 }}
     >
       <Stack spacing={1.25}>
         <Typography variant="body2" color="text.secondary">

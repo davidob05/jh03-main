@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Fab, Grid, IconButton, Paper, Stack, Tooltip, Typography, CircularProgress } from "@mui/material";
+import { Box, Fab, Grid, IconButton, Paper, Stack, Tooltip, Typography, CircularProgress, TextField, Autocomplete } from "@mui/material";
 import AddCommentIcon from "@mui/icons-material/AddComment";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
@@ -57,6 +58,7 @@ interface ExamData {
   exam_id: number;
   exam_name: string;
   course_code: string;
+  exam_school?: string;
   exam_venues: ExamVenueData[];
 }
 
@@ -142,6 +144,14 @@ export const AdminDashboard: React.FC = () => {
       contractsFulfilled: null,
     };
   }, [exams, invigilators, venues]);
+
+  const schoolOptions = useMemo(() => {
+    const unique = new Set<string>();
+    exams.forEach((exam) => {
+      if (exam.exam_school) unique.add(exam.exam_school);
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
+  }, [exams]);
 
   const notifications = (notificationsError ? [] : notificationsFromApi) || [];
 
@@ -231,33 +241,48 @@ export const AdminDashboard: React.FC = () => {
       <Typography variant="h4" fontWeight={700}>Dashboard</Typography>
       <Typography variant="body2" color="text.secondary">Browse and manage the exam scheduling system.</Typography>
 
-      <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mt: 2, mb: 2 }}>
-        <input
-          placeholder="School filter (optional)"
-          value={selectedSchool}
-          onChange={(e) => setSelectedSchool(e.target.value)}
-          style={{
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid #d0d7de",
-            minWidth: 0,
-          }}
-        />
-        <PillButton
-          variant="contained"
-          disabled={exporting}
-          onClick={handleExport}
-          sx={{ alignSelf: { xs: "stretch", md: "center" } }}
-        >
-          {exporting ? "Exporting..." : "Export provisions CSV"}
-        </PillButton>
-      </Stack>
-
       <Stack direction={{ xs: "column", md: "row" }} spacing={2.5} sx={{ mt: 1.5, mb: 3 }} alignItems="stretch">
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <UploadFile />
+          <Stack spacing={2}>
+            <UploadFile />
+            <Panel title="Export provisions" disableDivider sx={{ mb: 0 }}>
+              <Stack spacing={1.5}>
+                <Typography variant="body2" color="text.secondary">
+                  Download a CSV of student provisions, optionally filtered by school.
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ xs: "stretch", sm: "center" }}>
+                  <Autocomplete
+                    freeSolo
+                    options={schoolOptions}
+                    value={selectedSchool}
+                    onChange={(_, value) => setSelectedSchool(value ?? "")}
+                    onInputChange={(_, value) => setSelectedSchool(value)}
+                    sx={{ flex: 1 }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="School filter"
+                        placeholder="Start typing to search"
+                        size="small"
+                        fullWidth
+                      />
+                    )}
+                  />
+                  <PillButton
+                    variant="contained"
+                    disabled={exporting}
+                    onClick={handleExport}
+                    startIcon={<FileDownloadIcon />}
+                    sx={{ minWidth: 200 }}
+                  >
+                    {exporting ? "Exporting..." : "Export"}
+                  </PillButton>
+                </Stack>
+              </Stack>
+            </Panel>
+          </Stack>
         </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex" }}>
           <Panel
             title={activeAnnouncement ? activeAnnouncement.title : "Announcements"}
             actions={
@@ -288,10 +313,9 @@ export const AdminDashboard: React.FC = () => {
             }
             disableDivider
             sx={{
-              mt: 1,
               flex: 1,
+              mb: 0,
               width: "100%",
-              height: "100%",
               overflow: "hidden",
               color: "#fff",
               backgroundImage: heroImage
