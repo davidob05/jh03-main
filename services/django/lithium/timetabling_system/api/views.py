@@ -1,5 +1,6 @@
 import csv
-from io import StringIO
+from io import StringIO, BytesIO
+import zipfile
 from typing import Optional
 
 from rest_framework import permissions, status, viewsets
@@ -130,6 +131,182 @@ class ProvisionExportView(APIView):
         if school:
             filename_parts.append(slugify(str(school)))
         response["Content-Disposition"] = f'attachment; filename="{ "_".join(filename_parts) }.csv"'
+        return response
+
+
+class InvigilatorTimetableExportView(APIView):
+    """
+    Admin CSV export of invigilator timetables for one or more invigilators.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, *args, **kwargs):
+        invigilator_ids = request.data.get("invigilator_ids")
+        if invigilator_ids is None:
+            invigilator_id = request.data.get("invigilator_id")
+            invigilator_ids = [invigilator_id] if invigilator_id is not None else []
+
+        cleaned_ids = []
+        for raw_id in invigilator_ids:
+            if not str(raw_id).strip():
+                continue
+            try:
+                cleaned_ids.append(int(raw_id))
+            except (TypeError, ValueError):
+                return Response(
+                    {"detail": f"Invalid invigilator id: {raw_id}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        invigilator_ids = cleaned_ids
+        if not invigilator_ids:
+            return Response({"detail": "invigilator_ids is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        assignments = (
+            InvigilatorAssignment.objects.select_related(
+                "invigilator",
+                "invigilator__user",
+                "exam_venue__exam",
+                "exam_venue__venue",
+            )
+            .filter(invigilator_id__in=invigilator_ids, cancel=False)
+            .order_by("invigilator_id", "assigned_start")
+        )
+
+        exam_venue_ids = list(
+            assignments.values_list("exam_venue_id", flat=True).distinct()
+        )
+        student_exam_rows = list(
+            StudentExam.objects.filter(exam_venue_id__in=exam_venue_ids).values(
+                "exam_venue_id",
+                "student_id",
+                "exam_id",
+            )
+        )
+        provision_lookup = {
+            (p.student_id, p.exam_id): p
+            for p in Provisions.objects.filter(
+                exam_id__in={row["exam_id"] for row in student_exam_rows},
+                student_id__in={row["student_id"] for row in student_exam_rows},
+            )
+        }
+
+        provisions_by_venue: dict[int, set[str]] = {}
+        notes_by_venue: dict[int, list[str]] = {}
+        for row in student_exam_rows:
+            provision = provision_lookup.get((row["student_id"], row["exam_id"]))
+            if not provision:
+                continue
+            venue_id = row["exam_venue_id"]
+            if provision.provisions:
+                provisions_by_venue.setdefault(venue_id, set()).update(provision.provisions)
+            if provision.notes:
+                notes_by_venue.setdefault(venue_id, []).append(provision.notes)
+
+        def _format_dt(value):
+            if not value:
+                return ""
+            local = timezone.localtime(value) if timezone.is_aware(value) else value
+            return local.isoformat(timespec="minutes")
+
+        def _csv_for(assignments_list):
+            buffer = StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow(
+                [
+                    "invigilator_id",
+                    "invigilator_name",
+                    "username",
+                    "assignment_id",
+                    "exam_venue_id",
+                    "venue_name",
+                    "exam_name",
+                    "course_code",
+                    "exam_school",
+                    "exam_start",
+                    "exam_end",
+                    "exam_length_minutes",
+                    "assigned_start",
+                    "assigned_end",
+                    "role",
+                    "break_time_minutes",
+                    "assignment_notes",
+                    "student_provisions",
+                    "provision_notes",
+                ]
+            )
+
+            for assignment in assignments_list:
+                invigilator = assignment.invigilator
+                exam_venue = assignment.exam_venue
+                exam = exam_venue.exam if exam_venue else None
+                venue = exam_venue.venue if exam_venue else None
+                exam_start = getattr(exam_venue, "start_time", None)
+                exam_length = getattr(exam_venue, "exam_length", None)
+                exam_end = exam_start + timedelta(minutes=exam_length) if exam_start and exam_length else None
+
+                venue_provisions = sorted(provisions_by_venue.get(assignment.exam_venue_id, set()))
+                venue_notes = notes_by_venue.get(assignment.exam_venue_id, [])
+                unique_notes = []
+                for note in venue_notes:
+                    if note not in unique_notes:
+                        unique_notes.append(note)
+
+                writer.writerow(
+                    [
+                        invigilator.id if invigilator else "",
+                        invigilator.preferred_name or invigilator.full_name if invigilator else "",
+                        getattr(invigilator.user, "username", "") if invigilator and invigilator.user else "",
+                        assignment.id,
+                        assignment.exam_venue_id,
+                        venue.venue_name if venue else "",
+                        exam.exam_name if exam else "",
+                        exam.course_code if exam else "",
+                        exam.exam_school if exam else "",
+                        _format_dt(exam_start),
+                        _format_dt(exam_end),
+                        exam_length if exam_length is not None else "",
+                        _format_dt(assignment.assigned_start),
+                        _format_dt(assignment.assigned_end),
+                        assignment.role or "",
+                        assignment.break_time_minutes or 0,
+                        assignment.notes or "",
+                        ", ".join(venue_provisions),
+                        " | ".join(unique_notes),
+                    ]
+                )
+            return buffer.getvalue()
+
+        if len(invigilator_ids) == 1:
+            invigilator = assignments.first().invigilator if assignments.exists() else None
+            if not invigilator:
+                invigilator = Invigilator.objects.filter(id=invigilator_ids[0]).select_related("user").first()
+            name = (
+                getattr(invigilator.user, "username", "") if invigilator and invigilator.user else ""
+            ) or (invigilator.preferred_name if invigilator else "") or (invigilator.full_name if invigilator else "")
+            filename = f"{slugify(name or 'invigilator')}_timetable.csv"
+            response = HttpResponse(_csv_for(assignments), content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            return response
+
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            zip_file.writestr("invigilators_timetables.csv", _csv_for(assignments))
+            invigilator_map = {
+                inv.id: inv
+                for inv in Invigilator.objects.filter(id__in=invigilator_ids).select_related("user")
+            }
+            for invigilator_id in invigilator_ids:
+                invigilator = invigilator_map.get(invigilator_id)
+                name = (
+                    getattr(invigilator.user, "username", "") if invigilator and invigilator.user else ""
+                ) or (invigilator.preferred_name if invigilator else "") or (invigilator.full_name if invigilator else "")
+                filename = f"{slugify(name or f'invigilator_{invigilator_id}')}_timetable.csv"
+                per_assignments = [a for a in assignments if a.invigilator_id == invigilator_id]
+                zip_file.writestr(filename, _csv_for(per_assignments))
+
+        response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
+        response["Content-Disposition"] = 'attachment; filename="invigilators_timetables.zip"'
         return response
 
 
