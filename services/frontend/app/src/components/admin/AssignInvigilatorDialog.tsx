@@ -18,6 +18,7 @@ import {
   Stack,
   Typography,
   Alert,
+  Snackbar,
   Link as MUILink,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -72,7 +73,7 @@ type AssignInvigilatorDialogProps = {
   examVenue: ExamVenue | null;
   invigilators: Invigilator[];
   assignments: InvigilatorAssignment[];
-  onAssigned?: () => void;
+  onAssigned?: (summary?: { assigned: number; unassigned: number; updated: number }) => void;
 };
 
 const formatDuration = (minutes?: number | null) => {
@@ -150,7 +151,7 @@ const AssignInvigilatorDialogBody: React.FC<{
   examVenue: ExamVenue | null;
   invigilators: Invigilator[];
   assignments: InvigilatorAssignment[];
-  onAssigned?: () => void;
+  onAssigned?: (summary?: { assigned: number; unassigned: number; updated: number }) => void;
   onClose: () => void;
 }> = ({ open, examVenue, invigilators, assignments, onAssigned, onClose }) => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -159,6 +160,7 @@ const AssignInvigilatorDialogBody: React.FC<{
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [assignmentInputs, setAssignmentInputs] = useState<Map<number, { start: string; end: string; role: string }>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const queryClient = useQueryClient();
 
   const assignedAssignments = useMemo(() => {
@@ -396,8 +398,13 @@ const AssignInvigilatorDialogBody: React.FC<{
       return { success: true };
     },
     onSuccess: () => {
+      const summary = {
+        assigned: selectionDelta.toAdd.length,
+        unassigned: selectionDelta.toRemove.length,
+        updated: selectionDelta.toUpdate.length,
+      };
       queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
-      onAssigned?.();
+      onAssigned?.(summary);
       onClose();
     },
     onError: (err: unknown) => {
@@ -433,6 +440,10 @@ const AssignInvigilatorDialogBody: React.FC<{
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
       onAssigned?.();
+      setSnackbar({
+        open: true,
+        message: vars.action === "approve" ? "Cancellation approved." : "Cancellation rejected.",
+      });
     },
     onError: (err: unknown) => {
       setError(err instanceof Error ? err.message : "Failed to update cancellation status.");
@@ -455,6 +466,7 @@ const AssignInvigilatorDialogBody: React.FC<{
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
       onAssigned?.();
+      setSnackbar({ open: true, message: "Shift confirmed." });
     },
     onError: (err: unknown) => {
       setError(err instanceof Error ? err.message : "Failed to confirm assignment.");
@@ -926,6 +938,27 @@ const AssignInvigilatorDialogBody: React.FC<{
         )}
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
       {/** Helper to keep singular/plural tidy */}      
       <PillButton
         variant="contained"

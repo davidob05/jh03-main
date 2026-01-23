@@ -359,7 +359,30 @@ export const AdminExamDetails: React.FC = () => {
         examVenue={assignVenue}
         invigilators={invigilators}
         assignments={assignments}
-        onAssigned={() => refetch()}
+        onAssigned={(summary) => {
+          refetch();
+          if (!summary) return;
+          const { assigned, unassigned, updated } = summary;
+          if (assigned && unassigned) {
+            setSuccessMessage(`Assigned ${assigned} and unassigned ${unassigned} invigilator${unassigned === 1 ? "" : "s"}.`);
+            setSuccessOpen(true);
+            return;
+          }
+          if (assigned) {
+            setSuccessMessage(`Assigned ${assigned} invigilator${assigned === 1 ? "" : "s"}.`);
+            setSuccessOpen(true);
+            return;
+          }
+          if (unassigned) {
+            setSuccessMessage(`Unassigned ${unassigned} invigilator${unassigned === 1 ? "" : "s"}.`);
+            setSuccessOpen(true);
+            return;
+          }
+          if (updated) {
+            setSuccessMessage("Assignments updated.");
+            setSuccessOpen(true);
+          }
+        }}
       />
 
       <Snackbar
