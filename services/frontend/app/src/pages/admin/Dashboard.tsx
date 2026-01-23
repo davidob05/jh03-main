@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Fab, Grid, IconButton, Stack, Tooltip, Typography, CircularProgress } from "@mui/material";
+import { Box, Fab, Grid, IconButton, Stack, Tooltip, Typography, CircularProgress, Snackbar, Alert } from "@mui/material";
 import AddCommentIcon from "@mui/icons-material/AddComment";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -60,6 +60,7 @@ interface VenueData {
 export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
+  const [announcementSnackbar, setAnnouncementSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
 
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
@@ -466,8 +467,33 @@ export const AdminDashboard: React.FC = () => {
       <AddAnnouncementDialog
         open={announcementDialogOpen}
         onClose={() => setAnnouncementDialogOpen(false)}
-        onCreated={() => setAnnouncementDialogOpen(false)}
+        onCreated={(title) => {
+          setAnnouncementDialogOpen(false);
+          setAnnouncementSnackbar({ open: true, message: `${title} posted.` });
+        }}
       />
+
+      <Snackbar
+        open={announcementSnackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setAnnouncementSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setAnnouncementSnackbar((prev) => ({ ...prev, open: false }))}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {announcementSnackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
