@@ -72,7 +72,7 @@ export const ExportInvigilatorTimetablesDialog: React.FC<ExportInvigilatorTimeta
           <Close fontSize="small" />
         </IconButton>
       </DialogTitle>
-      <DialogContent dividers>
+      <DialogContent>
         <Stack spacing={2}>
           <Box>
             <Typography variant="body2" color="text.secondary">
@@ -135,7 +135,7 @@ export const ExportInvigilatorTimetablesDialog: React.FC<ExportInvigilatorTimeta
                   label="Only confirmed shifts"
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ ml: 4 }}>
-                  Only include shifts that are confirmed and not cancelled.
+                  Exports only shifts that are confirmed by invigilators and admin staff.
                 </Typography>
               </Stack>
               <Stack>
@@ -150,7 +150,7 @@ export const ExportInvigilatorTimetablesDialog: React.FC<ExportInvigilatorTimeta
                   label="Include cancelled shifts"
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ ml: 4 }}>
-                  Add confirmed cancellations to the export alongside other selections.
+                  Includes shifts that have been cancelled in the export.
                 </Typography>
               </Stack>
               <Stack>
@@ -165,7 +165,7 @@ export const ExportInvigilatorTimetablesDialog: React.FC<ExportInvigilatorTimeta
                   label="Include student provisions"
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ ml: 4 }}>
-                  Adds provisions and notes columns for each exam venue.
+                  Adds columns for student provisions and notes attached to each exam venue.
                 </Typography>
               </Stack>
             </Stack>
@@ -173,16 +173,13 @@ export const ExportInvigilatorTimetablesDialog: React.FC<ExportInvigilatorTimeta
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
-        <PillButton variant="outlined" onClick={onClose} disabled={loading}>
-          Cancel
-        </PillButton>
         <PillButton
           variant="contained"
           startIcon={<FileDownloadOutlined />}
           onClick={() => onExport({ onlyConfirmed, includeCancelled, includeProvisions })}
           disabled={!invigilators.length || loading}
         >
-          Export timetables
+          Export
         </PillButton>
       </DialogActions>
     </Dialog>

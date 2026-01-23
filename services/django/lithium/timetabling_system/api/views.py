@@ -240,6 +240,7 @@ class InvigilatorTimetableExportView(APIView):
                 "invigilator_name",
                 "username",
                 "assignment_id",
+                "assignment_status",
                 "exam_venue_id",
                 "venue_name",
                 "exam_name",
@@ -267,6 +268,15 @@ class InvigilatorTimetableExportView(APIView):
                 exam_length = getattr(exam_venue, "exam_length", None)
                 exam_end = exam_start + timedelta(minutes=exam_length) if exam_start and exam_length else None
 
+                if assignment.cancel and assignment.confirmed:
+                    status_label = "cancelled"
+                elif assignment.cancel and not assignment.confirmed:
+                    status_label = "cancellation requested"
+                elif assignment.confirmed:
+                    status_label = "confirmed"
+                else:
+                    status_label = "pending confirmation"
+
                 venue_provisions = sorted(provisions_by_venue.get(assignment.exam_venue_id, set()))
                 venue_notes = notes_by_venue.get(assignment.exam_venue_id, [])
                 unique_notes = []
@@ -279,6 +289,7 @@ class InvigilatorTimetableExportView(APIView):
                     invigilator.preferred_name or invigilator.full_name if invigilator else "",
                     getattr(invigilator.user, "username", "") if invigilator and invigilator.user else "",
                     assignment.id,
+                    status_label,
                     assignment.exam_venue_id,
                     venue.venue_name if venue else "",
                     exam.exam_name if exam else "",
