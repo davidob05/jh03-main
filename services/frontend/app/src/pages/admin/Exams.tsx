@@ -25,6 +25,8 @@ import {
   Divider,
   Stack,
   Fab,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
 import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
@@ -37,6 +39,7 @@ import dayjs from 'dayjs';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { EditExamDialog } from "../../components/admin/EditExamDialog";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 
 interface ExamData {
   exam_id: number;
@@ -228,6 +231,10 @@ export const AdminExams: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
   const [addOpen, setAddOpen] = React.useState(false);
+  const [successOpen, setSuccessOpen] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState("");
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -296,26 +303,10 @@ export const AdminExams: React.FC = () => {
   const handleEditSelected = () => {
     if (selected.length === 1) navigate(`/admin/exam/${selected[0]}`);
   };
-  const handleDeleteSelected = React.useCallback(async () => {
+  const handleDeleteSelected = React.useCallback(() => {
     if (selected.length === 0) return;
-    const ok = window.confirm(`Delete ${selected.length} exam${selected.length > 1 ? 's' : ''}?`);
-    if (!ok) return;
-    try {
-      const res = await apiFetch(`${apiBaseUrl}/exams/bulk-delete/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selected }),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Bulk delete failed");
-      }
-      setSelected([]);
-      await Promise.all([refetch(), queryClient.invalidateQueries({ queryKey: ['exams'] })]);
-    } catch (err: any) {
-      alert(err?.message || "Delete failed");
-    }
-  }, [selected, refetch, queryClient]);
+    setDeleteOpen(true);
+  }, [selected.length]);
 
   const filteredRows = React.useMemo(() => {
     if (!searchQuery) return rows;
@@ -472,6 +463,46 @@ export const AdminExams: React.FC = () => {
           onClose={() => setAddOpen(false)}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["exams"] });
+            setSuccessMessage("Exam added.");
+            setSuccessOpen(true);
+          }}
+        />
+
+        <DeleteConfirmationDialog
+          open={deleteOpen}
+          title={`Delete ${selected.length} exam${selected.length === 1 ? "" : "s"}?`}
+          description="This will permanently delete the selected exam(s)."
+          confirmText="Delete"
+          loading={deleting}
+          onClose={() => {
+            if (!deleting) setDeleteOpen(false);
+          }}
+          onConfirm={async () => {
+            if (selected.length === 0) {
+              setDeleteOpen(false);
+              return;
+            }
+            try {
+              setDeleting(true);
+              const res = await apiFetch(`${apiBaseUrl}/exams/bulk-delete/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: selected }),
+              });
+              if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "Bulk delete failed");
+              }
+              setSelected([]);
+              await Promise.all([refetch(), queryClient.invalidateQueries({ queryKey: ["exams"] })]);
+              setSuccessMessage(selected.length === 1 ? "Exam deleted." : "Exams deleted.");
+              setSuccessOpen(true);
+              setDeleteOpen(false);
+            } catch (err: any) {
+              alert(err?.message || "Delete failed");
+            } finally {
+              setDeleting(false);
+            }
           }}
         />
 
@@ -489,6 +520,28 @@ export const AdminExams: React.FC = () => {
             </Fab>
           </Tooltip>
         </Box>
+
+        <Snackbar
+          open={successOpen}
+          autoHideDuration={3000}
+          onClose={() => setSuccessOpen(false)}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
+            onClose={() => setSuccessOpen(false)}
+            severity="success"
+            variant="filled"
+            sx={{
+              backgroundColor: "#d4edda",
+              color: "#155724",
+              border: "1px solid #155724",
+              borderRadius: "50px",
+              fontWeight: 500,
+            }}
+          >
+            {successMessage}
+          </Alert>
+        </Snackbar>
       </Box>
     </LocalizationProvider>
   );
