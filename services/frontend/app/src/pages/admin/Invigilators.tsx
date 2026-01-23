@@ -864,6 +864,7 @@ export const AdminInvigilators: React.FC = () => {
               <span>
                 <IconButton
                   size="small"
+                  data-testid={bulkAction === "export" ? "bulk-action-export" : undefined}
                   disabled={selected.length === 0 || !bulkAction || exporting}
                   onClick={() => {
                     if (bulkAction === "delete") {
