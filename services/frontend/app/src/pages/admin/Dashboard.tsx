@@ -96,6 +96,7 @@ export const AdminDashboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(4);
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
   const [announcementSnackbar, setAnnouncementSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [exportSnackbar, setExportSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
   const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [exporting, setExporting] = useState(false);
@@ -295,6 +296,12 @@ export const AdminDashboard: React.FC = () => {
     try {
       setExporting(true);
       await downloadProvisionExport(selectedSchool || undefined);
+      setExportSnackbar({
+        open: true,
+        message: selectedSchool
+          ? `Provisions exported for ${selectedSchool}.`
+          : "Provisions exported.",
+      });
     } catch (err) {
       console.error(err);
       alert("Export failed");
@@ -586,6 +593,28 @@ export const AdminDashboard: React.FC = () => {
           }}
         >
           {announcementSnackbar.message}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={exportSnackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setExportSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setExportSnackbar((prev) => ({ ...prev, open: false }))}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {exportSnackbar.message}
         </Alert>
       </Snackbar>
     </Box>
