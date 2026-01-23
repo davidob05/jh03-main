@@ -36,6 +36,7 @@ import { Link } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { formatDateTime } from '../../utils/dates';
 import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
+import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { PillButton } from '../../components/PillButton';
 import { Panel } from '../../components/Panel';
 import { VENUE_TYPES } from '../../components/admin/venueTypes';
@@ -276,6 +277,7 @@ export const AdminVenues: React.FC = () => {
   const [order, setOrder] = React.useState<Order>('asc');
   const [orderBy, setOrderBy] = React.useState<keyof RowData>('name');
   const [selected, setSelected] = React.useState<readonly string[]>([]);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -382,6 +384,7 @@ export const AdminVenues: React.FC = () => {
       setSelected([]);
       setSuccessMessage(`Deleted ${ids.length} venue${ids.length === 1 ? "" : "s"}.`);
       setSuccessOpen(true);
+      setDeleteOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['venues'] });
     },
     onError: (err: any) => {
@@ -418,6 +421,11 @@ export const AdminVenues: React.FC = () => {
       );
 
     setSelected(newSelected);
+  };
+
+  const handleDeleteSelected = () => {
+    if (selected.length === 0) return;
+    setDeleteOpen(true);
   };
 
   const handleSearchChange = (q: string) => {
@@ -529,7 +537,7 @@ export const AdminVenues: React.FC = () => {
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
           onAddVenue={() => setAddOpen(true)}
-          onDeleteSelected={() => bulkDeleteMutation.mutate([...selected])}
+          onDeleteSelected={handleDeleteSelected}
           deleteLoading={bulkDeleteMutation.isPending}
         />
         <Divider />
@@ -687,6 +695,23 @@ export const AdminVenues: React.FC = () => {
           setSuccessOpen(true);
           queryClient.invalidateQueries({ queryKey: ['venues'] });
           setAddOpen(false);
+        }}
+      />
+      <DeleteConfirmationDialog
+        open={deleteOpen}
+        title={`Delete ${selected.length} venue${selected.length === 1 ? "" : "s"}?`}
+        description="This will permanently delete the selected venue(s)."
+        confirmText="Delete"
+        loading={bulkDeleteMutation.isPending}
+        onClose={() => {
+          if (!bulkDeleteMutation.isPending) setDeleteOpen(false);
+        }}
+        onConfirm={() => {
+          if (selected.length === 0) {
+            setDeleteOpen(false);
+            return;
+          }
+          bulkDeleteMutation.mutate([...selected]);
         }}
       />
       <Snackbar
