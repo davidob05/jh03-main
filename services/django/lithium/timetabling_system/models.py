@@ -104,9 +104,9 @@ class InvigilatorRestrictionType(models.TextChoices):
     PURPLE_CLUSTER = "purple_cluster", "Purple cluster"
     COMPUTER_CLUSTER = "computer_cluster", "Computer cluster"
     VET_SCHOOL = "vet_school", "Vet School"
-    OSCE_GOLDEN_JUBILEE = "osce_golden_jubilee", "OSCE - Golden Jubilee"
-    OSCE_WOLFSON = "osce_wolfson", "OSCE - Wolfson"
-    OSCE_QUEEN_ELIZABETH = "osce_queen_elizabeth", "OSCE - Queen Elizabeth"
+    OSCE_GOLDEN_JUBILEE = "osce_golden_jubilee", "Golden Jubilee"
+    OSCE_WOLFSON = "osce_wolfson", "Wolfson"
+    OSCE_QUEEN_ELIZABETH = "osce_queen_elizabeth", "Queen Elizabeth"
     APPROVED_EXEMPTION = "approved_exemption", "Approved exemption"
 
 
