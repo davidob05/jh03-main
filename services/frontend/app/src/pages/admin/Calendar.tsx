@@ -50,11 +50,13 @@ interface ExamData {
 }
 
 interface ExamVenueInfo {
+  examVenueId?: number;
   venue: string;
   startTime: string;
   endTime: string;
   students?: number;
   invigilators?: number;
+  core?: boolean;
 }
 
 interface ExamDetails {
@@ -92,6 +94,22 @@ const fetchExams = async (): Promise<ExamDetails[]> => {
   return data.map(toCalendarExam).filter((exam): exam is ExamDetails => Boolean(exam));
 };
 
+type InvigilatorAssignment = {
+  id: number;
+  exam_venue: number;
+  cancel?: boolean;
+};
+
+const fetchAssignments = async (): Promise<InvigilatorAssignment[]> => {
+  const res = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`);
+  if (!res.ok) throw new Error("Unable to load invigilator assignments");
+  const data = await res.json();
+  if (Array.isArray(data)) return data as InvigilatorAssignment[];
+  if (Array.isArray(data?.results)) return data.results as InvigilatorAssignment[];
+  if (Array.isArray(data?.assignments)) return data.assignments as InvigilatorAssignment[];
+  return [];
+};
+
 const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
   return exam.exam_venues.find((v) => v.core) || exam.exam_venues[0];
 };
@@ -115,9 +133,13 @@ const toCalendarExam = (exam: ExamData): ExamDetails | null => {
   const venues = exam.exam_venues
     .filter((v) => v.start_time)
     .map((venue) => ({
+      examVenueId: venue.examvenue_id,
+      core: venue.core,
       venue: venue.venue_name || "Unassigned",
       startTime: venue.start_time as string,
       endTime: addMinutes(venue.start_time as string, venue.exam_length) || venue.start_time || "",
+      students: venue.core ? exam.no_students : 0,
+      invigilators: 0,
     }));
 
   return {
@@ -170,6 +192,34 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
   });
 
   const effectiveExams = calendarExams ?? fallbackExams;
+  const { data: assignmentData = [] } = useQuery<InvigilatorAssignment[], Error>({
+    queryKey: ["invigilator-assignments"],
+    queryFn: fetchAssignments,
+    enabled: shouldFetch,
+    retry: false,
+    ...(shouldFetch ? {} : { initialData: [] }),
+  });
+
+  const assignmentCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    assignmentData.forEach((assignment) => {
+      if (assignment.cancel) return;
+      const current = counts.get(assignment.exam_venue) || 0;
+      counts.set(assignment.exam_venue, current + 1);
+    });
+    return counts;
+  }, [assignmentData]);
+
+  const displayExams = useMemo(() => {
+    return effectiveExams.map((exam) => ({
+      ...exam,
+      venues: exam.venues.map((venue) => ({
+        ...venue,
+        invigilators: venue.examVenueId ? assignmentCounts.get(venue.examVenueId) || 0 : 0,
+        students: typeof venue.students === "number" ? venue.students : 0,
+      })),
+    }));
+  }, [effectiveExams, assignmentCounts]);
   const isLoading = shouldFetch && queryLoading;
   const isError = shouldFetch && queryError;
 
@@ -177,7 +227,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
 
   const examsToday = useMemo(
     () =>
-      effectiveExams.filter((exam) => {
+      displayExams.filter((exam) => {
         const matchesDate = isSameDay(exam.mainStartTime, currentDate);
         const query = searchQuery.toLowerCase();
         const matchesQuery =
@@ -188,7 +238,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
           exam.department.toLowerCase().includes(query);
         return matchesDate && matchesQuery;
       }),
-    [effectiveExams, currentDate, searchQuery]
+    [displayExams, currentDate, searchQuery]
   );
 
   const paginatedExams = examsToday.slice((page - 1) * itemsPerPage, page * itemsPerPage);
