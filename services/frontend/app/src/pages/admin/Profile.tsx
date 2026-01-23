@@ -68,6 +68,7 @@ export const AdminProfile: React.FC = () => {
 
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [showPasswords, setShowPasswords] = useState(false);
+  const [extraSessionsToShow, setExtraSessionsToShow] = useState(0);
 
   const {
     data: sessions,
@@ -90,6 +91,27 @@ export const AdminProfile: React.FC = () => {
       .map((n) => n[0])
       .join("")
       .toUpperCase();
+
+  const normalizedSessions = Array.isArray(sessions) ? sessions : [];
+  const isToday = (iso?: string | null) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  };
+  const todaySessions = normalizedSessions.filter(
+    (s: any) => isToday(s.last_seen) || isToday(s.created_at)
+  );
+  const olderSessions = normalizedSessions.filter(
+    (s: any) => !todaySessions.includes(s)
+  );
+  const MORE_STEP = 3;
+  const visibleSessions = [...todaySessions, ...olderSessions.slice(0, extraSessionsToShow)];
+  const remainingSessions = Math.max(olderSessions.length - extraSessionsToShow, 0);
 
   const passwordStrength = (pwd: string) => {
     let score = 0;
@@ -462,6 +484,9 @@ export const AdminProfile: React.FC = () => {
 
           <Stack spacing={1}>
             <Typography variant="subtitle2">Active sessions</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Showing today's sessions only. You can view older sessions with the "Show more" button.
+            </Typography>
             <Stack spacing={1}>
               {sessionsLoading && (
                 <Card variant="outlined">
@@ -480,8 +505,8 @@ export const AdminProfile: React.FC = () => {
               )}
               {!sessionsLoading &&
                 !sessionsError &&
-                Array.isArray(sessions) &&
-                sessions.map((s: any) => (
+                Array.isArray(visibleSessions) &&
+                visibleSessions.map((s: any) => (
                   <Card key={s.key} variant="outlined">
                     <CardContent sx={{ py: 1.5 }}>
                       <Stack
@@ -532,6 +557,22 @@ export const AdminProfile: React.FC = () => {
             <PillButton variant="outlined" color="error" onClick={handleSignOutAll}>
               Sign out of other sessions
             </PillButton>
+            <Stack direction="row" spacing={1} justifyContent="flex-start">
+              <PillButton
+                variant="contained"
+                onClick={() => setExtraSessionsToShow((prev) => prev + Math.min(MORE_STEP, remainingSessions))}
+                disabled={remainingSessions === 0}
+              >
+                Show {Math.min(MORE_STEP, remainingSessions)} more
+              </PillButton>
+              <PillButton
+                variant="outlined"
+                onClick={() => setExtraSessionsToShow(0)}
+                disabled={extraSessionsToShow === 0}
+              >
+                Show less
+              </PillButton>
+            </Stack>
           </Stack>
         </Stack>
       </Panel>
@@ -594,7 +635,7 @@ export const AdminProfile: React.FC = () => {
           <Divider />
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-            <PillButton variant="outlined" onClick={handleExportData}>
+            <PillButton variant="outlined" onClick={handleExportData} disabled>
               Export my data
             </PillButton>
             <PillButton variant="outlined" color="error" onClick={() => setDeleteAccountOpen(true)}>

@@ -610,7 +610,7 @@ export const InvigilatorProfile: React.FC = () => {
           <Divider />
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-            <PillButton variant="outlined" onClick={() => setSnackbar({ open: true, message: "Data export started", severity: "success" })}>
+            <PillButton variant="outlined" onClick={() => setSnackbar({ open: true, message: "Data export started", severity: "success" })} disabled>
               Export my data
             </PillButton>
             <PillButton variant="outlined" color="error" onClick={() => setDeleteAccountOpen(true)}>

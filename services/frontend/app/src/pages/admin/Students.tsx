@@ -28,6 +28,7 @@ import {
   Toolbar,
   Typography,
   Collapse,
+  Snackbar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon, Close } from "@mui/icons-material";
@@ -161,11 +162,13 @@ type VenueDialogState = {
 type ChangeVenueDialogProps = VenueDialogState & {
   open: boolean;
   onClose: () => void;
+  onSuccess?: (row: StudentProvisionRow, venueLabel: string) => void;
 };
 
 const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
   open,
   onClose,
+  onSuccess,
   studentExamId,
   examId,
   currentExamVenueId,
@@ -202,6 +205,9 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
         });
       updateCache(["student-provisions", "all"]);
       updateCache(["student-provisions", "unallocated"], true);
+      const matchedVenue = venues.find((venue) => venue.examvenue_id === selectedVenueId);
+      const venueLabel = matchedVenue?.venue_name || "Unassigned venue";
+      onSuccess?.(updatedRow, venueLabel);
       onClose();
     },
     onError: (err: any) => setSaveError(err?.message || "Failed to update venue"),
@@ -318,6 +324,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
   const [selected, setSelected] = useState<string[]>([]);
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
   const [venueDialog, setVenueDialog] = useState<VenueDialogState | null>(null);
+  const [venueSnackbar, setVenueSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTargets, setDeleteTargets] = useState<StudentProvisionRow[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -676,6 +683,12 @@ const StudentTableSection: React.FC<SectionProps> = ({
         <ChangeVenueDialog
           open
           onClose={() => setVenueDialog(null)}
+          onSuccess={(row, venueLabel) => {
+            setVenueSnackbar({
+              open: true,
+              message: `Updated ${row.student_name}'s venue to ${venueLabel}.`,
+            });
+          }}
           {...venueDialog}
         />
       ) : null}
@@ -717,6 +730,27 @@ const StudentTableSection: React.FC<SectionProps> = ({
           if (deleteTargets.length) deleteMutation.mutate(deleteTargets);
         }}
       />
+      <Snackbar
+        open={venueSnackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setVenueSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setVenueSnackbar((prev) => ({ ...prev, open: false }))}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {venueSnackbar.message}
+        </Alert>
+      </Snackbar>
     </Panel>
   );
 };
