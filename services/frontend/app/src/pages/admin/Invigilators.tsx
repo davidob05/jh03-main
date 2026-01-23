@@ -62,6 +62,7 @@ import { InvigilatorAvailabilityModal } from "../../components/admin/Invigilator
 import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialog';
 import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { NotifyDialog } from '../../components/admin/NotifyDialog';
+import { ExportInvigilatorTimetablesDialog } from "../../components/admin/ExportInvigilatorTimetablesDialog";
 import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { formatMonthYear } from '../../utils/dates';
 import { PillButton } from "../../components/PillButton";
@@ -158,6 +159,7 @@ export const AdminInvigilators: React.FC = () => {
   const [bulkAction, setBulkAction] = useState("");
   const [exporting, setExporting] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Sync fetched data to state
   useEffect(() => {
@@ -331,86 +333,58 @@ export const AdminInvigilators: React.FC = () => {
     [invigilators, selected]
   );
 
-  const escapeCsv = (value: string | number | null | undefined) => {
-    if (value === null || value === undefined) return "";
-    const str = String(value);
-    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
-  const exportSelected = async (ids: number[]) => {
-    if (!ids.length || exporting) return;
+  const extractFilename = (contentDisposition: string | null, fallback: string) => {
+    if (!contentDisposition) return fallback;
+    const match = contentDisposition.match(/filename="?([^"]+)"?/i);
+    return match?.[1] || fallback;
+  };
+
+  const exportSelected = async (options: {
+    onlyConfirmed: boolean;
+    includeCancelled: boolean;
+    includeProvisions: boolean;
+  }) => {
+    if (!selected.length || exporting) return;
     setExporting(true);
     try {
-      const invigilatorPayloads = await Promise.all(
-        ids.map(async (id) => {
-          const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`);
-          if (!response.ok) {
-            const text = await response.text();
-            throw new Error(text || `Failed to fetch timetable for invigilator #${id}`);
-          }
-          return (await response.json()) as Invigilator;
-        })
-      );
-
-      invigilatorPayloads.forEach((invigilator) => {
-        const assignments = invigilator.assignments || [];
-        const headers = [
-          "assignment_id",
-          "invigilator_id",
-          "invigilator_name",
-          "exam_name",
-          "venue_name",
-          "exam_venue_id",
-          "exam_start",
-          "exam_length",
-          "assigned_start",
-          "assigned_end",
-          "role",
-          "break_time_minutes",
-          "notes",
-        ];
-
-        const rows = assignments.map((assignment) =>
-          [
-            assignment.id,
-            invigilator.id,
-            invigilator.preferred_name || invigilator.full_name || `Invigilator ${invigilator.id}`,
-            assignment.exam_name || "",
-            assignment.venue_name || "",
-            assignment.exam_venue,
-            assignment.exam_start || "",
-            assignment.exam_length ?? "",
-            assignment.assigned_start,
-            assignment.assigned_end,
-            assignment.role || "",
-            assignment.break_time_minutes ?? "",
-            assignment.notes || "",
-          ]
-            .map(escapeCsv)
-            .join(",")
-        );
-
-        const csv = [headers.map(escapeCsv).join(","), ...rows].join("\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        const safeName = (invigilator.preferred_name || invigilator.full_name || `invigilator-${invigilator.id}`)
-          .replace(/[^a-z0-9]+/gi, "_")
-          .replace(/^_+|_+$/g, "")
-          .toLowerCase();
-        link.href = url;
-        link.download = `${safeName || "invigilator"}_timetable.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/timetables/export/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invigilator_ids: selected,
+          only_confirmed: options.onlyConfirmed,
+          include_cancelled: options.includeCancelled,
+          include_provisions: options.includeProvisions,
+        }),
       });
 
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to export timetables");
+      }
+
+      const blob = await response.blob();
+      const fallbackName = selected.length === 1 ? "invigilator_timetable.csv" : "invigilators_timetables.zip";
+      const filename = extractFilename(response.headers.get("Content-Disposition"), fallbackName);
+      downloadBlob(blob, filename);
+
       setSuccessMessage(
-        ids.length === 1 ? "Timetable downloaded!" : `${ids.length} timetables downloaded!`
+        selected.length === 1 ? "Timetable export downloaded." : "Timetables export downloaded."
       );
       setSuccessOpen(true);
       setBulkAction("");
+      setExportDialogOpen(false);
     } catch (err: any) {
       alert(err?.message || "Failed to export timetables");
     } finally {
@@ -890,6 +864,7 @@ export const AdminInvigilators: React.FC = () => {
               <span>
                 <IconButton
                   size="small"
+                  data-testid={bulkAction === "export" ? "bulk-action-export" : undefined}
                   disabled={selected.length === 0 || !bulkAction || exporting}
                   onClick={() => {
                     if (bulkAction === "delete") {
@@ -899,7 +874,7 @@ export const AdminInvigilators: React.FC = () => {
                     }
 
                     if (bulkAction === "export") {
-                      exportSelected(selected);
+                      setExportDialogOpen(true);
                       return;
                     }
 
@@ -989,6 +964,24 @@ export const AdminInvigilators: React.FC = () => {
             setNotifyOpen(false);
             setBulkAction("");
           }}
+        />
+
+        <ExportInvigilatorTimetablesDialog
+          open={exportDialogOpen}
+          invigilators={invigilators
+            .filter((inv) => selected.includes(inv.id))
+            .map((inv) => ({
+              id: inv.id,
+              name: displayName(inv),
+            }))}
+          loading={exporting}
+          onClose={() => {
+            if (!exporting) {
+              setExportDialogOpen(false);
+              setBulkAction("");
+            }
+          }}
+          onExport={exportSelected}
         />
 
         {/* Delete Confirmation Dialog */}
