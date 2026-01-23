@@ -1,8 +1,22 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Fab, Grid, IconButton, Stack, Tooltip, Typography, CircularProgress, Snackbar, Alert } from "@mui/material";
+import {
+  Box,
+  Fab,
+  Grid,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+  CircularProgress,
+  Snackbar,
+  Alert,
+  TextField,
+  Autocomplete,
+} from "@mui/material";
 import AddCommentIcon from "@mui/icons-material/AddComment";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
@@ -12,6 +26,26 @@ import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { AddAnnouncementDialog } from "../../components/admin/AddAnnouncementDialog";
 import { DietManager } from "../../components/admin/DietManager";
+
+const fileSafe = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const downloadProvisionExport = async (school?: string) => {
+  const params = new URLSearchParams();
+  if (school) params.set("school", school);
+  const url = `${apiBaseUrl}/provisions/export/${params.toString() ? `?${params.toString()}` : ""}`;
+  const res = await apiFetch(url);
+  if (!res.ok) throw new Error("Failed to export provisions");
+  const blob = await res.blob();
+  const link = document.createElement("a");
+  link.href = window.URL.createObjectURL(blob);
+  link.download = school ? `provisions_${fileSafe(school)}.csv` : "provisions.csv";
+  link.click();
+  window.URL.revokeObjectURL(link.href);
+};
 
 type Announcement = {
   id: number;
@@ -38,6 +72,7 @@ interface ExamData {
   exam_id: number;
   exam_name: string;
   course_code: string;
+  exam_school?: string;
   exam_venues: ExamVenueData[];
 }
 
@@ -62,6 +97,8 @@ export const AdminDashboard: React.FC = () => {
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
   const [announcementSnackbar, setAnnouncementSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
+  const [selectedSchool, setSelectedSchool] = useState<string>("");
+  const [exporting, setExporting] = useState(false);
 
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
@@ -168,6 +205,14 @@ export const AdminDashboard: React.FC = () => {
     };
   }, [exams, invigilators, venues]);
 
+  const schoolOptions = useMemo(() => {
+    const unique = new Set<string>();
+    exams.forEach((exam) => {
+      if (exam.exam_school) unique.add(exam.exam_school);
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
+  }, [exams]);
+
   const notifications = (notificationsError ? [] : notificationsFromApi) || [];
 
   const placeholderAnnouncement: Announcement = {
@@ -246,6 +291,18 @@ export const AdminDashboard: React.FC = () => {
     placeholderAnnouncement.publishedAt ||
     new Date().toISOString();
 
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      await downloadProvisionExport(selectedSchool || undefined);
+    } catch (err) {
+      console.error(err);
+      alert("Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Box sx={{ p: 3, height: "100%", overflowY: "auto" }}>
       <Typography variant="h4" fontWeight={700}>Dashboard</Typography>
@@ -253,9 +310,46 @@ export const AdminDashboard: React.FC = () => {
 
       <Stack direction={{ xs: "column", md: "row" }} spacing={2.5} sx={{ mt: 1.5, mb: 3 }} alignItems="stretch">
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <UploadFile />
+          <Stack spacing={2}>
+            <UploadFile />
+            <Panel title="Export provisions" disableDivider sx={{ mb: 0 }}>
+              <Stack spacing={1.5}>
+                <Typography variant="body2" color="text.secondary">
+                  Download a CSV of student provisions, optionally filtered by school.
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ xs: "stretch", sm: "center" }}>
+                  <Autocomplete
+                    freeSolo
+                    options={schoolOptions}
+                    value={selectedSchool}
+                    onChange={(_, value) => setSelectedSchool(value ?? "")}
+                    onInputChange={(_, value) => setSelectedSchool(value)}
+                    sx={{ flex: 1 }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="School filter"
+                        placeholder="Start typing to search"
+                        size="small"
+                        fullWidth
+                      />
+                    )}
+                  />
+                  <PillButton
+                    variant="contained"
+                    disabled={exporting}
+                    onClick={handleExport}
+                    startIcon={<FileDownloadIcon />}
+                    sx={{ minWidth: 200 }}
+                  >
+                    {exporting ? "Exporting..." : "Export"}
+                  </PillButton>
+                </Stack>
+              </Stack>
+            </Panel>
+          </Stack>
         </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex" }}>
           <Panel
             title={activeAnnouncement ? activeAnnouncement.title : "Announcements"}
             actions={
@@ -286,8 +380,8 @@ export const AdminDashboard: React.FC = () => {
             }
             disableDivider
             sx={{
-              mt: 1,
               flex: 1,
+              mb: 0,
               width: "100%",
               height: "100%",
               position: "relative",
