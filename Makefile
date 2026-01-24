@@ -44,8 +44,8 @@ create-admin:
 from django.contrib.auth import get_user_model; \
 from rest_framework.authtoken.models import Token; \
 User = get_user_model(); \
-u, created = User.objects.get_or_create(username=\"$(USER)\", defaults={\"email\": \"$(EMAIL)\", \"is_staff\": True, \"is_superuser\": True}); \
-u.email = \"$(EMAIL)\"; u.set_password(\"$(PASSWORD)\"); u.is_staff = True; u.is_superuser = True; u.is_active = True; u.save(); \
+u, created = User.objects.get_or_create(username=\"$(USER)\", defaults={\"email\": \"$(EMAIL)\", \"is_staff\": True, \"is_superuser\": True, \"is_senior_admin\": True}); \
+u.email = \"$(EMAIL)\"; u.set_password(\"$(PASSWORD)\"); u.is_staff = True; u.is_superuser = True; u.is_senior_admin = True; u.is_active = True; u.save(); \
 Token.objects.filter(user=u).delete(); t = Token.objects.create(user=u); \
 print(f\"Admin {u.username} ready. Token: {t.key}\")" \
 	'
