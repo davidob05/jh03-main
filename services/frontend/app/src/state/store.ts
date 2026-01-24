@@ -81,7 +81,7 @@ const initialState: AdminTableState = {
   },
   calendar: {
     viewMode: "grid",
-    currentDate: new Date().toISOString(),
+    currentDate: "",
     searchQuery: "",
     page: 1,
   },

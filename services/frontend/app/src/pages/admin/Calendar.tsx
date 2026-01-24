@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useContext } from "react";
 import {
   Box,
   Typography,
@@ -29,7 +29,8 @@ import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
-import { useAppDispatch, useAppSelector, setCalendarPrefs } from "../../state/store";
+import { useAppDispatch, useAppSelector, setCalendarPrefs, store } from "../../state/store";
+import { Provider, ReactReduxContext } from "react-redux";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -145,7 +146,7 @@ const minutesSinceMidnight = (dateTime: string) => {
   return date.getHours() * 60 + date.getMinutes();
 };
 
-export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
+const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
   const dispatch = useAppDispatch();
   const { viewMode, currentDate: currentDateIso, searchQuery, page } = useAppSelector((s) => s.adminTables.calendar);
   const [searchDraft, setSearchDraft] = useState(searchQuery);
@@ -266,7 +267,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
           </Typography>
         </Paper>
       </Box>
-    );
+  );
 
   return (
     <Box sx={{ p: 4, maxWidth: "1400px", mx: "auto" }}>
@@ -610,4 +611,16 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
       />
     </Box>
   );
+};
+
+export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
+  const ctx = useContext(ReactReduxContext);
+  if (!ctx) {
+    return (
+      <Provider store={store}>
+        <AdminCalendarInner {...props} />
+      </Provider>
+    );
+  }
+  return <AdminCalendarInner {...props} />;
 };
