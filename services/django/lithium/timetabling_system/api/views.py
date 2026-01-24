@@ -367,6 +367,35 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"], url_path="make-senior-admin", permission_classes=[IsSeniorAdmin])
+    def make_senior_admin(self, request, pk=None):
+        invigilator = self.get_object()
+        user = getattr(invigilator, "user", None)
+        if not user:
+            return Response(
+                {"detail": "Invigilator has no linked login to update."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not (user.is_staff or user.is_superuser):
+            return Response(
+                {"detail": "User must already be an admin to be promoted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not getattr(user, "is_senior_admin", False):
+            user.is_senior_admin = True
+            user.save(update_fields=["is_senior_admin"])
+
+        return Response(
+            {
+                "detail": "Admin promoted to senior admin.",
+                "user_id": user.id,
+                "is_senior_admin": getattr(user, "is_senior_admin", False),
+            },
+            status=status.HTTP_200_OK,
+        )
+
     def perform_update(self, serializer):
         instance = serializer.save()
         name = instance.preferred_name or instance.full_name or "Invigilator"
