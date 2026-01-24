@@ -88,6 +88,7 @@ run_in_venv python -m pip install --no-input --upgrade pip
 run_in_venv python -m pip install --no-input -r requirements.txt
 run_in_venv python manage.py makemigrations --noinput
 run_in_venv python manage.py migrate --noinput
+run_in_venv python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='test1').update(is_senior_admin=True)"
 
 run_in_venv python manage.py runserver 0.0.0.0:8000 &
 RUNSERVER_PID=$!

@@ -111,4 +111,18 @@ describe("AdminInvigilatorProfile", () => {
     await user.click(trigger);
     expect(await screen.findByText("Make this admin a senior admin?")).toBeInTheDocument();
   });
+
+  it("hides senior admin promotion button for junior admins", async () => {
+    apiFetchMock.mockImplementationOnce((url: string) => {
+      if (url.includes("/invigilators/1/")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ ...invigilatorResponse, user_is_staff: true }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+    renderPage();
+    expect(screen.queryByText("Make senior admin")).not.toBeInTheDocument();
+  });
 });
