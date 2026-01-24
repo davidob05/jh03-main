@@ -332,6 +332,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
             color="error"
             onClick={() => setDemoteOpen(true)}
             disabled={!canDemote || demoting}
+            sx={!isSeniorAdmin ? { display: "none" } : undefined}
           >
             Remove admin
           </Button>
