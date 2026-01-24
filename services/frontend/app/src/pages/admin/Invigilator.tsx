@@ -227,7 +227,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
     };
   }, [data?.contracted_hours, assignmentMetrics]);
 
-  const canPromote = Boolean(data?.user_id) && !data?.user_is_superuser;
+  const canPromote = Boolean(data?.user_id) && !data?.user_is_superuser && isSeniorAdmin;
   const canDemote =
     Boolean(data?.user_id) &&
     (data?.user_is_staff || data?.user_is_superuser) &&
@@ -376,6 +376,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
               setPromoteOpen(true);
             }}
             disabled={!canPromote || promoting}
+            sx={!isSeniorAdmin ? { display: "none" } : undefined}
           >
             {data.user_is_superuser ? "Already admin" : "Make them an admin"}
           </Button>

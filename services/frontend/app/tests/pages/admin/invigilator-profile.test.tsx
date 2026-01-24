@@ -90,6 +90,11 @@ describe("AdminInvigilatorProfile", () => {
     expect(await screen.findByText("Make this invigilator an admin?")).toBeInTheDocument();
   });
 
+  it("hides admin promotion button for junior admins", async () => {
+    renderPage();
+    expect(screen.queryByText("Make them an admin")).not.toBeInTheDocument();
+  });
+
   it("disables remove admin when current user is not senior admin", async () => {
     renderPage();
     expect(screen.queryByText("Remove admin")).not.toBeInTheDocument();

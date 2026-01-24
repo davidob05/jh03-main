@@ -592,7 +592,7 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
         deleted_count, _ = qs.delete()
         return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["post"], url_path="make-admin", permission_classes=[permissions.IsAdminUser])
+    @action(detail=True, methods=["post"], url_path="make-admin", permission_classes=[IsSeniorAdmin])
     def make_admin(self, request, pk=None):
         invigilator = self.get_object()
         user = getattr(invigilator, "user", None)

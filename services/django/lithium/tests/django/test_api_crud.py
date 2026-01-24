@@ -195,7 +195,10 @@ class AdminApiCrudTests(TestCase):
             user=invigilator_user,
         )
 
-        response = self.client.post(
+        client = APIClient()
+        client.force_authenticate(self.senior_admin)
+
+        response = client.post(
             reverse("invigilator-make-admin", args=[invigilator.pk]),
             format="json",
         )
@@ -211,12 +214,40 @@ class AdminApiCrudTests(TestCase):
             full_name="No Login Example",
         )
 
-        response = self.client.post(
+        client = APIClient()
+        client.force_authenticate(self.senior_admin)
+
+        response = client.post(
             reverse("invigilator-make-admin", args=[invigilator.pk]),
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_make_invigilator_admin_requires_senior_admin(self):
+        User = get_user_model()
+        invigilator_user = User.objects.create_user(
+            username="invigilator_user2",
+            email="invigilator2@example.com",
+            password="secret",
+            is_staff=False,
+            is_superuser=False,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Casey",
+            full_name="Casey Example",
+            user=invigilator_user,
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.admin)
+
+        response = client.post(
+            reverse("invigilator-make-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_remove_admin_requires_senior_admin(self):
         User = get_user_model()
