@@ -52,8 +52,11 @@ const invigilatorResponse = {
   assignments: [],
 };
 
-const renderPage = () => {
+const renderPage = (opts: { isSeniorAdmin?: boolean } = {}) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  if (opts.isSeniorAdmin) {
+    client.setQueryData(["me"], { is_senior_admin: true });
+  }
   return render(
     <MemoryRouter initialEntries={["/admin/invigilators/1"]}>
       <QueryClientProvider client={client}>
@@ -80,7 +83,7 @@ describe("AdminInvigilatorProfile", () => {
   });
 
   it("opens confirmation dialog before promoting", async () => {
-    renderPage();
+    renderPage({ isSeniorAdmin: true });
     const user = userEvent.setup();
     const trigger = await screen.findByText("Make them an admin");
     await user.click(trigger);
@@ -90,5 +93,22 @@ describe("AdminInvigilatorProfile", () => {
   it("disables remove admin when current user is not senior admin", async () => {
     renderPage();
     expect(screen.queryByText("Remove admin")).not.toBeInTheDocument();
+  });
+
+  it("shows senior admin promotion dialog for senior admins", async () => {
+    apiFetchMock.mockImplementationOnce((url: string) => {
+      if (url.includes("/invigilators/1/")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ ...invigilatorResponse, user_is_staff: true }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+    renderPage({ isSeniorAdmin: true });
+    const user = userEvent.setup();
+    const trigger = await screen.findByText("Make senior admin");
+    await user.click(trigger);
+    expect(await screen.findByText("Make this admin a senior admin?")).toBeInTheDocument();
   });
 });
