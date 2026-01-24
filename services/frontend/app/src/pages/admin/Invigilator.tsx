@@ -118,6 +118,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const [promoteMode, setPromoteMode] = useState<"admin" | "senior">("admin");
   const [promoting, setPromoting] = useState(false);
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [demoteOpen, setDemoteOpen] = useState(false);
@@ -210,6 +211,11 @@ export const AdminInvigilatorProfile: React.FC = () => {
     (data?.user_is_staff || data?.user_is_superuser) &&
     !data?.user_is_senior_admin &&
     isSeniorAdmin;
+  const canSeniorPromote =
+    Boolean(data?.user_id) &&
+    (data?.user_is_staff || data?.user_is_superuser) &&
+    !data?.user_is_senior_admin &&
+    isSeniorAdmin;
 
   const handleDelete = async () => {
     if (!id) return;
@@ -273,6 +279,27 @@ export const AdminInvigilatorProfile: React.FC = () => {
     }
   };
 
+  const handleSeniorPromote = async () => {
+    if (!id) return;
+    try {
+      setPromoting(true);
+      setPromoteError(null);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/make-senior-admin/`, { method: "POST" });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to promote admin");
+      }
+      setSuccessMessage("Admin promoted to senior admin.");
+      setSuccessOpen(true);
+      await refetch();
+    } catch (err: any) {
+      setPromoteError(err?.message || "Failed to promote admin.");
+    } finally {
+      setPromoting(false);
+      setPromoteOpen(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Box sx={{ p: 4, display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
@@ -322,10 +349,25 @@ export const AdminInvigilatorProfile: React.FC = () => {
           <Button
             variant="contained"
             color="secondary"
-            onClick={() => setPromoteOpen(true)}
+            onClick={() => {
+              setPromoteMode("admin");
+              setPromoteOpen(true);
+            }}
             disabled={!canPromote || promoting}
           >
             {data.user_is_superuser ? "Already admin" : "Make them an admin"}
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => {
+              setPromoteMode("senior");
+              setPromoteOpen(true);
+            }}
+            disabled={!canSeniorPromote || promoting}
+            sx={!isSeniorAdmin ? { display: "none" } : undefined}
+          >
+            Make senior admin
           </Button>
           <Button
             variant="outlined"
@@ -913,15 +955,19 @@ export const AdminInvigilatorProfile: React.FC = () => {
       />
       <DeleteConfirmationDialog
         open={promoteOpen}
-        title="Make this invigilator an admin?"
-        description="This grants full admin access while keeping their existing login."
-        confirmText="Make admin"
+        title={promoteMode === "senior" ? "Make this admin a senior admin?" : "Make this invigilator an admin?"}
+        description={
+          promoteMode === "senior"
+            ? "This grants senior admin privileges while keeping their existing login."
+            : "This grants full admin access while keeping their existing login."
+        }
+        confirmText={promoteMode === "senior" ? "Make senior admin" : "Make admin"}
         destructive={false}
         loading={promoting}
         onClose={() => {
           if (!promoting) setPromoteOpen(false);
         }}
-        onConfirm={handlePromote}
+        onConfirm={promoteMode === "senior" ? handleSeniorPromote : handlePromote}
       />
       <DeleteConfirmationDialog
         open={demoteOpen}
