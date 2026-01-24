@@ -89,7 +89,6 @@ describe("AdminInvigilatorProfile", () => {
 
   it("disables remove admin when current user is not senior admin", async () => {
     renderPage();
-    const removeButton = await screen.findByText("Remove admin");
-    expect(removeButton).toBeDisabled();
+    expect(screen.queryByText("Remove admin")).not.toBeInTheDocument();
   });
 });
