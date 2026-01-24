@@ -53,6 +53,9 @@ export const DeleteConfirmationDialog: React.FC<Props> = ({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
+        <PillButton variant="outlined" onClick={onClose} disabled={loading}>
+          {cancelText}
+        </PillButton>
         <PillButton
           variant="contained"
           color={destructive ? "error" : "primary"}

@@ -146,6 +146,10 @@ CI mirrors these commands via `.gitlab-ci.yml`.
   - email: `test1@example.com`  
   - password: `test2test2`  
   This account is staff + superuser and has an API token created for it.
+- **Senior admins** — subset of admins with elevated privileges:
+  - Can promote invigilators to admins.
+  - Can remove admin privileges (revert to invigilator).
+  - Can promote admins to senior admins.
 - **Login endpoint** — `POST /api/auth/token/login/` with `{ "username": "<email or username>", "password": "<password>" }` returns `{ token, user, role }`.  
   - `role` is `admin` for staff/superuser, otherwise `invigilator`.
 - **Who can access what**  

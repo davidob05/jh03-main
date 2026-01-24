@@ -419,6 +419,16 @@ class IsInvigilatorOrAdmin(permissions.BasePermission):
         return _resolve_invigilator_for_user(user) is not None
 
 
+class IsSeniorAdmin(permissions.BasePermission):
+    """
+    Allow access only to senior admins.
+    """
+
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        return bool(user and (user.is_staff or user.is_superuser) and getattr(user, "is_senior_admin", False))
+
+
 class ExamViewSet(viewsets.ModelViewSet):
     queryset = Exam.objects.all().prefetch_related("examvenue_set__venue")
     serializer_class = ExamSerializer
@@ -581,6 +591,95 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
         qs = Invigilator.objects.filter(pk__in=ids)
         deleted_count, _ = qs.delete()
         return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="make-admin", permission_classes=[IsSeniorAdmin])
+    def make_admin(self, request, pk=None):
+        invigilator = self.get_object()
+        user = getattr(invigilator, "user", None)
+        if not user:
+            return Response(
+                {"detail": "Invigilator has no linked login to promote."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not (user.is_staff and user.is_superuser):
+            user.is_staff = True
+            user.is_superuser = True
+            user.save(update_fields=["is_staff", "is_superuser"])
+
+        return Response(
+            {
+                "detail": "Invigilator promoted to admin.",
+                "user_id": user.id,
+                "is_staff": user.is_staff,
+                "is_superuser": user.is_superuser,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="remove-admin", permission_classes=[IsSeniorAdmin])
+    def remove_admin(self, request, pk=None):
+        invigilator = self.get_object()
+        user = getattr(invigilator, "user", None)
+        if not user:
+            return Response(
+                {"detail": "Invigilator has no linked login to update."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not (user.is_staff or user.is_superuser):
+            return Response(
+                {"detail": "User is not an admin."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.is_staff = False
+        user.is_superuser = False
+        if getattr(user, "is_senior_admin", False):
+            user.is_senior_admin = False
+            user.save(update_fields=["is_staff", "is_superuser", "is_senior_admin"])
+        else:
+            user.save(update_fields=["is_staff", "is_superuser"])
+
+        return Response(
+            {
+                "detail": "Admin privileges removed.",
+                "user_id": user.id,
+                "is_staff": user.is_staff,
+                "is_superuser": user.is_superuser,
+                "is_senior_admin": getattr(user, "is_senior_admin", False),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="make-senior-admin", permission_classes=[IsSeniorAdmin])
+    def make_senior_admin(self, request, pk=None):
+        invigilator = self.get_object()
+        user = getattr(invigilator, "user", None)
+        if not user:
+            return Response(
+                {"detail": "Invigilator has no linked login to update."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not (user.is_staff or user.is_superuser):
+            return Response(
+                {"detail": "User must already be an admin to be promoted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not getattr(user, "is_senior_admin", False):
+            user.is_senior_admin = True
+            user.save(update_fields=["is_senior_admin"])
+
+        return Response(
+            {
+                "detail": "Admin promoted to senior admin.",
+                "user_id": user.id,
+                "is_senior_admin": getattr(user, "is_senior_admin", False),
+            },
+            status=status.HTTP_200_OK,
+        )
 
     def perform_update(self, serializer):
         instance = serializer.save()

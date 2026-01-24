@@ -259,6 +259,47 @@ class InvigilatorSerializerTests(TestCase):
         # self.diet is 1 day (2 slots), diet2 is 2 days (4 slots) -> total 6
         self.assertEqual(InvigilatorAvailability.objects.filter(invigilator=invig).count(), 6)
 
+    def test_invigilator_serializer_exposes_admin_flags(self):
+        User = get_user_model()
+        admin_user = User.objects.create_user(
+            username="adminish",
+            email="adminish@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+        )
+        invig = Invigilator.objects.create(
+            preferred_name="Adminish",
+            full_name="Adminish Example",
+            user=admin_user,
+        )
+
+        data = InvigilatorSerializer(instance=invig).data
+
+        self.assertTrue(data["user_is_staff"])
+        self.assertTrue(data["user_is_superuser"])
+        self.assertFalse(data["user_is_senior_admin"])
+
+    def test_invigilator_serializer_exposes_senior_admin_flag(self):
+        User = get_user_model()
+        admin_user = User.objects.create_user(
+            username="senior",
+            email="senior@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+            is_senior_admin=True,
+        )
+        invig = Invigilator.objects.create(
+            preferred_name="Senior",
+            full_name="Senior Example",
+            user=admin_user,
+        )
+
+        data = InvigilatorSerializer(instance=invig).data
+
+        self.assertTrue(data["user_is_senior_admin"])
+
     def test_generate_availability_skips_diet_without_dates(self):
         diet_no_dates, _ = Diet.objects.update_or_create(
             code=self.diet.code, defaults={"name": self.diet.name, "start_date": None, "end_date": None}

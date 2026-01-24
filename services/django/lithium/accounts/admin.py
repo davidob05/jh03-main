@@ -15,15 +15,16 @@ class CustomUserAdmin(UserAdmin):
         "phone",
         "has_avatar",
         "is_staff",
+        "is_senior_admin",
         "is_active",
     ]
-    list_filter = ["is_staff", "is_superuser", "is_active"]
+    list_filter = ["is_staff", "is_superuser", "is_senior_admin", "is_active"]
     search_fields = ["email", "username", "phone"]
     fieldsets = UserAdmin.fieldsets + (
-        ("Profile", {"fields": ("phone", "avatar")}),
+        ("Profile", {"fields": ("phone", "avatar", "is_senior_admin")}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ("Profile", {"fields": ("phone", "avatar")}),
+        ("Profile", {"fields": ("phone", "avatar", "is_senior_admin")}),
     )
 
     @admin.display(description="Avatar", boolean=True)

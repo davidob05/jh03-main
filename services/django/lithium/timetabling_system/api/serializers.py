@@ -440,6 +440,9 @@ class InvigilatorSerializer(serializers.ModelSerializer):
     availabilities = InvigilatorAvailabilitySerializer(many=True, read_only=True)
     user = serializers.DictField(write_only=True, required=False, allow_null=True)
     user_id = serializers.IntegerField(read_only=True)
+    user_is_staff = serializers.SerializerMethodField()
+    user_is_superuser = serializers.SerializerMethodField()
+    user_is_senior_admin = serializers.SerializerMethodField()
 
     class Meta:
         model = Invigilator
@@ -447,6 +450,9 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "user_id",
+            "user_is_staff",
+            "user_is_superuser",
+            "user_is_senior_admin",
             "preferred_name",
             "full_name",
             "mobile",
@@ -462,6 +468,18 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "assignments",
             "availabilities",
         )
+
+    def get_user_is_staff(self, obj):
+        user = getattr(obj, "user", None)
+        return bool(getattr(user, "is_staff", False)) if user else False
+
+    def get_user_is_superuser(self, obj):
+        user = getattr(obj, "user", None)
+        return bool(getattr(user, "is_superuser", False)) if user else False
+
+    def get_user_is_senior_admin(self, obj):
+        user = getattr(obj, "user", None)
+        return bool(getattr(user, "is_senior_admin", False)) if user else False
 
     def validate_user(self, value):
         if value in (None, {}):

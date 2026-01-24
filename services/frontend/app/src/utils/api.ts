@@ -96,7 +96,9 @@ export type AuthUser = {
   username?: string;
   is_staff?: boolean;
   is_superuser?: boolean;
+  is_senior_admin?: boolean;
   role?: string;
+  invigilator_id?: number | null;
   phone?: string;
   avatar?: string;
 };
