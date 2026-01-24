@@ -297,6 +297,14 @@ export const AdminProfile: React.FC = () => {
           <Typography variant="h5" sx={{ mt: 2, fontWeight: 600 }}>
             {displayName}
           </Typography>
+          {userData.is_senior_admin && (
+            <Chip
+              label="Senior admin"
+              color="secondary"
+              size="small"
+              sx={{ mt: 1, fontWeight: 600 }}
+            />
+          )}
 
           <Typography variant="body1" sx={{ color: "text.secondary" }}>
             {email || displayFallbackName}
