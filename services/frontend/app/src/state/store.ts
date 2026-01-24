@@ -121,11 +121,16 @@ export const {
   resetAdminPrefs,
 } = adminTablesSlice.actions;
 
-export const store = configureStore({
-  reducer: {
-    adminTables: adminTablesSlice.reducer,
-  },
-});
+// Factory so tests/components can get an isolated store instance when needed
+export const createStoreInstance = () =>
+  configureStore({
+    reducer: {
+      adminTables: adminTablesSlice.reducer,
+    },
+  });
+
+// Default app-wide store
+export const store = createStoreInstance();
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

@@ -29,7 +29,7 @@ import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
-import { useAppDispatch, useAppSelector, setCalendarPrefs, store } from "../../state/store";
+import { useAppDispatch, useAppSelector, setCalendarPrefs, store, createStoreInstance } from "../../state/store";
 import { Provider, ReactReduxContext } from "react-redux";
 
 interface ExamVenueData {
@@ -616,8 +616,9 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
 export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
   const ctx = useContext(ReactReduxContext);
   if (!ctx) {
+    const localStore = useMemo(() => createStoreInstance(), []);
     return (
-      <Provider store={store}>
+      <Provider store={localStore}>
         <AdminCalendarInner {...props} />
       </Provider>
     );
