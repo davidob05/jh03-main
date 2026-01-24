@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDate, formatDateWithWeekday } from "../../utils/dates";
 
 type SlotCode = "MORNING" | "EVENING";
 
@@ -283,7 +284,7 @@ export const InvigilatorRestrictions: React.FC = () => {
             <Alert severity={cutoffReached ? "warning" : "info"} sx={{ mt: 1 }}>
               {cutoffReached
                 ? "Restrictions are closed for this diet. Please email admin to request changes."
-                : `Restrictions remain open until ${dayjs(selectedDietCutoff).format("D MMM YYYY")}.`}
+                : `Restrictions remain open until ${formatDate(selectedDietCutoff)}.`}
             </Alert>
           )}
         </Panel>
@@ -308,7 +309,7 @@ export const InvigilatorRestrictions: React.FC = () => {
 
             <Grid container spacing={1.5}>
               {days.map((day) => {
-                const dateLabel = dayjs(day.date).format("ddd, D MMM");
+                const dateLabel = formatDateWithWeekday(day.date);
                 return (
                   <Grid item xs={12} sm={6} md={4} key={day.date}>
                     <Panel
@@ -332,7 +333,7 @@ export const InvigilatorRestrictions: React.FC = () => {
                             return (
                               <PillButton
                                 key={slot.slot}
-                                variant={available ? "contained" : "outlined"}
+                                variant="contained"
                                 color="success"
                                 size="medium"
                                 onClick={() => !cutoffReached && toggleSlot(day.date, slot.slot)}
@@ -340,20 +341,21 @@ export const InvigilatorRestrictions: React.FC = () => {
                                 sx={{
                                   borderRadius: 10,
                                   minWidth: 120,
+                                  minHeight: 36,
                                   justifyContent: "center",
-                                  borderWidth: 1.5,
-                                  borderColor: available ? "success.main" : "success.main",
-                                  backgroundColor: available ? "success.main" : "transparent",
-                                  color: available ? "#fff" : "success.dark",
+                                  border: "1.5px solid transparent",
+                                  boxSizing: "border-box",
+                                  backgroundColor: available ? "success.main" : "#d4edda",
+                                  color: available ? "#fff" : "#155724",
                                   opacity: cutoffReached ? 0.6 : 1,
+                                  boxShadow: "none",
                                   "&:hover": {
                                     backgroundColor: cutoffReached
                                       ? undefined
                                       : available
                                       ? "success.dark"
-                                      : "success.light",
-                                    color: available ? "#fff" : "success.dark",
-                                    borderColor: "success.dark",
+                                      : "#c6e9cf",
+                                    color: available ? "#fff" : "#155724",
                                   },
                                 }}
                               >

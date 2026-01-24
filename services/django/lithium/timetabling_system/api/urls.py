@@ -23,6 +23,8 @@ from .views import (
     NotificationsView,
     TimetableUploadView,
     StudentProvisionListView,
+    ProvisionExportView,
+    InvigilatorTimetableExportView,
     VenueViewSet,
     DietViewSet,
 )
@@ -50,6 +52,8 @@ urlpatterns = [
     path("invigilator/notifications/", InvigilatorNotificationsView.as_view(), name="api-invigilator-notifications"),
     path("invigilator/assignments/", InvigilatorAssignmentViewSet.as_view({"get": "list"}), name="api-invigilator-assignments",),
     path("students/provisions/", StudentProvisionListView.as_view(), name="api-student-provisions"),
+    path("provisions/export/", ProvisionExportView.as_view(), name="api-provisions-export"),
+    path("invigilators/timetables/export/", InvigilatorTimetableExportView.as_view(), name="api-invigilator-timetable-export"),
 ]
 
 urlpatterns += router.urls

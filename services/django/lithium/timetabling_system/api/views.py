@@ -1,3 +1,6 @@
+import csv
+from io import StringIO, BytesIO
+import zipfile
 from typing import Optional
 
 from rest_framework import permissions, status, viewsets
@@ -13,6 +16,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from datetime import date, timedelta
 from django.conf import settings
 from django.core.mail import EmailMessage
+from django.http import HttpResponse
+from django.utils.text import slugify
 from timetabling_system.models import (
     Exam,
     ExamVenue,
@@ -62,11 +67,291 @@ from .serializers import (
 )
 
 
+class ProvisionExportView(APIView):
+    """
+    Admin CSV export of provision allocations, optionally filtered by school.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        school = request.query_params.get("school")
+        provisions_qs = Provisions.objects.select_related("student", "exam")
+        if school:
+            provisions_qs = provisions_qs.filter(exam__exam_school__iexact=school)
+
+        # Map student+exam to their allocated ExamVenue (with venue)
+        student_exam_map = {
+            (se.student_id, se.exam_id): se
+            for se in StudentExam.objects.select_related("exam_venue__venue", "student", "exam")
+        }
+
+        buffer = StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            [
+                "Date",
+                "Start Time",
+                "End Time",
+                "Exam Code",
+                "Exam Name",
+                "School",
+                "Student Name",
+                "Provisions",
+                "Additional Info",
+                "Venue",
+            ]
+        )
+
+        for provision in provisions_qs:
+            student_exam = student_exam_map.get((provision.student_id, provision.exam_id))
+            exam_venue = getattr(student_exam, "exam_venue", None) if student_exam else None
+            venue = getattr(exam_venue, "venue", None)
+            start = getattr(exam_venue, "start_time", None)
+            length = getattr(exam_venue, "exam_length", None)
+            end = start + timedelta(minutes=length) if start and length else None
+
+            writer.writerow(
+                [
+                    start.date().isoformat() if start else "",
+                    start.time().isoformat(timespec="minutes") if start else "",
+                    end.time().isoformat(timespec="minutes") if end else "",
+                    provision.exam.course_code,
+                    provision.exam.exam_name,
+                    provision.exam.exam_school,
+                    provision.student.student_name,
+                    ", ".join(provision.provisions or []),
+                    provision.notes or "",
+                    venue.venue_name if venue else "",
+                ]
+            )
+
+        response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+        filename_parts = ["provisions_export"]
+        if school:
+            filename_parts.append(slugify(str(school)))
+        response["Content-Disposition"] = f'attachment; filename="{ "_".join(filename_parts) }.csv"'
+        return response
+
+
+class InvigilatorTimetableExportView(APIView):
+    """
+    Admin CSV export of invigilator timetables for one or more invigilators.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, *args, **kwargs):
+        invigilator_ids = request.data.get("invigilator_ids")
+        if invigilator_ids is None:
+            invigilator_id = request.data.get("invigilator_id")
+            invigilator_ids = [invigilator_id] if invigilator_id is not None else []
+
+        only_confirmed = bool(request.data.get("only_confirmed", False))
+        include_cancelled = bool(request.data.get("include_cancelled", False))
+        include_provisions = bool(request.data.get("include_provisions", False))
+
+        cleaned_ids = []
+        for raw_id in invigilator_ids:
+            if not str(raw_id).strip():
+                continue
+            try:
+                cleaned_ids.append(int(raw_id))
+            except (TypeError, ValueError):
+                return Response(
+                    {"detail": f"Invalid invigilator id: {raw_id}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        invigilator_ids = cleaned_ids
+        if not invigilator_ids:
+            return Response({"detail": "invigilator_ids is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        assignments = (
+            InvigilatorAssignment.objects.select_related(
+                "invigilator",
+                "invigilator__user",
+                "exam_venue__exam",
+                "exam_venue__venue",
+            )
+            .filter(invigilator_id__in=invigilator_ids)
+            .order_by("invigilator_id", "assigned_start")
+        )
+
+        if only_confirmed:
+            assignments = assignments.filter(confirmed=True, cancel=False)
+        else:
+            assignments = assignments.filter(
+                models.Q(cancel=False) | models.Q(cancel=True, confirmed=False)
+            )
+        if include_cancelled:
+            cancelled_qs = (
+                InvigilatorAssignment.objects.select_related(
+                    "invigilator",
+                    "invigilator__user",
+                    "exam_venue__exam",
+                    "exam_venue__venue",
+                )
+                .filter(invigilator_id__in=invigilator_ids, cancel=True, confirmed=True)
+            )
+            assignments = (assignments | cancelled_qs).order_by("invigilator_id", "assigned_start")
+
+        exam_venue_ids = list(
+            assignments.values_list("exam_venue_id", flat=True).distinct()
+        )
+        provisions_by_venue: dict[int, set[str]] = {}
+        notes_by_venue: dict[int, list[str]] = {}
+        if include_provisions and exam_venue_ids:
+            student_exam_rows = list(
+                StudentExam.objects.filter(exam_venue_id__in=exam_venue_ids).values(
+                    "exam_venue_id",
+                    "student_id",
+                    "exam_id",
+                )
+            )
+            provision_lookup = {
+                (p.student_id, p.exam_id): p
+                for p in Provisions.objects.filter(
+                    exam_id__in={row["exam_id"] for row in student_exam_rows},
+                    student_id__in={row["student_id"] for row in student_exam_rows},
+                )
+            }
+
+            for row in student_exam_rows:
+                provision = provision_lookup.get((row["student_id"], row["exam_id"]))
+                if not provision:
+                    continue
+                venue_id = row["exam_venue_id"]
+                if provision.provisions:
+                    provisions_by_venue.setdefault(venue_id, set()).update(provision.provisions)
+                if provision.notes:
+                    notes_by_venue.setdefault(venue_id, []).append(provision.notes)
+
+        def _format_dt(value):
+            if not value:
+                return ""
+            local = timezone.localtime(value) if timezone.is_aware(value) else value
+            return local.isoformat(timespec="minutes")
+
+        def _csv_for(assignments_list):
+            buffer = StringIO()
+            writer = csv.writer(buffer)
+            headers = [
+                "invigilator_id",
+                "invigilator_name",
+                "username",
+                "assignment_id",
+                "assignment_status",
+                "exam_venue_id",
+                "venue_name",
+                "exam_name",
+                "course_code",
+                "exam_school",
+                "exam_start",
+                "exam_end",
+                "exam_length_minutes",
+                "assigned_start",
+                "assigned_end",
+                "role",
+                "break_time_minutes",
+                "assignment_notes",
+            ]
+            if include_provisions:
+                headers.extend(["student_provisions", "provision_notes"])
+            writer.writerow(headers)
+
+            for assignment in assignments_list:
+                invigilator = assignment.invigilator
+                exam_venue = assignment.exam_venue
+                exam = exam_venue.exam if exam_venue else None
+                venue = exam_venue.venue if exam_venue else None
+                exam_start = getattr(exam_venue, "start_time", None)
+                exam_length = getattr(exam_venue, "exam_length", None)
+                exam_end = exam_start + timedelta(minutes=exam_length) if exam_start and exam_length else None
+
+                if assignment.cancel and assignment.confirmed:
+                    status_label = "cancelled"
+                elif assignment.cancel and not assignment.confirmed:
+                    status_label = "cancellation requested"
+                elif assignment.confirmed:
+                    status_label = "confirmed"
+                else:
+                    status_label = "pending confirmation"
+
+                venue_provisions = sorted(provisions_by_venue.get(assignment.exam_venue_id, set()))
+                venue_notes = notes_by_venue.get(assignment.exam_venue_id, [])
+                unique_notes = []
+                for note in venue_notes:
+                    if note not in unique_notes:
+                        unique_notes.append(note)
+
+                row = [
+                    invigilator.id if invigilator else "",
+                    invigilator.preferred_name or invigilator.full_name if invigilator else "",
+                    getattr(invigilator.user, "username", "") if invigilator and invigilator.user else "",
+                    assignment.id,
+                    status_label,
+                    assignment.exam_venue_id,
+                    venue.venue_name if venue else "",
+                    exam.exam_name if exam else "",
+                    exam.course_code if exam else "",
+                    exam.exam_school if exam else "",
+                    _format_dt(exam_start),
+                    _format_dt(exam_end),
+                    exam_length if exam_length is not None else "",
+                    _format_dt(assignment.assigned_start),
+                    _format_dt(assignment.assigned_end),
+                    assignment.role or "",
+                    assignment.break_time_minutes or 0,
+                    assignment.notes or "",
+                ]
+                if include_provisions:
+                    row.extend([", ".join(venue_provisions), " | ".join(unique_notes)])
+                writer.writerow(row)
+            return buffer.getvalue()
+
+        if len(invigilator_ids) == 1:
+            invigilator = assignments.first().invigilator if assignments.exists() else None
+            if not invigilator:
+                invigilator = Invigilator.objects.filter(id=invigilator_ids[0]).select_related("user").first()
+            name = (
+                getattr(invigilator.user, "username", "") if invigilator and invigilator.user else ""
+            ) or (invigilator.preferred_name if invigilator else "") or (invigilator.full_name if invigilator else "")
+            filename = f"{slugify(name or 'invigilator')}_timetable.csv"
+            response = HttpResponse(_csv_for(assignments), content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            return response
+
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            zip_file.writestr("invigilators_timetables.csv", _csv_for(assignments))
+            invigilator_map = {
+                inv.id: inv
+                for inv in Invigilator.objects.filter(id__in=invigilator_ids).select_related("user")
+            }
+            for invigilator_id in invigilator_ids:
+                invigilator = invigilator_map.get(invigilator_id)
+                name = (
+                    getattr(invigilator.user, "username", "") if invigilator and invigilator.user else ""
+                ) or (invigilator.preferred_name if invigilator else "") or (invigilator.full_name if invigilator else "")
+                filename = f"{slugify(name or f'invigilator_{invigilator_id}')}_timetable.csv"
+                per_assignments = [a for a in assignments if a.invigilator_id == invigilator_id]
+                zip_file.writestr(filename, _csv_for(per_assignments))
+
+        response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
+        response["Content-Disposition"] = 'attachment; filename="invigilators_timetables.zip"'
+        return response
+
+
 def log_notification(type_: str, message: str, when=None, user=None):
+    """
+    Create a notification using the new admin/invigilator message fields.
+    Existing callers pass a single `message`; we fan that out to both variants.
+    """
     try:
         Notification.objects.create(
             type=type_,
-            message=message,
+            invigilator_message=message or "",
+            admin_message=message or "",
             timestamp=when or timezone.now(),
             triggered_by=user,
         )
@@ -399,7 +684,13 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         instance = serializer.save()
         name = instance.preferred_name or instance.full_name or "Invigilator"
-        log_notification("invigilatorUpdate", f"{name} has updated details.", user=_get_request_user(self, serializer))
+        Notification.objects.create(
+            type=Notification.NotificationType.INVIGILATOR_UPDATE,
+            admin_message=f"{name} has updated details.",
+            invigilator_message="Your details have been updated",
+            invigilator=instance,
+            triggered_by=_get_request_user(self, serializer),
+        )
         return instance
 
 
@@ -431,6 +722,55 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         if invigilator is None:
             return qs.none()
         return qs.filter(invigilator=invigilator)
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        was_confirmed = bool(instance.confirmed)
+        was_cancelled = bool(instance.cancel)
+        updated = serializer.save()
+        is_cancelled = bool(updated.cancel)
+        if not was_confirmed and bool(updated.confirmed):
+            name = updated.invigilator.preferred_name or updated.invigilator.full_name or "Invigilator"
+            exam_name = updated.exam_venue.exam.exam_name if updated.exam_venue and updated.exam_venue.exam else "an exam"
+            venue_name = updated.exam_venue.venue.venue_name if updated.exam_venue and updated.exam_venue.venue else "Venue TBC"
+            start_str = (
+                timezone.localtime(updated.assigned_start).strftime("%d %b %Y at %H:%M")
+                if updated.assigned_start else "start time TBC"
+            )
+            details = f"{exam_name} at {venue_name} on {start_str}"
+            if is_cancelled:
+                Notification.objects.create(
+                    type=Notification.NotificationType.CANCELLATION,
+                    admin_message=f"Cancellation request approved for {name} ({details}).",
+                    invigilator_message=f"Your cancellation request was approved for {details}.",
+                    invigilator=updated.invigilator,
+                    triggered_by=_get_request_user(self, serializer),
+                )
+            else:
+                Notification.objects.create(
+                    type=Notification.NotificationType.ASSIGNMENT,
+                    admin_message=f"{name} has confirmed their assignment for {details}.",
+                    invigilator_message=f"Your assignment has been confirmed for {details}.",
+                    invigilator=updated.invigilator,
+                    triggered_by=_get_request_user(self, serializer),
+                )
+        if was_cancelled and not is_cancelled:
+            name = updated.invigilator.preferred_name or updated.invigilator.full_name or "Invigilator"
+            exam_name = updated.exam_venue.exam.exam_name if updated.exam_venue and updated.exam_venue.exam else "an exam"
+            venue_name = updated.exam_venue.venue.venue_name if updated.exam_venue and updated.exam_venue.venue else "Venue TBC"
+            start_str = (
+                timezone.localtime(updated.assigned_start).strftime("%d %b %Y at %H:%M")
+                if updated.assigned_start else "start time TBC"
+            )
+            details = f"{exam_name} at {venue_name} on {start_str}"
+            Notification.objects.create(
+                type=Notification.NotificationType.CANCELLATION,
+                admin_message=f"Cancellation request rejected for {name} ({details}).",
+                invigilator_message=f"Your cancellation request was rejected for {details}.",
+                invigilator=updated.invigilator,
+                triggered_by=_get_request_user(self, serializer),
+            )
+        return updated
 
     @action(detail=False, methods=["get"], url_path="available-covers", permission_classes=[IsInvigilatorOrAdmin])
     def available_covers(self, request):
@@ -519,10 +859,17 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
             if candidate.assigned_start else "start time TBC"
         )
         details = f"{exam_name} at {venue_name} on {start_str}"
+        admin_details = details
         original_invigilator = getattr(candidate.invigilator, "preferred_name", None) or getattr(candidate.invigilator, "full_name", None) or None
         if original_invigilator:
-            details = f"{details} (covering for {original_invigilator})"
-        log_notification("shiftPickup", f"{name} picked up a shift for {details}.", user=request.user)
+            admin_details = f"{admin_details} (covering for {original_invigilator})"
+        Notification.objects.create(
+            type=Notification.NotificationType.SHIFT_PICKUP,
+            admin_message=f"{name} picked up a shift for {admin_details}.",
+            invigilator_message=f"You picked up a shift for {details}.",
+            invigilator=invigilator,
+            triggered_by=request.user,
+        )
 
         serializer = self.get_serializer(new_assignment)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -570,7 +917,13 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         details = f"{exam_name} at {venue_name} on {start_str}"
         if reason:
             details = f"{details} (reason: {reason})"
-        log_notification("cancellation", f"{name} requested cancellation for {details}.", user=request.user)
+        Notification.objects.create(
+            type=Notification.NotificationType.CANCELLATION,
+            admin_message=f"{name} requested cancellation for {details}.",
+            invigilator_message=f"Your cancellation request was submitted for {details}.",
+            invigilator=assignment.invigilator,
+            triggered_by=request.user,
+        )
 
         return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
 
@@ -615,7 +968,13 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         details = f"{exam_name} at {venue_name} on {start_str}"
         if reason:
             details = f"{details} (undo reason: {reason})"
-        log_notification("cancellation", f"{name} withdrew cancellation for {details}.", user=request.user)
+        Notification.objects.create(
+            type=Notification.NotificationType.CANCELLATION,
+            admin_message=f"{name} withdrew cancellation for {details}.",
+            invigilator_message=f"Your cancellation withdrawal was submitted for {details}.",
+            invigilator=assignment.invigilator,
+            triggered_by=request.user,
+        )
 
         return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
 
@@ -629,6 +988,8 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
             if instance.assigned_start else "start time TBC"
         )
         details = f"{exam_name} at {venue_name} on {start_str}"
+        admin_details = details
+        invigilator_details = details
         original_invigilator = None
         try:
             original_invigilator = (
@@ -640,14 +1001,32 @@ class InvigilatorAssignmentViewSet(viewsets.ModelViewSet):
         except Exception:
             original_invigilator = None
         if original_invigilator:
-            details = f"{details} (covering for {original_invigilator})"
-        log_notification("shiftPickup", f"{name} picked up a shift for {details}.", user=_get_request_user(self, serializer))
+            admin_details = f"{admin_details} (covering for {original_invigilator})"
+        Notification.objects.create(
+            type=Notification.NotificationType.ASSIGNMENT,
+            admin_message=f"{name} has been assigned to a shift for {admin_details}.",
+            invigilator_message=f"You have been assigned to a shift for {invigilator_details}.",
+            invigilator=instance.invigilator,
+            triggered_by=_get_request_user(self, serializer),
+        )
         return instance
 
     def perform_destroy(self, instance):
         name = instance.invigilator.preferred_name or instance.invigilator.full_name or "Invigilator"
         exam_name = instance.exam_venue.exam.exam_name if instance.exam_venue and instance.exam_venue.exam else "an exam"
-        log_notification("cancellation", f"{name} cancelled a shift for {exam_name}.", user=_get_request_user(self))
+        venue_name = instance.exam_venue.venue.venue_name if instance.exam_venue and instance.exam_venue.venue else "Venue TBC"
+        start_str = (
+            timezone.localtime(instance.assigned_start).strftime("%d %b %Y at %H:%M")
+            if instance.assigned_start else "start time TBC"
+        )
+        details = f"{exam_name} at {venue_name} on {start_str}"
+        Notification.objects.create(
+            type=Notification.NotificationType.CANCELLATION,
+            admin_message=f"Cancellation request approved for {name} ({details}).",
+            invigilator_message=f"Your cancellation request was approved for {details}.",
+            invigilator=instance.invigilator,
+            triggered_by=_get_request_user(self),
+        )
         return super().perform_destroy(instance)
 
 
@@ -754,9 +1133,11 @@ class NotificationsView(APIView):
 
         if log_only:
             count = len(recipients)
+            method_label = " & ".join(methods) if methods else "mail"
             Notification.objects.create(
                 type=Notification.NotificationType.MAIL_MERGE,
-                message=f"Sent '{subject_to_use}' mail merge to {count} invigilator{'s' if count != 1 else ''}",
+                admin_message=f"Sent '{subject_to_use}' mail merge to {count} invigilator{'s' if count != 1 else ''} via {method_label}",
+                invigilator_message="",
                 timestamp=timezone.now(),
                 triggered_by=request.user,
             )
@@ -805,7 +1186,7 @@ class NotificationsView(APIView):
                     ]
                 )
             if "sms" in methods:
-                sms_candidate = getattr(invigilator, "janet_txt", None) or getattr(invigilator, "mobile_text_only", None)
+                sms_candidate = getattr(invigilator, "mobile_text_only", None)
                 if sms_candidate and "@" in sms_candidate:
                     sms_recipients.append(sms_candidate)
                 else:
@@ -846,7 +1227,7 @@ class NotificationsView(APIView):
             errors.append("No email addresses found for selected invigilators.")
         if "sms" in methods and not sms_recipients:
             errors.append(
-                "No SMS-capable addresses (e.g. janet_txt/mobile_text_only with @) found for selected invigilators."
+                "No SMS-capable addresses (e.g. mobile_text_only with @) found for selected invigilators."
             )
         if skipped_sms and "sms" in methods:
             errors.append(f"Skipped SMS for: {', '.join(skipped_sms)} (missing SMS address).")
@@ -869,50 +1250,24 @@ class NotificationsView(APIView):
         )
         
 
-class AnnouncementViewSet(viewsets.ModelViewSet):
-    """
-    CRUD for announcements shown on dashboards.
-    Admin-only for mutations; authenticated invigilators/admins can read.
-    """
-
-    queryset = Announcement.objects.all()
-    serializer_class = AnnouncementSerializer
-    throttle_classes: list = []
-
-    def get_permissions(self):
-        if self.request.method in permissions.SAFE_METHODS:
-            return [IsInvigilatorOrAdmin()]
-        return [permissions.IsAdminUser()]
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-
-        audience = self.request.query_params.get("audience")
-        if audience:
-            qs = qs.filter(audience=audience)
-
-        active_flag = self.request.query_params.get("active")
-        if active_flag is not None:
-            should_be_active = str(active_flag).lower() in {"1", "true", "yes"}
-            if should_be_active:
-                now = timezone.now()
-                qs = qs.filter(is_active=True).filter(
-                    models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now)
-                )
-            else:
-                qs = qs.filter(is_active=False)
-
-        return qs
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=_get_request_user(self, serializer))
-
-
 class DietViewSet(viewsets.ModelViewSet):
     queryset = Diet.objects.all().order_by("-is_active", "-start_date", "code")
     serializer_class = DietSerializer
     permission_classes = [permissions.IsAdminUser]
     throttle_classes: list = []
+
+    def destroy(self, request, *args, **kwargs):
+        diet = self.get_object()
+        code = diet.code
+        start_date = diet.start_date
+        end_date = diet.end_date
+        with transaction.atomic():
+            if code:
+                InvigilatorRestriction.objects.filter(diet=code).delete()
+            if start_date and end_date:
+                InvigilatorAvailability.objects.filter(date__gte=start_date, date__lte=end_date).delete()
+            diet.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
         
 def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
@@ -1020,6 +1375,19 @@ class DietViewSet(viewsets.ModelViewSet):
     serializer_class = DietSerializer
     permission_classes = [permissions.IsAdminUser]
     throttle_classes: list = []
+
+    def destroy(self, request, *args, **kwargs):
+        diet = self.get_object()
+        code = diet.code
+        start_date = diet.start_date
+        end_date = diet.end_date
+        with transaction.atomic():
+            if code:
+                InvigilatorRestriction.objects.filter(diet=code).delete()
+            if start_date and end_date:
+                InvigilatorAvailability.objects.filter(date__gte=start_date, date__lte=end_date).delete()
+            diet.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
     
 def _provision_row(provision: Provisions, student_exam: Optional[StudentExam]):
@@ -1246,15 +1614,30 @@ class StudentProvisionListView(APIView):
 
 class InvigilatorNotificationsView(APIView):
     """
-    Return recent notifications (last 20) for authenticated invigilators.
-    Currently returns global notifications as the model is not scoped per-invigilator.
+    Return recent notifications (last 20) for the authenticated invigilator.
+    Includes global notifications and those targeted at the invigilator.
     """
 
     permission_classes = [IsAuthenticated]
     throttle_classes: list = []  # Lightweight
 
     def get(self, request, *args, **kwargs):
-        qs = Notification.objects.order_by("-timestamp")[:20]
+        invigilator = _resolve_invigilator_for_user(getattr(request, "user", None))
+        if invigilator is None:
+            return Response([])
+
+        hidden_types = [
+            Notification.NotificationType.EXAM_CHANGE,
+            Notification.NotificationType.VENUE_CHANGE,
+            Notification.NotificationType.MAIL_MERGE,
+        ]
+        qs = (
+            Notification.objects.filter(
+                models.Q(invigilator__isnull=True) | models.Q(invigilator=invigilator)
+            )
+            .exclude(type__in=hidden_types)
+            .order_by("-timestamp")[:20]
+        )
         return Response(NotificationSerializer(qs, many=True).data)
 
 
@@ -1596,3 +1979,13 @@ class InvigilatorAssignmentsView(APIView):
         )
 
         return Response(InvigilatorAssignmentSerializer(assignments, many=True).data)
+
+
+
+
+
+
+
+
+
+

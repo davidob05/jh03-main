@@ -438,14 +438,16 @@ class ApiViewActionTests(TestCase):
         inv_view = api_views.InvigilatorViewSet()
         inv_serializer = mock.Mock()
         inv_serializer.save.return_value = self.invigilator
-        with mock.patch("timetabling_system.api.views.log_notification") as log:
+        with mock.patch("timetabling_system.api.views._get_request_user", return_value=None), \
+            mock.patch("timetabling_system.api.views.Notification.objects.create") as log:
             inv_view.perform_update(inv_serializer)
         self.assertEqual(log.call_count, 1)
 
         assign_view = api_views.InvigilatorAssignmentViewSet()
         assign_serializer = mock.Mock()
         assign_serializer.save.return_value = self.assignment
-        with mock.patch("timetabling_system.api.views.log_notification") as log_assign:
+        with mock.patch("timetabling_system.api.views._get_request_user", return_value=None), \
+            mock.patch("timetabling_system.api.views.Notification.objects.create") as log_assign:
             assign_view.perform_create(assign_serializer)
             assign_view.perform_destroy(self.assignment)
         self.assertEqual(log_assign.call_count, 2)

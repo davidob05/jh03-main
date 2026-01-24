@@ -94,6 +94,7 @@ class InvigilatorQualificationChoices(models.TextChoices):
     SENIOR_INVIGILATOR = 'SENIOR_INVIGILATOR', 'Senior Invigilator (SI)'
     AKT_TRAINED = 'AKT_TRAINED', 'AKT Trained'
     CHECK_IN = 'CHECK_IN', 'Check-In'
+    DETACHED_DUTY = 'DETACHED_DUTY', 'Detached Duty'
     # Add more qualifications as needed
 
 
@@ -103,10 +104,9 @@ class InvigilatorRestrictionType(models.TextChoices):
     PURPLE_CLUSTER = "purple_cluster", "Purple cluster"
     COMPUTER_CLUSTER = "computer_cluster", "Computer cluster"
     VET_SCHOOL = "vet_school", "Vet School"
-    SEC = "sec", "Scottish Event Campus"
-    OSCE_GOLDEN_JUBILEE = "osce_golden_jubilee", "OSCE - Golden Jubilee"
-    OSCE_WOLFSON = "osce_wolfson", "OSCE - Wolfson"
-    OSCE_QUEEN_ELIZABETH = "osce_queen_elizabeth", "OSCE - Queen Elizabeth"
+    OSCE_GOLDEN_JUBILEE = "osce_golden_jubilee", "Golden Jubilee"
+    OSCE_WOLFSON = "osce_wolfson", "Wolfson"
+    OSCE_QUEEN_ELIZABETH = "osce_queen_elizabeth", "Queen Elizabeth"
     APPROVED_EXEMPTION = "approved_exemption", "Approved exemption"
 
 
@@ -248,6 +248,7 @@ class Notification(models.Model):
     class NotificationType(models.TextChoices):
         AVAILABILITY = "availability", "Availability"
         CANCELLATION = "cancellation", "Cancellation"
+        ASSIGNMENT = "assignment", "Assignment"
         SHIFT_PICKUP = "shiftPickup", "Shift pickup"
         EXAM_CHANGE = "examChange", "Exam change"
         VENUE_CHANGE = "venueChange", "Venue change"
@@ -257,7 +258,8 @@ class Notification(models.Model):
 
     id = models.AutoField(primary_key=True)
     type = models.CharField(max_length=30, choices=NotificationType.choices)
-    message = models.TextField()
+    invigilator_message = models.TextField(blank=True, default="")
+    admin_message = models.TextField(blank=True, default="")
     timestamp = models.DateTimeField(auto_now_add=True)
     triggered_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -266,12 +268,20 @@ class Notification(models.Model):
         blank=True,
         related_name="triggered_notifications",
     )
+    invigilator = models.ForeignKey(
+        "Invigilator",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
 
     class Meta:
         ordering = ["-timestamp"]
 
     def __str__(self):
-        return f"{self.get_type_display()}: {self.message[:40]}"
+        preview = (self.invigilator_message or self.admin_message or "")[:40]
+        return f"{self.get_type_display()}: {preview}"
 
 
 class Announcement(models.Model):
@@ -334,7 +344,6 @@ class Invigilator(models.Model):
 
     mobile = models.CharField(max_length=30, blank=True, null=True)
     mobile_text_only = models.CharField(max_length=30, blank=True, null=True)
-    janet_txt = models.CharField(max_length=30, blank=True, null=True)
     alt_phone = models.CharField(max_length=30, blank=True, null=True)
 
     university_email = models.EmailField(blank=True, null=True)
