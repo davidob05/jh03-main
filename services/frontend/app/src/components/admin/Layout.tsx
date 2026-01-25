@@ -113,7 +113,7 @@ export const AdminLayout: React.FC = () => {
                 </MenuItem>
                 {user?.invigilator_id && (
                   <MenuItem component={Link} to="/invigilator/profile" onClick={closeMenu} sx={{ borderRadius: 2 }}>
-                    View my invigilator information
+                    View Invigilator Profile
                   </MenuItem>
                 )}
                 <MenuItem

@@ -322,10 +322,10 @@ export const AdminProfile: React.FC = () => {
           </Typography>
           {userData.is_senior_admin && (
             <Chip
-              label="Senior admin"
-              color="secondary"
-              size="small"
-              sx={{ mt: 1, fontWeight: 600 }}
+              label="Senior Administrator"
+              color="success"
+              size="medium"
+              sx={{ mt: 1, mb: 1, fontWeight: 600, fontSize: "0.85rem", height: 28, px: 1.5 }}
             />
           )}
 

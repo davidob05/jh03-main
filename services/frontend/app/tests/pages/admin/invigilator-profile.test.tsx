@@ -1,7 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AdminInvigilatorProfile } from "@/pages/admin/Invigilator";
@@ -84,20 +83,14 @@ describe("AdminInvigilatorProfile", () => {
 
   it("opens confirmation dialog before promoting", async () => {
     renderPage({ isSeniorAdmin: true });
-    const user = userEvent.setup();
-    const trigger = await screen.findByText("Make them an admin");
-    await user.click(trigger);
-    expect(await screen.findByText("Make this invigilator an admin?")).toBeInTheDocument();
+    const trigger = await screen.findByRole("button", { name: "Administrator" });
+    fireEvent.click(trigger);
+    expect(await screen.findByText("Grant administrator privileges?")).toBeInTheDocument();
   });
 
   it("hides admin promotion button for junior admins", async () => {
     renderPage();
-    expect(screen.queryByText("Make them an admin")).not.toBeInTheDocument();
-  });
-
-  it("disables remove admin when current user is not senior admin", async () => {
-    renderPage();
-    expect(screen.queryByText("Remove admin")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Administrator" })).not.toBeInTheDocument();
   });
 
   it("shows senior admin promotion dialog for senior admins", async () => {
@@ -105,16 +98,15 @@ describe("AdminInvigilatorProfile", () => {
       if (url.includes("/invigilators/1/")) {
         return Promise.resolve({
           ok: true,
-          json: async () => ({ ...invigilatorResponse, user_is_staff: true }),
+          json: async () => ({ ...invigilatorResponse, user_is_staff: true, user_is_superuser: true }),
         });
       }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
     renderPage({ isSeniorAdmin: true });
-    const user = userEvent.setup();
-    const trigger = await screen.findByText("Make senior admin");
-    await user.click(trigger);
-    expect(await screen.findByText("Make this admin a senior admin?")).toBeInTheDocument();
+    const trigger = await screen.findByRole("switch", { name: "Senior" });
+    fireEvent.click(trigger);
+    expect(await screen.findByText("Grant senior administrator privileges?")).toBeInTheDocument();
   });
 
   it("hides senior admin promotion button for junior admins", async () => {
@@ -122,12 +114,12 @@ describe("AdminInvigilatorProfile", () => {
       if (url.includes("/invigilators/1/")) {
         return Promise.resolve({
           ok: true,
-          json: async () => ({ ...invigilatorResponse, user_is_staff: true }),
+          json: async () => ({ ...invigilatorResponse, user_is_staff: true, user_is_superuser: true }),
         });
       }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
     renderPage();
-    expect(screen.queryByText("Make senior admin")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Senior")).not.toBeInTheDocument();
   });
 });

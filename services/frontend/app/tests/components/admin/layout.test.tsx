@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "@/components/admin/Layout";
 import { setAuthSession, clearAuthSession } from "@/utils/api";
@@ -74,9 +73,8 @@ describe("Components - AdminLayout", () => {
 
   it("shows invigilator link when admin has invigilator profile", async () => {
     setAuthSession("token", { username: "admin", invigilator_id: 12 });
-    const user = userEvent.setup();
     renderLayout();
-    await user.click(screen.getByLabelText(/account menu/i));
-    expect(await screen.findByText("View my invigilator information")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/account menu/i));
+    expect(await screen.findByText("View Invigilator Profile")).toBeInTheDocument();
   });
 });

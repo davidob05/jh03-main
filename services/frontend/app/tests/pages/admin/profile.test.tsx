@@ -52,6 +52,6 @@ describe("AdminProfile", () => {
 
   it("shows senior admin tag", async () => {
     renderPage();
-    expect(await screen.findByText("Senior admin")).toBeInTheDocument();
+    expect(await screen.findByText("Senior Administrator")).toBeInTheDocument();
   });
 });

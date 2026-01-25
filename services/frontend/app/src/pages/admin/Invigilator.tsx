@@ -11,6 +11,8 @@ import {
   Divider,
   ToggleButton,
   ToggleButtonGroup,
+  Switch,
+  FormControlLabel,
   CircularProgress,
   Alert,
   Fab,
@@ -267,13 +269,13 @@ export const AdminInvigilatorProfile: React.FC = () => {
       const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/make-admin/`, { method: "POST" });
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(text || "Failed to promote invigilator");
+        throw new Error(text || "Failed to promote invigilator to administrator.");
       }
-      setSuccessMessage("Invigilator promoted to admin.");
+      setSuccessMessage("Invigilator promoted to administrator.");
       setSuccessOpen(true);
       await refetch();
     } catch (err: any) {
-      setPromoteError(err?.message || "Failed to promote invigilator.");
+      setPromoteError(err?.message || "Failed to promote invigilator to administrator.");
     } finally {
       setPromoting(false);
       setPromoteOpen(false);
@@ -288,13 +290,13 @@ export const AdminInvigilatorProfile: React.FC = () => {
       const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/remove-admin/`, { method: "POST" });
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(text || "Failed to remove admin privileges");
+        throw new Error(text || "Failed to remove administrator privileges");
       }
-      setSuccessMessage("Admin privileges removed.");
+      setSuccessMessage("Administrator privileges removed.");
       setSuccessOpen(true);
       await refetch();
     } catch (err: any) {
-      setDemoteError(err?.message || "Failed to remove admin privileges.");
+      setDemoteError(err?.message || "Failed to remove administrator privileges.");
     } finally {
       setDemoting(false);
       setDemoteOpen(false);
@@ -309,13 +311,13 @@ export const AdminInvigilatorProfile: React.FC = () => {
       const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/make-senior-admin/`, { method: "POST" });
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(text || "Failed to promote admin");
+        throw new Error(text || "Failed to promote administrator to senior administrator.");
       }
-      setSuccessMessage("Admin promoted to senior admin.");
+      setSuccessMessage("Administrator promoted to senior administrator.");
       setSuccessOpen(true);
       await refetch();
     } catch (err: any) {
-      setPromoteError(err?.message || "Failed to promote admin.");
+      setPromoteError(err?.message || "Failed to promote administrator to senior administrator.");
     } finally {
       setPromoting(false);
       setPromoteOpen(false);
@@ -355,6 +357,70 @@ export const AdminInvigilatorProfile: React.FC = () => {
         </Tooltip>
 
         <Stack direction="row" spacing={2} alignItems="center">
+          <Tooltip
+            title={
+              data.user_is_superuser
+                ? canDemote
+                  ? "Click to remove administrator access."
+                  : "Senior administrators cannot be demoted."
+                : canPromote
+                  ? "Click to grant administrator access."
+                  : "No user account available to promote."
+            }
+          >
+            <span>
+              <PillButton
+                variant={data.user_is_superuser ? "contained" : "outlined"}
+                color="primary"
+                onClick={() => {
+                  if (data.user_is_superuser) {
+                    if (!canDemote) return;
+                    setDemoteOpen(true);
+                    return;
+                  }
+                  if (!canPromote) return;
+                  setPromoteMode("admin");
+                  setPromoteOpen(true);
+                }}
+                disabled={promoting || demoting || data.user_is_senior_admin}
+                aria-disabled={data.user_is_superuser ? !canDemote || data.user_is_senior_admin : !canPromote}
+                sx={!isSeniorAdmin ? { display: "none" } : undefined}
+              >
+                Administrator
+              </PillButton>
+            </span>
+          </Tooltip>
+          {isSeniorAdmin && data.user_is_superuser && (
+            <Tooltip
+              title={
+                data.user_is_senior_admin
+                  ? "Senior access is enabled."
+                  : canSeniorPromote
+                    ? "Toggle on to grant senior admin access."
+                    : "Only admins can be made senior."
+              }
+            >
+              <span>
+                <FormControlLabel
+                  label="Senior"
+                  sx={{ ml: 0 }}
+                  control={
+                    <Switch
+                      checked={Boolean(data.user_is_senior_admin)}
+                      onChange={(_, checked) => {
+                        if (!checked) return;
+                        if (!canSeniorPromote || promoting) return;
+                        setPromoteMode("senior");
+                        setPromoteOpen(true);
+                      }}
+                      disabled={!canSeniorPromote || promoting}
+                      color="primary"
+                    />
+                  }
+                />
+              </span>
+            </Tooltip>
+          )}
           <ToggleButtonGroup
             value={availabilityView}
             exclusive
@@ -368,39 +434,6 @@ export const AdminInvigilatorProfile: React.FC = () => {
               <CalendarViewMonth />
             </ToggleButton>
           </ToggleButtonGroup>
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={() => {
-              setPromoteMode("admin");
-              setPromoteOpen(true);
-            }}
-            disabled={!canPromote || promoting}
-            sx={!isSeniorAdmin ? { display: "none" } : undefined}
-          >
-            {data.user_is_superuser ? "Already admin" : "Make them an admin"}
-          </Button>
-          <Button
-            variant="outlined"
-            color="secondary"
-            onClick={() => {
-              setPromoteMode("senior");
-              setPromoteOpen(true);
-            }}
-            disabled={!canSeniorPromote || promoting}
-            sx={!isSeniorAdmin ? { display: "none" } : undefined}
-          >
-            Make senior admin
-          </Button>
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={() => setDemoteOpen(true)}
-            disabled={!canDemote || demoting}
-            sx={!isSeniorAdmin ? { display: "none" } : undefined}
-          >
-            Remove admin
-          </Button>
         </Stack>
       </Stack>
       {promoteError && (
@@ -968,13 +1001,13 @@ export const AdminInvigilatorProfile: React.FC = () => {
       />
       <DeleteConfirmationDialog
         open={promoteOpen}
-        title={promoteMode === "senior" ? "Make this admin a senior admin?" : "Make this invigilator an admin?"}
+        title={promoteMode === "senior" ? "Grant senior administrator privileges?" : "Grant administrator privileges?"}
         description={
           promoteMode === "senior"
-            ? "This grants senior admin privileges while keeping their existing login."
-            : "This grants full admin access while keeping their existing login."
+            ? "This gives this invigilator senior administrator privileges while keeping their existing login and account the same."
+            : "This gives this invigilator full administrator privileges while keeping their existing login and account the same."
         }
-        confirmText={promoteMode === "senior" ? "Make senior admin" : "Make admin"}
+        confirmText={promoteMode === "senior" ? "Promote" : "Promote"}
         destructive={false}
         loading={promoting}
         onClose={() => {
@@ -984,9 +1017,9 @@ export const AdminInvigilatorProfile: React.FC = () => {
       />
       <DeleteConfirmationDialog
         open={demoteOpen}
-        title="Remove admin privileges?"
-        description="This will revert the account to a standard invigilator login."
-        confirmText="Remove admin"
+        title="Remove administrator privileges?"
+        description="This will remove this invigilator's administrator privileges while keeping their existing login and account the same."
+        confirmText="Demote"
         loading={demoting}
         onClose={() => {
           if (!demoting) setDemoteOpen(false);

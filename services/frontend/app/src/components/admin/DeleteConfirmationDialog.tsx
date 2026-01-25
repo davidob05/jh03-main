@@ -16,7 +16,6 @@ type Props = {
   title?: string;
   description: React.ReactNode;
   confirmText?: string;
-  cancelText?: string;
   loading?: boolean;
   destructive?: boolean;
   onConfirm: () => void;
@@ -28,7 +27,6 @@ export const DeleteConfirmationDialog: React.FC<Props> = ({
   title = "Confirm delete",
   description,
   confirmText = "Delete",
-  cancelText = "Cancel",
   loading = false,
   destructive = true,
   onConfirm,
@@ -53,9 +51,6 @@ export const DeleteConfirmationDialog: React.FC<Props> = ({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <PillButton variant="outlined" onClick={onClose} disabled={loading}>
-          {cancelText}
-        </PillButton>
         <PillButton
           variant="contained"
           color={destructive ? "error" : "primary"}
