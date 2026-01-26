@@ -24,22 +24,17 @@ import {
   Chip,
   Divider,
   Stack,
-  Fab,
-  Snackbar,
-  Alert,
 } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
-import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
-import { formatDateTime } from '../../utils/dates';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
-import { EditExamDialog } from "../../components/admin/EditExamDialog";
-import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { useAppDispatch, useAppSelector, setExamsPrefs } from '../../state/store';
 
 interface ExamData {
   exam_id: number;
@@ -109,6 +104,13 @@ const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
   return venues.find((v) => v.core) || venues[0];
 };
 
+function formatDateTime(dateTime: string): string {
+  if (!dateTime) return 'N/A';
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function calculateDuration(startTime: string, endTime: string): string {
   if (!startTime || !endTime) return 'N/A';
   const start = new Date(startTime);
@@ -177,11 +179,12 @@ interface EnhancedTableToolbarProps {
   numSelected: number;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onSearchSubmit: () => void;
   onEditSelected: () => void;
   onDeleteSelected: () => void;
 }
 
-function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEditSelected, onDeleteSelected }: EnhancedTableToolbarProps) {
+function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onSearchSubmit, onEditSelected, onDeleteSelected }: EnhancedTableToolbarProps) {
   return (
     <Toolbar sx={[{ pl: { sm: 2 }, pr: { xs: 1, sm: 1 } }, numSelected > 0 && { bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity) }]}>
       {numSelected > 0 ? (
@@ -189,10 +192,24 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEdit
           {numSelected} selected
         </Typography>
       ) : (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 100%' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', backgroundColor: 'action.hover', borderRadius: 1, px: 2, py: 0.5 }}>
             <SearchIcon sx={{ color: 'action.active', mr: 1 }} />
-            <InputBase placeholder="Search exams..." value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} sx={{ width: 250 }} />
+            <InputBase
+              placeholder="Search exams..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSearchSubmit();
+                }
+              }}
+              sx={{ width: 220 }}
+            />
+            <IconButton aria-label="Apply search" color="primary" onClick={onSearchSubmit} sx={{ ml: 1 }}>
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
           </Box>
         </Box>
       )}
@@ -223,22 +240,21 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onEdit
 }
 
 export const AdminExams: React.FC = () => {
-  const [order, setOrder] = React.useState<Order>('asc');
-  const [orderBy, setOrderBy] = React.useState<keyof RowData>('code');
+  const dispatch = useAppDispatch();
+  const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.exams);
+  const allowedSortKeys = ['code', 'subject', 'coreVenue', 'startTime', 'endTime'] as const;
+  type ExamSortKey = typeof allowedSortKeys[number];
+  const orderBy: ExamSortKey = allowedSortKeys.includes(rawOrderBy as ExamSortKey)
+    ? (rawOrderBy as ExamSortKey)
+    : 'code';
+  const [searchDraft, setSearchDraft] = React.useState(searchQuery);
   const [selected, setSelected] = React.useState<readonly number[]>([]);
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(5);
-  const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
-  const [addOpen, setAddOpen] = React.useState(false);
-  const [successOpen, setSuccessOpen] = React.useState(false);
-  const [successMessage, setSuccessMessage] = React.useState("");
-  const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [deleting, setDeleting] = React.useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  React.useEffect(() => setSearchDraft(searchQuery), [searchQuery]);
 
-  const { data: examsData = [], isLoading, isError, error, refetch } = useQuery<ExamData[], Error>({ queryKey: ['exams'], queryFn: fetchExams });
+  const { data: examsData = [], isLoading, isError, error, refetch } = useQuery<ExamData[], Error>({ queryKey: ['exams-table'], queryFn: fetchExams });
 
   const rows = React.useMemo<RowData[]>(() => examsData.map((exam) => {
     const coreVenue = getPrimaryExamVenue(exam);
@@ -283,8 +299,7 @@ export const AdminExams: React.FC = () => {
 
   const handleRequestSort = (event: React.MouseEvent<unknown>, property: keyof RowData) => {
     const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
+    dispatch(setExamsPrefs({ order: isAsc ? 'desc' : 'asc', orderBy: property }));
   };
 
   const handleClick = (event: React.MouseEvent<unknown>, id: number) => {
@@ -297,16 +312,40 @@ export const AdminExams: React.FC = () => {
     setSelected(newSelected);
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => setPage(newPage);
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
-  const handleSearchChange = (query: string) => { setSearchQuery(query); setPage(0); };
+  const handleChangePage = (_event: unknown, newPage: number) => dispatch(setExamsPrefs({ page: newPage }));
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const next = parseInt(event.target.value, 10);
+    dispatch(setExamsPrefs({ rowsPerPage: next, page: 0 }));
+  };
+  const applySearch = () => dispatch(setExamsPrefs({ searchQuery: searchDraft.trim(), page: 0 }));
+  const handleSearchChange = (query: string) => { setSearchDraft(query); };
   const handleEditSelected = () => {
     if (selected.length === 1) navigate(`/admin/exam/${selected[0]}`);
   };
-  const handleDeleteSelected = React.useCallback(() => {
+  const handleDeleteSelected = React.useCallback(async () => {
     if (selected.length === 0) return;
-    setDeleteOpen(true);
-  }, [selected.length]);
+    const ok = window.confirm(`Delete ${selected.length} exam${selected.length > 1 ? 's' : ''}?`);
+    if (!ok) return;
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/exams/bulk-delete/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selected }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Bulk delete failed");
+      }
+      setSelected([]);
+      await Promise.all([
+        refetch(),
+        queryClient.invalidateQueries({ queryKey: ['exams-table'] }),
+        queryClient.invalidateQueries({ queryKey: ['exams-calendar'] }),
+      ]);
+    } catch (err: any) {
+      alert(err?.message || "Delete failed");
+    }
+  }, [selected, refetch, queryClient]);
 
   const filteredRows = React.useMemo(() => {
     if (!searchQuery) return rows;
@@ -322,7 +361,12 @@ export const AdminExams: React.FC = () => {
   }, [rows, searchQuery]);
 
   const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredRows.length) : 0;
-  const visibleRows = React.useMemo(() => [...filteredRows].sort(getComparator(order, orderBy)).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage), [order, orderBy, page, rowsPerPage, filteredRows]);
+  const visibleRows = React.useMemo(() => [...filteredRows].sort(getComparator(order, orderBy as keyof RowData)).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage), [order, orderBy, page, rowsPerPage, filteredRows]);
+
+  React.useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1);
+    if (page > maxPage) dispatch(setExamsPrefs({ page: maxPage }));
+  }, [filteredRows.length, rowsPerPage, page, dispatch]);
 
   if (isLoading) 
     return (
@@ -341,7 +385,7 @@ export const AdminExams: React.FC = () => {
             <Typography variant="h4" fontWeight={700}>Exams</Typography>
             <Typography variant="body2" color="text.secondary">Manage exam schedules, venues, and timings.</Typography>
           </Box>
-          <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1.5}>
+          <Stack direction="row" spacing={1}>
             <Chip
               label={`${summary.total} Exams`}
               size="medium"
@@ -355,8 +399,8 @@ export const AdminExams: React.FC = () => {
               label={`${summary.upcoming} Upcoming`}
               size="medium"
               sx={{
-                backgroundColor: alpha("#2e7d32", 0.12),
-                color: "success.main",
+                backgroundColor: "#def3dbff",
+                color: "secondary.main",
                 fontWeight: 600,
               }}
             />
@@ -374,8 +418,9 @@ export const AdminExams: React.FC = () => {
         <Panel disableDivider sx={{ p: 0, overflow: 'hidden'}}>
           <EnhancedTableToolbar
             numSelected={selected.length}
-            searchQuery={searchQuery}
+            searchQuery={searchDraft}
             onSearchChange={handleSearchChange}
+            onSearchSubmit={applySearch}
             onEditSelected={handleEditSelected}
             onDeleteSelected={handleDeleteSelected}
           />
@@ -456,92 +501,6 @@ export const AdminExams: React.FC = () => {
           <Divider />
           <TablePagination rowsPerPageOptions={[5, 10, 25]} component="div" count={filteredRows.length} rowsPerPage={rowsPerPage} page={page} onPageChange={handleChangePage} onRowsPerPageChange={handleChangeRowsPerPage} />
         </Panel>
-
-        <EditExamDialog
-          open={addOpen}
-          examId={null}
-          onClose={() => setAddOpen(false)}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["exams"] });
-            setSuccessMessage("Exam added.");
-            setSuccessOpen(true);
-          }}
-        />
-
-        <DeleteConfirmationDialog
-          open={deleteOpen}
-          title={`Delete ${selected.length} exam${selected.length === 1 ? "" : "s"}?`}
-          description="This will permanently delete the selected exam(s)."
-          confirmText="Delete"
-          loading={deleting}
-          onClose={() => {
-            if (!deleting) setDeleteOpen(false);
-          }}
-          onConfirm={async () => {
-            if (selected.length === 0) {
-              setDeleteOpen(false);
-              return;
-            }
-            try {
-              setDeleting(true);
-              const res = await apiFetch(`${apiBaseUrl}/exams/bulk-delete/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids: selected }),
-              });
-              if (!res.ok) {
-                const text = await res.text();
-                throw new Error(text || "Bulk delete failed");
-              }
-              setSelected([]);
-              await Promise.all([refetch(), queryClient.invalidateQueries({ queryKey: ["exams"] })]);
-              setSuccessMessage(selected.length === 1 ? "Exam deleted." : "Exams deleted.");
-              setSuccessOpen(true);
-              setDeleteOpen(false);
-            } catch (err: any) {
-              alert(err?.message || "Delete failed");
-            } finally {
-              setDeleting(false);
-            }
-          }}
-        />
-
-        <Box
-          sx={{
-            position: "fixed",
-            bottom: 32,
-            right: 32,
-            zIndex: 1000,
-          }}
-        >
-          <Tooltip title="Add exam">
-            <Fab color="primary" onClick={() => setAddOpen(true)}>
-              <AddIcon />
-            </Fab>
-          </Tooltip>
-        </Box>
-
-        <Snackbar
-          open={successOpen}
-          autoHideDuration={3000}
-          onClose={() => setSuccessOpen(false)}
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        >
-          <Alert
-            onClose={() => setSuccessOpen(false)}
-            severity="success"
-            variant="filled"
-            sx={{
-              backgroundColor: "#d4edda",
-              color: "#155724",
-              border: "1px solid #155724",
-              borderRadius: "50px",
-              fontWeight: 500,
-            }}
-          >
-            {successMessage}
-          </Alert>
-        </Snackbar>
       </Box>
     </LocalizationProvider>
   );
