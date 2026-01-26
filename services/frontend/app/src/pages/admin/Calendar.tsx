@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useContext } from "react";
 import {
   Box,
   Typography,
@@ -29,6 +29,7 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { formatDateWithWeekday } from "../../utils/dates";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
+import { useAppDispatch, useAppSelector, setCalendarPrefs } from "../../state/store";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -167,9 +168,13 @@ const minutesSinceMidnight = (dateTime: string) => {
 };
 
 export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"grid" | "timeline">("grid");
-  const [searchQuery, setSearchQuery] = useState("");
+  const dispatch = useAppDispatch();
+  const { viewMode, currentDate: currentDateIso, searchQuery, page } = useAppSelector((s) => s.adminTables.calendar);
+  const [searchDraft, setSearchDraft] = useState(searchQuery);
+  const currentDate = useMemo(() => {
+    const d = new Date(currentDateIso);
+    return Number.isNaN(d.getTime()) ? new Date() : d;
+  }, [currentDateIso]);
   const [popupOpen, setPopupOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<ExamDetails | null>(null);
   const [page, setPage] = useState(1);
@@ -300,7 +305,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
           </Typography>
         </Paper>
       </Box>
-    );
+  );
 
   return (
     <Box sx={{ p: 4, maxWidth: "1400px", mx: "auto" }}>
@@ -642,4 +647,17 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetc
       />
     </Box>
   );
+};
+
+export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
+  const ctx = useContext(ReactReduxContext);
+  if (!ctx) {
+    const localStore = useMemo(() => createStoreInstance(), []);
+    return (
+      <Provider store={localStore}>
+        <AdminCalendarInner {...props} />
+      </Provider>
+    );
+  }
+  return <AdminCalendarInner {...props} />;
 };
