@@ -20,6 +20,9 @@ export const RequireRole: React.FC<RequireRoleProps> = ({ role }) => {
   }
 
   if (storedRole !== role) {
+    if (role === "invigilator" && storedRole === "admin") {
+      return <Outlet />;
+    }
     const redirectPath = storedRole === "admin" ? "/admin" : "/invigilator";
     return <Navigate to={redirectPath} replace />;
   }

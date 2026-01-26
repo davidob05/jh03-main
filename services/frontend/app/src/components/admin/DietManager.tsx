@@ -14,6 +14,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Snackbar,
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Edit, Delete as DeleteIcon, Add as AddIcon, Close } from "@mui/icons-material";
@@ -21,6 +22,7 @@ import dayjs from "dayjs";
 import { Panel } from "../Panel";
 import { PillButton } from "../PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDate } from "../../utils/dates";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 
 export interface Diet {
@@ -50,6 +52,7 @@ export const DietManager: React.FC = () => {
   const [draft, setDraft] = useState<DraftDiet>(emptyDraft);
   const [error, setError] = useState<string>("");
   const [dietToDelete, setDietToDelete] = useState<Diet | null>(null);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
 
   const { data: diets = [], isLoading, isError } = useQuery<Diet[]>({
     queryKey: ["diets"],
@@ -85,11 +88,15 @@ export const DietManager: React.FC = () => {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, payload) => {
       queryClient.invalidateQueries({ queryKey: ["diets"] });
       setDialogOpen(false);
       setDraft(emptyDraft);
       setError("");
+      setSnackbar({
+        open: true,
+        message: payload.id ? "Diet updated." : "Diet added.",
+      });
     },
     onError: (err: any) => {
       setError(err?.message || "Failed to save diet");
@@ -105,7 +112,10 @@ export const DietManager: React.FC = () => {
       }
       return true;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["diets"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["diets"] });
+      setSnackbar({ open: true, message: "Diet deleted." });
+    },
   });
 
   const openDialog = (diet?: Diet) => {
@@ -117,6 +127,7 @@ export const DietManager: React.FC = () => {
         name: diet.name,
         start_date: diet.start_date || "",
         end_date: diet.end_date || "",
+        restriction_cutoff: diet.restriction_cutoff || "",
         is_active: diet.is_active,
       });
     } else {
@@ -196,12 +207,12 @@ export const DietManager: React.FC = () => {
                 </Typography>
                 <Typography variant="body2">
                   {diet.start_date && diet.end_date
-                    ? `${diet.start_date} → ${diet.end_date}`
+                    ? `${formatDate(diet.start_date)} → ${formatDate(diet.end_date)}`
                     : "No date range set"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {diet.restriction_cutoff
-                    ? `Restriction cutoff: ${diet.restriction_cutoff}`
+                    ? `Restriction cutoff: ${formatDate(diet.restriction_cutoff)}`
                     : "Restriction cutoff: Not set"}
                 </Typography>
                 <Typography variant="caption" color={diet.is_active ? "success.main" : "text.secondary"}>
@@ -315,6 +326,28 @@ export const DietManager: React.FC = () => {
         }}
         onClose={() => setDietToDelete(null)}
       />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Panel>
   );
 };

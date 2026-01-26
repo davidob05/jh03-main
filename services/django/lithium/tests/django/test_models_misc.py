@@ -70,7 +70,8 @@ class ModelBehaviorTests(TestCase):
     def test_notification_str_includes_display_and_message(self):
         note = Notification.objects.create(
             type="availability",
-            message="Availability update for week",
+            invigilator_message="Availability update for week",
+            admin_message="Availability update for week",
         )
         display = note.get_type_display()
         self.assertIn(display, str(note))

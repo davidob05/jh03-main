@@ -17,6 +17,7 @@ import {
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateTime } from "../../utils/dates";
 import { EditVenueDialog } from "../../components/admin/EditVenueDialog";
 import { Edit, Delete } from "@mui/icons-material";
 import { ExamDetailsPopup, ExamDetails as PopupExamDetails, ExamVenueInfo as PopupExamVenueInfo } from "../../components/admin/ExamDetailsPopup";
@@ -53,13 +54,6 @@ const formatLabel = (text?: string): string => {
   if (!text) return "Unknown";
   const spaced = text.replace(/_/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-};
-
-const formatDateTime = (dateTime?: string): string => {
-  if (!dateTime) return "N/A";
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return date.toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
 const formatDurationFromLength = (length: number | null | undefined): string => {

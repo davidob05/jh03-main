@@ -32,6 +32,15 @@ def _derive_role(user):
     return "invigilator"
 
 
+def _get_invigilator_id(user):
+    invigilator = _safe_attr(user, "invigilator_profile")
+    return getattr(invigilator, "id", None)
+
+
+def _get_senior_admin_flag(user):
+    return bool(_safe_attr(user, "is_senior_admin", False))
+
+
 def _get_client_ip(request):
     xff = request.META.get("HTTP_X_FORWARDED_FOR")
     if xff:
@@ -110,12 +119,14 @@ class ObtainAuthTokenView(ObtainAuthToken):
                     "id": user.id,
                     "email": user.email,
                     "username": user.username,
-                    "is_staff": user.is_staff,
-                    "is_superuser": user.is_superuser,
-                    "role": _derive_role(user),
-                    "avatar": getattr(user, "avatar", None),
-                    "last_login": user.last_login.isoformat() if user.last_login else None,
-                },
+                "is_staff": user.is_staff,
+                "is_superuser": user.is_superuser,
+                "role": _derive_role(user),
+                "invigilator_id": _get_invigilator_id(user),
+                "is_senior_admin": _get_senior_admin_flag(user),
+                "avatar": getattr(user, "avatar", None),
+                "last_login": user.last_login.isoformat() if user.last_login else None,
+            },
             },
             status=status.HTTP_200_OK,
         )
@@ -149,6 +160,8 @@ class CurrentUserView(APIView):
                 "is_staff": _safe_attr(user, "is_staff", False),
                 "is_superuser": _safe_attr(user, "is_superuser", False),
                 "role": _derive_role(user),
+                "invigilator_id": _get_invigilator_id(user),
+                "is_senior_admin": _get_senior_admin_flag(user),
                 "phone": phone,
                 "avatar": avatar,
                 "last_login": last_login_iso,

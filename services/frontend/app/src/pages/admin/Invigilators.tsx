@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from "react-router-dom";
 import { Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -61,10 +62,11 @@ import { InvigilatorAvailabilityModal } from "../../components/admin/Invigilator
 import { AddInvigilatorDialog } from '../../components/admin/AddInvigilatorDialog';
 import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { NotifyDialog } from '../../components/admin/NotifyDialog';
+import { ExportInvigilatorTimetablesDialog } from "../../components/admin/ExportInvigilatorTimetablesDialog";
 import { apiBaseUrl, apiFetch } from '../../utils/api';
+import { formatMonthYear } from '../../utils/dates';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
-import { useAppDispatch, useAppSelector, setInvigilatorsPrefs } from '../../state/store';
 
 interface Invigilator {
   id: number;
@@ -72,7 +74,6 @@ interface Invigilator {
   full_name: string | null;
   mobile: string | null;
   mobile_text_only: string | null;
-  janet_txt: string | null;
   alt_phone: string | null;
   university_email: string | null;
   personal_email: string | null;
@@ -112,9 +113,6 @@ type SortOrder = 'asc' | 'desc';
 type NotifyMethod = 'email' | 'sms' | 'call';
 
 export const AdminInvigilators: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const { viewMode, firstLetter, lastLetter, searchQuery, sortField, sortOrder, page, showAll } = useAppSelector((s) => s.adminTables.invigilators);
-  const [searchDraft, setSearchDraft] = useState(searchQuery);
   const { data: invigilatorsData = [], isLoading, isError, error } = useQuery<Invigilator[], Error>({ queryKey: ['invigilators'], queryFn: fetchInvigilators });
   const [invigilators, setInvigilators] = useState<Invigilator[]>([]);
   const [filtered, setFiltered] = useState<Invigilator[]>([]);
@@ -128,11 +126,25 @@ export const AdminInvigilators: React.FC = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialView = (searchParams.get("view") as ViewMode) || "grid";
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
+
+  const [firstLetter, setFirstLetter] = useState<string>('All');
+  const [lastLetter, setLastLetter] = useState<string>('All');
+  const [page, setPage] = useState(1);
   const itemsPerPage = viewMode === 'grid' ? 12 : 10;
 
   // Calendar state
-  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(dayjs());
+  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
+
+  // Searching state
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField>('firstName');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   // Month index for calendar view
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
@@ -140,22 +152,32 @@ export const AdminInvigilators: React.FC = () => {
   // Selection state
   const [selected, setSelected] = useState<number[]>([]);
 
+  // Show all state
+  const [showAll, setShowAll] = useState(false);
+
   // Bulk action state
   const [bulkAction, setBulkAction] = useState("");
   const [exporting, setExporting] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Sync fetched data to state
   useEffect(() => {
     setInvigilators(invigilatorsData);
     setFiltered(invigilatorsData);
   }, [invigilatorsData]);
-  useEffect(() => setSearchDraft(searchQuery), [searchQuery]);
 
   // Handle view mode change
   const handleViewChange = (event: React.MouseEvent<HTMLElement>, value: ViewMode) => {
     if (!value) return;
-    dispatch(setInvigilatorsPrefs({ viewMode: value, page: 1 }));
+
+    setViewMode(value);
+
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set("view", value);
+      return newParams;
+    });
   };
 
   // Helper to display preferred and full names
@@ -200,8 +222,8 @@ export const AdminInvigilators: React.FC = () => {
     result = sortInvigilators(result);
 
     setFiltered(result);
-    dispatch(setInvigilatorsPrefs({ page: 1 }));
-  }, [firstLetter, lastLetter, invigilators, sortField, sortOrder, searchQuery, dispatch]);
+    setPage(1);
+  }, [firstLetter, lastLetter, invigilators, sortField, sortOrder, searchQuery]);
 
   // Sorting function
   const sortInvigilators = (data: Invigilator[]) => {
@@ -311,86 +333,58 @@ export const AdminInvigilators: React.FC = () => {
     [invigilators, selected]
   );
 
-  const escapeCsv = (value: string | number | null | undefined) => {
-    if (value === null || value === undefined) return "";
-    const str = String(value);
-    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
-  const exportSelected = async (ids: number[]) => {
-    if (!ids.length || exporting) return;
+  const extractFilename = (contentDisposition: string | null, fallback: string) => {
+    if (!contentDisposition) return fallback;
+    const match = contentDisposition.match(/filename="?([^"]+)"?/i);
+    return match?.[1] || fallback;
+  };
+
+  const exportSelected = async (options: {
+    onlyConfirmed: boolean;
+    includeCancelled: boolean;
+    includeProvisions: boolean;
+  }) => {
+    if (!selected.length || exporting) return;
     setExporting(true);
     try {
-      const invigilatorPayloads = await Promise.all(
-        ids.map(async (id) => {
-          const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`);
-          if (!response.ok) {
-            const text = await response.text();
-            throw new Error(text || `Failed to fetch timetable for invigilator #${id}`);
-          }
-          return (await response.json()) as Invigilator;
-        })
-      );
-
-      invigilatorPayloads.forEach((invigilator) => {
-        const assignments = invigilator.assignments || [];
-        const headers = [
-          "assignment_id",
-          "invigilator_id",
-          "invigilator_name",
-          "exam_name",
-          "venue_name",
-          "exam_venue_id",
-          "exam_start",
-          "exam_length",
-          "assigned_start",
-          "assigned_end",
-          "role",
-          "break_time_minutes",
-          "notes",
-        ];
-
-        const rows = assignments.map((assignment) =>
-          [
-            assignment.id,
-            invigilator.id,
-            invigilator.preferred_name || invigilator.full_name || `Invigilator ${invigilator.id}`,
-            assignment.exam_name || "",
-            assignment.venue_name || "",
-            assignment.exam_venue,
-            assignment.exam_start || "",
-            assignment.exam_length ?? "",
-            assignment.assigned_start,
-            assignment.assigned_end,
-            assignment.role || "",
-            assignment.break_time_minutes ?? "",
-            assignment.notes || "",
-          ]
-            .map(escapeCsv)
-            .join(",")
-        );
-
-        const csv = [headers.map(escapeCsv).join(","), ...rows].join("\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        const safeName = (invigilator.preferred_name || invigilator.full_name || `invigilator-${invigilator.id}`)
-          .replace(/[^a-z0-9]+/gi, "_")
-          .replace(/^_+|_+$/g, "")
-          .toLowerCase();
-        link.href = url;
-        link.download = `${safeName || "invigilator"}_timetable.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/timetables/export/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invigilator_ids: selected,
+          only_confirmed: options.onlyConfirmed,
+          include_cancelled: options.includeCancelled,
+          include_provisions: options.includeProvisions,
+        }),
       });
 
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to export timetables");
+      }
+
+      const blob = await response.blob();
+      const fallbackName = selected.length === 1 ? "invigilator_timetable.csv" : "invigilators_timetables.zip";
+      const filename = extractFilename(response.headers.get("Content-Disposition"), fallbackName);
+      downloadBlob(blob, filename);
+
       setSuccessMessage(
-        ids.length === 1 ? "Timetable downloaded!" : `${ids.length} timetables downloaded!`
+        selected.length === 1 ? "Timetable export downloaded." : "Timetables export downloaded."
       );
       setSuccessOpen(true);
       setBulkAction("");
+      setExportDialogOpen(false);
     } catch (err: any) {
       alert(err?.message || "Failed to export timetables");
     } finally {
@@ -448,19 +442,10 @@ export const AdminInvigilators: React.FC = () => {
             <Search sx={{ color: "action.active", mr: 1 }} />
             <InputBase
               placeholder="Search invigilators..."
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  dispatch(setInvigilatorsPrefs({ searchQuery: searchDraft.trim(), page: 1 }));
-                }
-              }}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               sx={{ width: 250 }}
             />
-            <IconButton aria-label="Apply search" color="primary" onClick={() => dispatch(setInvigilatorsPrefs({ searchQuery: searchDraft.trim(), page: 1 }))}>
-              <ArrowForward />
-            </IconButton>
           </Box>
 
           {/* Sort by First Name */}
@@ -474,9 +459,10 @@ export const AdminInvigilators: React.FC = () => {
             }
             onClick={() => {
               if (sortField === 'firstName') {
-                dispatch(setInvigilatorsPrefs({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' }));
+                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
               } else {
-                dispatch(setInvigilatorsPrefs({ sortField: 'firstName', sortOrder: 'asc' }));
+                setSortField('firstName');
+                setSortOrder('asc');
               }
             }}
             sx={{
@@ -498,9 +484,10 @@ export const AdminInvigilators: React.FC = () => {
             }
             onClick={() => {
               if (sortField === 'lastName') {
-                dispatch(setInvigilatorsPrefs({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' }));
+                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
               } else {
-                dispatch(setInvigilatorsPrefs({ sortField: 'lastName', sortOrder: 'asc' }));
+                setSortField('lastName');
+                setSortOrder('asc');
               }
             }}
             sx={{
@@ -516,17 +503,17 @@ export const AdminInvigilators: React.FC = () => {
         <Stack spacing={2} mb={3}>
           <Typography variant="subtitle2">First name</Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip label="All" color={firstLetter === 'All' ? 'primary' : 'default'} onClick={() => dispatch(setInvigilatorsPrefs({ firstLetter: 'All', page: 1 }))} />
+            <Chip label="All" color={firstLetter === 'All' ? 'primary' : 'default'} onClick={() => setFirstLetter('All')} />
             {alphabet.map(l => (
-              <Chip key={l} label={l} color={firstLetter === l ? 'primary' : 'default'} onClick={() => dispatch(setInvigilatorsPrefs({ firstLetter: l, page: 1 }))} />
+              <Chip key={l} label={l} color={firstLetter === l ? 'primary' : 'default'} onClick={() => setFirstLetter(l)} />
             ))}
           </Stack>
 
           <Typography variant="subtitle2" sx={{ mt: 2 }}>Last name</Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip label="All" color={lastLetter === 'All' ? 'primary' : 'default'} onClick={() => dispatch(setInvigilatorsPrefs({ lastLetter: 'All', page: 1 }))} />
+            <Chip label="All" color={lastLetter === 'All' ? 'primary' : 'default'} onClick={() => setLastLetter('All')} />
             {alphabet.map(l => (
-              <Chip key={l} label={l} color={lastLetter === l ? 'primary' : 'default'} onClick={() => dispatch(setInvigilatorsPrefs({ lastLetter: l, page: 1 }))} />
+              <Chip key={l} label={l} color={lastLetter === l ? 'primary' : 'default'} onClick={() => setLastLetter(l)} />
             ))}
           </Stack>
         </Stack>
@@ -561,7 +548,7 @@ export const AdminInvigilators: React.FC = () => {
             {/* Three Independent Calendars */}
             <Box sx={{ display: 'flex', p: 3, gap: 3, flex: 1, overflow: 'hidden' }}>
               {[-1, 0, 1].map((offset) => {
-                const monthDate = dayjs('2025-12-01').add(currentMonthIndex + offset, 'month');
+                const monthDate = dayjs().startOf("month").add(currentMonthIndex + offset, "month");
                 const isCurrentMonth = offset === 0;
 
                 return (
@@ -578,12 +565,13 @@ export const AdminInvigilators: React.FC = () => {
                     }}
                   >
                     <Typography variant="h6" align="center" gutterBottom sx={{ fontWeight: 600 }}>
-                      {monthDate.format('MMMM YYYY')}
+                      {formatMonthYear(monthDate)}
                     </Typography>
 
                     <StaticDatePicker
                       displayStaticWrapperAs="desktop"
-                      value={monthDate}
+                      value={null}
+                      referenceDate={monthDate}
                       onChange={(newValue) => {
                         setSelectedDate(newValue);
                         setCalendarModalOpen(true);
@@ -700,11 +688,11 @@ export const AdminInvigilators: React.FC = () => {
           <Grid container spacing={3}>
             {paginated.map(i => (
               // @ts-ignore
-              <Grid component="div" item xs={12} sm={6} md={4} lg={3} key={i.id}>
+              <Grid component="div" item xs={12} sm={6} md={4} lg={3} key={i.id} sx={{ display: "flex", justifyContent: "center" }}>
                 <Panel
                   disableDivider
                   sx={{
-                    width: '100%',
+                    width: 200,
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
@@ -750,7 +738,11 @@ export const AdminInvigilators: React.FC = () => {
                               fontSize: '1.15rem',
                               lineHeight: 1.3,
                               fontFamily: theme => theme.typography.fontFamily,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
                             }}
+                            title={names.main}
                           >
                             {names.main}
                           </MUILink>
@@ -759,7 +751,15 @@ export const AdminInvigilators: React.FC = () => {
                             <Typography
                               variant="body2"
                               color="text.secondary"
-                              sx={{ mt: 0.5, display: 'block', fontFamily: theme => theme.typography.fontFamily}}
+                              sx={{
+                                mt: 0.5,
+                                display: 'block',
+                                fontFamily: theme => theme.typography.fontFamily,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                              title={names.sub}
                             >
                               ({names.sub})
                             </Typography>
@@ -768,7 +768,18 @@ export const AdminInvigilators: React.FC = () => {
                       );
                     })()}
 
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontFamily: theme => theme.typography.fontFamily}}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mt: 1,
+                        fontFamily: theme => theme.typography.fontFamily,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      title={i.university_email || i.personal_email || 'No email'}
+                    >
                       {i.university_email || i.personal_email || 'No email'}
                     </Typography>
                   </Box>
@@ -853,6 +864,7 @@ export const AdminInvigilators: React.FC = () => {
               <span>
                 <IconButton
                   size="small"
+                  data-testid={bulkAction === "export" ? "bulk-action-export" : undefined}
                   disabled={selected.length === 0 || !bulkAction || exporting}
                   onClick={() => {
                     if (bulkAction === "delete") {
@@ -862,7 +874,7 @@ export const AdminInvigilators: React.FC = () => {
                     }
 
                     if (bulkAction === "export") {
-                      exportSelected(selected);
+                      setExportDialogOpen(true);
                       return;
                     }
 
@@ -886,7 +898,7 @@ export const AdminInvigilators: React.FC = () => {
             </Tooltip>
           </Stack>
 
-          <Pagination count={totalPages} page={page} onChange={(_e, v) => dispatch(setInvigilatorsPrefs({ page: v }))} color="primary" />
+          <Pagination count={totalPages} page={page} onChange={(e, v) => setPage(v)} color="primary" />
         </Stack>
 
         {/* Show All Button */}
@@ -894,14 +906,14 @@ export const AdminInvigilators: React.FC = () => {
           <Box sx={{ textAlign: 'center', mt: 2, display: 'flex', justifyContent: 'center', gap: 1.5 }}>
             <PillButton
               variant="outlined"
-              onClick={() => dispatch(setInvigilatorsPrefs({ showAll: false }))}
+              onClick={() => setShowAll(false)}
               disabled={!showAll}
             >
               Show less
             </PillButton>
             <PillButton
               variant="contained"
-              onClick={() => dispatch(setInvigilatorsPrefs({ showAll: true }))}
+              onClick={() => setShowAll(true)}
               disabled={showAll}
             >
               {`Show all ${filtered.length}`}
@@ -952,6 +964,24 @@ export const AdminInvigilators: React.FC = () => {
             setNotifyOpen(false);
             setBulkAction("");
           }}
+        />
+
+        <ExportInvigilatorTimetablesDialog
+          open={exportDialogOpen}
+          invigilators={invigilators
+            .filter((inv) => selected.includes(inv.id))
+            .map((inv) => ({
+              id: inv.id,
+              name: displayName(inv),
+            }))}
+          loading={exporting}
+          onClose={() => {
+            if (!exporting) {
+              setExportDialogOpen(false);
+              setBulkAction("");
+            }
+          }}
+          onExport={exportSelected}
         />
 
         {/* Delete Confirmation Dialog */}

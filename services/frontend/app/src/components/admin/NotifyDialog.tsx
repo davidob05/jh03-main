@@ -94,7 +94,7 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
           <Close fontSize="small" />
         </IconButton>
       </DialogTitle>
-      <DialogContent dividers>
+      <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           {recipientIds.length === 1
             ? "Sending to 1 invigilator"

@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "@/components/admin/Layout";
+import { setAuthSession, clearAuthSession } from "@/utils/api";
 
 describe("Components - AdminLayout", () => {
   const renderLayout = (initialPath = "/admin") =>
@@ -15,6 +16,10 @@ describe("Components - AdminLayout", () => {
         </Routes>
       </MemoryRouter>
     );
+
+  afterEach(() => {
+    clearAuthSession();
+  });
 
   it ("renders all menu items", () => {
     renderLayout();
@@ -64,5 +69,12 @@ describe("Components - AdminLayout", () => {
     renderLayout();
     const banner = screen.getByRole("banner");
     expect(banner).toBeInTheDocument();
+  });
+
+  it("shows invigilator link when admin has invigilator profile", async () => {
+    setAuthSession("token", { username: "admin", invigilator_id: 12 });
+    renderLayout();
+    fireEvent.click(screen.getByLabelText(/account menu/i));
+    expect(await screen.findByText("View Invigilator Profile")).toBeInTheDocument();
   });
 });

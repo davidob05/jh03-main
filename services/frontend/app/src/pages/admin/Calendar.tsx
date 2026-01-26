@@ -14,7 +14,6 @@ import {
   Divider,
   Tooltip,
   CircularProgress,
-  IconButton,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -27,10 +26,10 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateWithWeekday } from "../../utils/dates";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
-import { useAppDispatch, useAppSelector, setCalendarPrefs, store, createStoreInstance } from "../../state/store";
-import { Provider, ReactReduxContext } from "react-redux";
+import { useAppDispatch, useAppSelector, setCalendarPrefs } from "../../state/store";
 
 interface ExamVenueData {
   examvenue_id: number;
@@ -52,11 +51,13 @@ interface ExamData {
 }
 
 interface ExamVenueInfo {
+  examVenueId?: number;
   venue: string;
   startTime: string;
   endTime: string;
   students?: number;
   invigilators?: number;
+  core?: boolean;
 }
 
 interface ExamDetails {
@@ -94,6 +95,22 @@ const fetchExams = async (): Promise<ExamDetails[]> => {
   return data.map(toCalendarExam).filter((exam): exam is ExamDetails => Boolean(exam));
 };
 
+type InvigilatorAssignment = {
+  id: number;
+  exam_venue: number;
+  cancel?: boolean;
+};
+
+const fetchAssignments = async (): Promise<InvigilatorAssignment[]> => {
+  const res = await apiFetch(`${apiBaseUrl}/invigilator-assignments/`);
+  if (!res.ok) throw new Error("Unable to load invigilator assignments");
+  const data = await res.json();
+  if (Array.isArray(data)) return data as InvigilatorAssignment[];
+  if (Array.isArray(data?.results)) return data.results as InvigilatorAssignment[];
+  if (Array.isArray(data?.assignments)) return data.assignments as InvigilatorAssignment[];
+  return [];
+};
+
 const getPrimaryExamVenue = (exam: ExamData): ExamVenueData | undefined => {
   return exam.exam_venues.find((v) => v.core) || exam.exam_venues[0];
 };
@@ -117,9 +134,13 @@ const toCalendarExam = (exam: ExamData): ExamDetails | null => {
   const venues = exam.exam_venues
     .filter((v) => v.start_time)
     .map((venue) => ({
+      examVenueId: venue.examvenue_id,
+      core: venue.core,
       venue: venue.venue_name || "Unassigned",
       startTime: venue.start_time as string,
       endTime: addMinutes(venue.start_time as string, venue.exam_length) || venue.start_time || "",
+      students: venue.core ? exam.no_students : 0,
+      invigilators: 0,
     }));
 
   return {
@@ -146,7 +167,7 @@ const minutesSinceMidnight = (dateTime: string) => {
   return date.getHours() * 60 + date.getMinutes();
 };
 
-const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
+export const AdminCalendar: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
   const dispatch = useAppDispatch();
   const { viewMode, currentDate: currentDateIso, searchQuery, page } = useAppSelector((s) => s.adminTables.calendar);
   const [searchDraft, setSearchDraft] = useState(searchQuery);
@@ -156,6 +177,7 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
   }, [currentDateIso]);
   const [popupOpen, setPopupOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<ExamDetails | null>(null);
+  const [page, setPage] = useState(1);
   const itemsPerPage = 6;
 
   const fallbackExams = initialExams ?? examData;
@@ -167,7 +189,7 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
     isError: queryError,
     error,
   } = useQuery<ExamDetails[], Error>({
-    queryKey: ["exams-calendar"],
+    queryKey: ["exams"],
     queryFn: fetchExams,
     enabled: shouldFetch,
     retry: false,
@@ -175,22 +197,42 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
   });
 
   const effectiveExams = calendarExams ?? fallbackExams;
+  const { data: assignmentData = [] } = useQuery<InvigilatorAssignment[], Error>({
+    queryKey: ["invigilator-assignments"],
+    queryFn: fetchAssignments,
+    enabled: shouldFetch,
+    retry: false,
+    ...(shouldFetch ? {} : { initialData: [] }),
+  });
+
+  const assignmentCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    assignmentData.forEach((assignment) => {
+      if (assignment.cancel) return;
+      const current = counts.get(assignment.exam_venue) || 0;
+      counts.set(assignment.exam_venue, current + 1);
+    });
+    return counts;
+  }, [assignmentData]);
+
+  const displayExams = useMemo(() => {
+    return effectiveExams.map((exam) => ({
+      ...exam,
+      venues: exam.venues.map((venue) => ({
+        ...venue,
+        invigilators: venue.examVenueId ? assignmentCounts.get(venue.examVenueId) || 0 : 0,
+        students: typeof venue.students === "number" ? venue.students : 0,
+      })),
+    }));
+  }, [effectiveExams, assignmentCounts]);
   const isLoading = shouldFetch && queryLoading;
   const isError = shouldFetch && queryError;
-
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString("en-GB", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
 
   const formatDateInput = (date: Date) => date.toISOString().split("T")[0];
 
   const examsToday = useMemo(
     () =>
-      effectiveExams.filter((exam) => {
+      displayExams.filter((exam) => {
         const matchesDate = isSameDay(exam.mainStartTime, currentDate);
         const query = searchQuery.toLowerCase();
         const matchesQuery =
@@ -201,7 +243,7 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
           exam.department.toLowerCase().includes(query);
         return matchesDate && matchesQuery;
       }),
-    [effectiveExams, currentDate, searchQuery]
+    [displayExams, currentDate, searchQuery]
   );
 
   const paginatedExams = examsToday.slice((page - 1) * itemsPerPage, page * itemsPerPage);
@@ -218,10 +260,6 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
     acc[exam.mainVenue].push(exam);
     return acc;
   }, {} as Record<string, ExamDetails[]>);
-
-  useEffect(() => {
-    setSearchDraft(searchQuery);
-  }, [searchQuery]);
 
   const { startMinutes, endMinutes } = useMemo(() => {
     const defaultStart = 8 * 60;
@@ -278,7 +316,7 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
           <Typography variant="body2" color="text.secondary">Browse and manage the exam scheduling system.</Typography>
         </Stack>
         <Typography variant="h6" color="text.secondary" data-testid="date-header">
-          {formatDate(currentDate)}
+          {formatDateWithWeekday(currentDate)}
         </Typography>
       </Stack>
 
@@ -289,19 +327,10 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
             <Search sx={{ color: "action.active", mr: 1 }} />
             <InputBase
               placeholder="Search exams..."
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  dispatch(setCalendarPrefs({ searchQuery: searchDraft.trim(), page: 1 }));
-                }
-              }}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               sx={{ width: 300 }}
             />
-            <IconButton aria-label="Apply search" color="primary" onClick={() => dispatch(setCalendarPrefs({ searchQuery: searchDraft.trim(), page: 1 }))}>
-              <ArrowForward />
-            </IconButton>
           </Paper>
 
           <TextField
@@ -312,8 +341,7 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
             onChange={(e) => {
               if (!e.target.value) return;
               const picked = new Date(e.target.value);
-              if (!Number.isNaN(picked.getTime()))
-                dispatch(setCalendarPrefs({ currentDate: picked.toISOString(), page: 1 }));
+              if (!Number.isNaN(picked.getTime())) setCurrentDate(picked);
             }}
             InputLabelProps={{ shrink: true }}
             sx={{ minWidth: 180 }}
@@ -324,12 +352,16 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
             size="medium"
             startIcon={<ArrowBack />}
             onClick={() =>
-              dispatch(setCalendarPrefs({ currentDate: new Date(currentDate.getTime() - 24 * 3600 * 1000).toISOString(), page: 1 }))
+              setCurrentDate((d) => {
+                const nd = new Date(d);
+                nd.setDate(d.getDate() - 1);
+                return nd;
+              })
             }
           >
             Previous
           </PillButton>
-          <PillButton variant="contained" size="medium" startIcon={<Today />} onClick={() => dispatch(setCalendarPrefs({ currentDate: new Date().toISOString(), page: 1 }))}>
+          <PillButton variant="contained" size="medium" startIcon={<Today />} onClick={() => setCurrentDate(new Date())}>
             Today
           </PillButton>
           <PillButton
@@ -337,14 +369,18 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
             size="medium"
             endIcon={<ArrowForward />}
             onClick={() =>
-              dispatch(setCalendarPrefs({ currentDate: new Date(currentDate.getTime() + 24 * 3600 * 1000).toISOString(), page: 1 }))
+              setCurrentDate((d) => {
+                const nd = new Date(d);
+                nd.setDate(d.getDate() + 1);
+                return nd;
+              })
             }
           >
             Next
           </PillButton>
         </Stack>
 
-        <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && dispatch(setCalendarPrefs({ viewMode: v }))} color="primary">
+        <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && setViewMode(v)} color="primary">
           <ToggleButton value="grid" data-testid="grid-btn">
             <GridView />
           </ToggleButton>
@@ -438,7 +474,7 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
 
           {totalPages > 1 && (
             <Stack direction="row" justifyContent="center" mt={6}>
-              <Pagination count={totalPages} page={page} onChange={(_, v) => dispatch(setCalendarPrefs({ page: v }))} color="primary" size="large" />
+              <Pagination count={totalPages} page={page} onChange={(_, v) => setPage(v)} color="primary" size="large" />
             </Stack>
           )}
         </>

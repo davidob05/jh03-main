@@ -64,6 +64,59 @@ def _sanitize_dataframe(df):
     df = df.loc[:, [col for col in df.columns if str(col).strip() != ""]]
     return df.where(pd.notna(df), None)
 
+def _is_missing(value):
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    try:
+        return pd.isna(value)
+    except Exception:
+        return False
+
+
+def _row_is_header(values):
+    canonical, exam_hits, provision_hits = _score_headers(values)
+    return exam_hits >= 2 or provision_hits >= 2
+
+
+def _assign_school_blocks(df, school_header):
+    if "school" not in df.columns:
+        df["school"] = None
+
+    df = df.reset_index(drop=True)
+    columns_without_school = [col for col in df.columns if col != "school"]
+    current_school = school_header
+    drop_indices = []
+
+    for idx in range(len(df.index)):
+        row_values = [df.at[idx, col] for col in columns_without_school]
+        non_empty = [val for val in row_values if not _is_missing(val)]
+
+        if _row_is_header(non_empty):
+            drop_indices.append(idx)
+            continue
+
+        if len(non_empty) == 1:
+            candidate = str(non_empty[0]).strip()
+            if "school" in candidate.lower():
+                next_idx = idx + 1
+                if next_idx < len(df.index):
+                    next_values = [df.at[next_idx, col] for col in columns_without_school]
+                    next_non_empty = [val for val in next_values if not _is_missing(val)]
+                    if _row_is_header(next_non_empty):
+                        current_school = candidate
+                        drop_indices.append(idx)
+                        continue
+
+        if current_school and _is_missing(df.at[idx, "school"]):
+            df.at[idx, "school"] = current_school
+
+    if drop_indices:
+        df = df.drop(index=drop_indices).reset_index(drop=True)
+
+    return df
+
 
 def prepare_exam_provision_df(df):
     """
@@ -77,8 +130,7 @@ def prepare_exam_provision_df(df):
     mapping = map_equivalent_columns(df.columns)
     df.rename(columns=mapping, inplace=True)
 
-    if school_header and "school" not in df.columns:
-        df["school"] = school_header
+    df = _assign_school_blocks(df, school_header)
 
     df = _sanitize_dataframe(df)
     return df

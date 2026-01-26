@@ -74,8 +74,8 @@ export const ExamDetailsPopup: React.FC<ExamDetailsPopupProps> = ({ open, onClos
                 </Typography>
               </Stack>
               <Stack spacing={0.5} alignItems="flex-end">
-                <Typography variant="body2">Students: {v.students}</Typography>
-                <Typography variant="body2">Invigilators: {v.invigilators}</Typography>
+                <Typography variant="body2">Students: {typeof v.students === "number" ? v.students : "N/A"}</Typography>
+                <Typography variant="body2">Invigilators: {typeof v.invigilators === "number" ? v.invigilators : "N/A"}</Typography>
               </Stack>
             </Paper>
           ))}

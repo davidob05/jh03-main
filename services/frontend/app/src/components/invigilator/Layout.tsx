@@ -109,6 +109,11 @@ export const InvigilatorLayout: React.FC = () => {
                 <MenuItem component={Link} to="/invigilator/profile" onClick={closeMenu} sx={{ borderRadius: 2 }}>
                   Account
                 </MenuItem>
+                {(user?.is_staff || user?.is_superuser) && (
+                  <MenuItem component={Link} to="/admin" onClick={closeMenu} sx={{ borderRadius: 2 }}>
+                    View Administrator Dashboard
+                  </MenuItem>
+                )}
                 <MenuItem
                   onClick={() => {
                     closeMenu();

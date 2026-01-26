@@ -28,6 +28,14 @@ class AdminApiCrudTests(TestCase):
             is_staff=True,
             is_superuser=True,
         )
+        self.senior_admin = User.objects.create_user(
+            username="senior",
+            email="senior@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+            is_senior_admin=True,
+        )
         self.non_admin = User.objects.create_user(
             username="user",
             email="user@example.com",
@@ -67,7 +75,7 @@ class AdminApiCrudTests(TestCase):
         self.assertEqual(exam.exam_name, "Updated Algorithms")
         note = Notification.objects.get()
         self.assertEqual(note.type, "examChange")
-        self.assertIn("Updated Algorithms", note.message)
+        self.assertIn("Updated Algorithms", note.admin_message)
 
     def test_venue_create_and_update_log_notifications(self):
         create_response = self.client.post(
@@ -87,7 +95,7 @@ class AdminApiCrudTests(TestCase):
         )
         self.assertIn(
             "Main Hall",
-            Notification.objects.filter(type="venueChange").latest("id").message,
+            Notification.objects.filter(type="venueChange").latest("id").admin_message,
         )
 
         update_response = self.client.patch(
@@ -170,7 +178,183 @@ class AdminApiCrudTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         note = Notification.objects.get()
         self.assertEqual(note.type, "invigilatorUpdate")
-        self.assertIn("Pat", note.message)
+        self.assertIn("Pat", note.admin_message)
+
+    def test_make_invigilator_admin_promotes_linked_user(self):
+        User = get_user_model()
+        invigilator_user = User.objects.create_user(
+            username="invigilator_user",
+            email="invigilator@example.com",
+            password="secret",
+            is_staff=False,
+            is_superuser=False,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Morgan",
+            full_name="Morgan Example",
+            user=invigilator_user,
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.senior_admin)
+
+        response = client.post(
+            reverse("invigilator-make-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        invigilator_user.refresh_from_db()
+        self.assertTrue(invigilator_user.is_staff)
+        self.assertTrue(invigilator_user.is_superuser)
+
+    def test_make_invigilator_admin_requires_linked_user(self):
+        invigilator = Invigilator.objects.create(
+            preferred_name="NoLogin",
+            full_name="No Login Example",
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.senior_admin)
+
+        response = client.post(
+            reverse("invigilator-make-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_make_invigilator_admin_requires_senior_admin(self):
+        User = get_user_model()
+        invigilator_user = User.objects.create_user(
+            username="invigilator_user2",
+            email="invigilator2@example.com",
+            password="secret",
+            is_staff=False,
+            is_superuser=False,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Casey",
+            full_name="Casey Example",
+            user=invigilator_user,
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.admin)
+
+        response = client.post(
+            reverse("invigilator-make-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_remove_admin_requires_senior_admin(self):
+        User = get_user_model()
+        admin_user = User.objects.create_user(
+            username="adminish",
+            email="adminish@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Alex",
+            full_name="Alex Example",
+            user=admin_user,
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.admin)
+
+        response = client.post(
+            reverse("invigilator-remove-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_remove_admin_demotes_user(self):
+        User = get_user_model()
+        admin_user = User.objects.create_user(
+            username="demote",
+            email="demote@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+            is_senior_admin=True,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Jo",
+            full_name="Jo Example",
+            user=admin_user,
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.senior_admin)
+
+        response = client.post(
+            reverse("invigilator-remove-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        admin_user.refresh_from_db()
+        self.assertFalse(admin_user.is_staff)
+        self.assertFalse(admin_user.is_superuser)
+        self.assertFalse(admin_user.is_senior_admin)
+
+    def test_make_senior_admin_requires_senior_admin(self):
+        User = get_user_model()
+        admin_user = User.objects.create_user(
+            username="adminish",
+            email="adminish@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Alex",
+            full_name="Alex Example",
+            user=admin_user,
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.admin)
+
+        response = client.post(
+            reverse("invigilator-make-senior-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_make_senior_admin_promotes_admin(self):
+        User = get_user_model()
+        admin_user = User.objects.create_user(
+            username="seniorize",
+            email="seniorize@example.com",
+            password="secret",
+            is_staff=True,
+            is_superuser=True,
+        )
+        invigilator = Invigilator.objects.create(
+            preferred_name="Jo",
+            full_name="Jo Example",
+            user=admin_user,
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.senior_admin)
+
+        response = client.post(
+            reverse("invigilator-make-senior-admin", args=[invigilator.pk]),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        admin_user.refresh_from_db()
+        self.assertTrue(admin_user.is_senior_admin)
 
     def test_invigilator_assignment_create_and_delete_log_notifications(self):
         exam = Exam.objects.create(
@@ -215,7 +399,7 @@ class AdminApiCrudTests(TestCase):
 
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(
-            Notification.objects.filter(type="shiftPickup").count(),
+            Notification.objects.filter(type="assignment").count(),
             1,
         )
         assignment_id = create_response.data["id"]
@@ -225,6 +409,10 @@ class AdminApiCrudTests(TestCase):
         )
 
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(
+            Notification.objects.filter(type="assignment").count(),
+            1,
+        )
         self.assertEqual(
             Notification.objects.filter(type="cancellation").count(),
             1,

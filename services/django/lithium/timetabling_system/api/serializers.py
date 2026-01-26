@@ -12,6 +12,8 @@ from timetabling_system.models import (
     InvigilatorRestriction,
     InvigilatorAvailability,
     InvigilatorAssignment,
+    StudentExam,
+    Provisions,
     Notification,
     Announcement,
     SlotChoices,
@@ -262,10 +264,19 @@ class VenueWriteSerializer(serializers.ModelSerializer):
 
 class NotificationSerializer(serializers.ModelSerializer):
     triggered_by = serializers.SerializerMethodField()
+    invigilator = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
-        fields = ("id", "type", "message", "timestamp", "triggered_by")
+        fields = (
+            "id",
+            "type",
+            "invigilator_message",
+            "admin_message",
+            "timestamp",
+            "triggered_by",
+            "invigilator",
+        )
 
     def get_triggered_by(self, obj):
         user = getattr(obj, "triggered_by", None)
@@ -275,6 +286,15 @@ class NotificationSerializer(serializers.ModelSerializer):
             "id": user.id,
             "email": getattr(user, "email", None),
             "username": getattr(user, "username", None),
+        }
+
+    def get_invigilator(self, obj):
+        inv = getattr(obj, "invigilator", None)
+        if not inv:
+            return None
+        return {
+            "id": inv.id,
+            "name": getattr(inv, "preferred_name", None) or getattr(inv, "full_name", None),
         }
 
 
@@ -302,6 +322,9 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
     exam_start = serializers.DateTimeField(source="exam_venue.start_time", read_only=True)
     exam_length = serializers.IntegerField(source="exam_venue.exam_length", read_only=True)
     cover_filled = serializers.SerializerMethodField()
+    provision_capabilities = serializers.SerializerMethodField()
+    student_provisions = serializers.SerializerMethodField()
+    student_provision_notes = serializers.SerializerMethodField()
 
     class Meta:
         model = InvigilatorAssignment
@@ -314,6 +337,9 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
             "venue_name",
             "exam_start",
             "exam_length",
+            "provision_capabilities",
+            "student_provisions",
+            "student_provision_notes",
             "role",
             "assigned_start",
             "assigned_end",
@@ -337,6 +363,34 @@ class InvigilatorAssignmentSerializer(serializers.ModelSerializer):
 
     def get_cover_filled(self, obj):
         return obj.cover_assignments.filter(cancel=False).exists()
+
+    def get_provision_capabilities(self, obj):
+        caps = getattr(getattr(obj, "exam_venue", None), "provision_capabilities", None)
+        return list(caps or [])
+
+    def _student_provision_rows(self, obj):
+        exam_venue = getattr(obj, "exam_venue", None)
+        if not exam_venue or not getattr(exam_venue, "exam", None):
+            return []
+        student_ids = StudentExam.objects.filter(exam_venue=exam_venue).values_list("student_id", flat=True)
+        if not student_ids:
+            return []
+        return Provisions.objects.filter(exam=exam_venue.exam, student_id__in=student_ids)
+
+    def get_student_provisions(self, obj):
+        provisions: list[str] = []
+        for row in self._student_provision_rows(obj):
+            provisions.extend(row.provisions or [])
+        return sorted(set(provisions))
+
+    def get_student_provision_notes(self, obj):
+        notes: list[str] = []
+        for row in self._student_provision_rows(obj):
+            if row.extra_time_custom:
+                notes.append(str(row.extra_time_custom).strip())
+            if row.notes:
+                notes.append(str(row.notes).strip())
+        return [note for note in dict.fromkeys(notes) if note]
 
 
 class InvigilatorQualificationSerializer(serializers.ModelSerializer):
@@ -386,6 +440,9 @@ class InvigilatorSerializer(serializers.ModelSerializer):
     availabilities = InvigilatorAvailabilitySerializer(many=True, read_only=True)
     user = serializers.DictField(write_only=True, required=False, allow_null=True)
     user_id = serializers.IntegerField(read_only=True)
+    user_is_staff = serializers.SerializerMethodField()
+    user_is_superuser = serializers.SerializerMethodField()
+    user_is_senior_admin = serializers.SerializerMethodField()
 
     class Meta:
         model = Invigilator
@@ -393,11 +450,13 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "user_id",
+            "user_is_staff",
+            "user_is_superuser",
+            "user_is_senior_admin",
             "preferred_name",
             "full_name",
             "mobile",
             "mobile_text_only",
-            "janet_txt",
             "alt_phone",
             "university_email",
             "personal_email",
@@ -409,6 +468,18 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             "assignments",
             "availabilities",
         )
+
+    def get_user_is_staff(self, obj):
+        user = getattr(obj, "user", None)
+        return bool(getattr(user, "is_staff", False)) if user else False
+
+    def get_user_is_superuser(self, obj):
+        user = getattr(obj, "user", None)
+        return bool(getattr(user, "is_superuser", False)) if user else False
+
+    def get_user_is_senior_admin(self, obj):
+        user = getattr(obj, "user", None)
+        return bool(getattr(user, "is_senior_admin", False)) if user else False
 
     def validate_user(self, value):
         if value in (None, {}):
@@ -530,3 +601,4 @@ class InvigilatorSerializer(serializers.ModelSerializer):
             self._generate_availability(instance, diet_map)
 
         return instance
+

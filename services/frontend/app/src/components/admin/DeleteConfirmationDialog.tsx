@@ -16,7 +16,6 @@ type Props = {
   title?: string;
   description: React.ReactNode;
   confirmText?: string;
-  cancelText?: string;
   loading?: boolean;
   destructive?: boolean;
   onConfirm: () => void;
@@ -28,7 +27,6 @@ export const DeleteConfirmationDialog: React.FC<Props> = ({
   title = "Confirm delete",
   description,
   confirmText = "Delete",
-  cancelText = "Cancel",
   loading = false,
   destructive = true,
   onConfirm,

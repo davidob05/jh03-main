@@ -175,9 +175,9 @@ class UploadLogAdmin(admin.ModelAdmin):
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ("type", "message", "timestamp")
-    list_filter = ("type",)
-    search_fields = ("message",)
+    list_display = ("type", "invigilator", "invigilator_message", "admin_message", "timestamp")
+    list_filter = ("type", "invigilator")
+    search_fields = ("invigilator_message", "admin_message")
 
 
 @admin.register(Announcement)

@@ -8,6 +8,7 @@ from django.utils import timezone
 class CustomUser(AbstractUser):
     phone = models.CharField(max_length=50, blank=True, null=True)
     avatar = models.TextField(blank=True, null=True)
+    is_senior_admin = models.BooleanField(default=False)
 
     def __str__(self):
         return self.email

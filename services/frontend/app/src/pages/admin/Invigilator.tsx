@@ -11,6 +11,8 @@ import {
   Divider,
   ToggleButton,
   ToggleButtonGroup,
+  Switch,
+  FormControlLabel,
   CircularProgress,
   Alert,
   Fab,
@@ -19,7 +21,7 @@ import {
 import { GridView, CalendarViewMonth, Edit, Delete as DeleteIcon } from "@mui/icons-material";
 import dayjs, { Dayjs } from "dayjs";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ContractedHoursReport } from "../../components/admin/ContractedHoursReport";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
@@ -28,6 +30,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { StaticDatePicker } from "@mui/x-date-pickers/StaticDatePicker";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateWithWeekday } from "../../utils/dates";
 import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
@@ -46,6 +49,7 @@ const allQualifications: Record<string, string> = {
   SENIOR_INVIGILATOR: "Senior Invigilator",
   AKT_TRAINED: "AKT Trained",
   CHECK_IN: "Check-In",
+  DETACHED_DUTY: "Detached Duty",
 };
 
 interface InvigilatorAvailability {
@@ -75,11 +79,14 @@ interface Diet {
 
 interface InvigilatorData {
   id: number;
+  user_id?: number | null;
+  user_is_staff?: boolean;
+  user_is_superuser?: boolean;
+  user_is_senior_admin?: boolean;
   preferred_name: string | null;
   full_name: string;
   mobile: string | null;
   mobile_text_only: string | null;
-  janet_txt: string | null;
   alt_phone: string | null;
   university_email: string | null;
   personal_email: string | null;
@@ -96,6 +103,7 @@ interface InvigilatorAssignment {
   assigned_start: string;
   assigned_end: string;
   break_time_minutes: number;
+  cancel?: boolean;
 }
 
 const slotLabelMap: Record<string, string> = {
@@ -113,8 +121,16 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
+  const [promoteMode, setPromoteMode] = useState<"admin" | "senior">("admin");
+  const [promoting, setPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
+  const [demoteOpen, setDemoteOpen] = useState(false);
+  const [demoting, setDemoting] = useState(false);
+  const [demoteError, setDemoteError] = useState<string | null>(null);
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, error, refetch } = useQuery<InvigilatorData, Error>({
     queryKey: ["invigilator", id],
@@ -125,6 +141,9 @@ export const AdminInvigilatorProfile: React.FC = () => {
     },
     enabled: Boolean(id),
   });
+
+  const currentUser = queryClient.getQueryData<any>(["me"]);
+  const isSeniorAdmin = Boolean(currentUser?.is_senior_admin);
 
   const { data: diets = [] } = useQuery<Diet[]>({
     queryKey: ["diets"],
@@ -142,6 +161,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
   }, [data]);
 
   const dietsFromData = useMemo(() => data?.restrictions?.map((r) => r.diet) || [], [data]);
+  const dietsSelected = useMemo(() => new Set(dietsFromData.filter(Boolean)), [dietsFromData]);
 
   const dietOptions = useMemo(() => {
     const base = diets.map((d) => ({ code: d.code, label: formatDietLabel(d) }));
@@ -169,26 +189,57 @@ export const AdminInvigilatorProfile: React.FC = () => {
     [groupedAvailability]
   );
 
-  const totalAssignedHours = useMemo(() => {
+  const assignmentMetrics = useMemo(() => {
     const assignments = data?.assignments || [];
-    return assignments.reduce((sum, assignment) => {
+    let totalHours = 0;
+    let completedHours = 0;
+    let assignedShiftCount = 0;
+    let completedShiftCount = 0;
+    assignments.forEach((assignment) => {
       const start = new Date(assignment.assigned_start).getTime();
       const end = new Date(assignment.assigned_end).getTime();
-      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return sum;
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
+      assignedShiftCount += 1;
       const durationMinutes = (end - start) / 60000 - (assignment.break_time_minutes || 0);
-      return sum + Math.max(durationMinutes, 0) / 60;
-    }, 0);
+      const hours = Math.max(durationMinutes, 0) / 60;
+      totalHours += hours;
+      if (!assignment.cancel) {
+        completedShiftCount += 1;
+        completedHours += hours;
+      }
+    });
+    return {
+      totalHours,
+      completedHours,
+      assignedShiftCount,
+      completedShiftCount,
+    };
   }, [data]);
 
   const contractedHoursReport = useMemo(() => {
     const contracted = data?.contracted_hours ?? null;
-    if (contracted == null && totalAssignedHours === 0) return null;
+    if (contracted == null && assignmentMetrics.totalHours === 0) return null;
     return {
       contracted_hours: contracted ?? 0,
-      total_hours: totalAssignedHours,
-      remaining_hours: contracted != null ? contracted - totalAssignedHours : undefined,
+      total_hours: assignmentMetrics.totalHours,
+      completed_hours: assignmentMetrics.completedHours,
+      assigned_shift_count: assignmentMetrics.assignedShiftCount,
+      completed_shift_count: assignmentMetrics.completedShiftCount,
+      remaining_hours: contracted != null ? contracted - assignmentMetrics.totalHours : undefined,
     };
-  }, [data?.contracted_hours, totalAssignedHours]);
+  }, [data?.contracted_hours, assignmentMetrics]);
+
+  const canPromote = Boolean(data?.user_id) && !data?.user_is_superuser && isSeniorAdmin;
+  const canDemote =
+    Boolean(data?.user_id) &&
+    (data?.user_is_staff || data?.user_is_superuser) &&
+    !data?.user_is_senior_admin &&
+    isSeniorAdmin;
+  const canSeniorPromote =
+    Boolean(data?.user_id) &&
+    (data?.user_is_staff || data?.user_is_superuser) &&
+    !data?.user_is_senior_admin &&
+    isSeniorAdmin;
 
   const handleDelete = async () => {
     if (!id) return;
@@ -207,6 +258,69 @@ export const AdminInvigilatorProfile: React.FC = () => {
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
+    }
+  };
+
+  const handlePromote = async () => {
+    if (!id) return;
+    try {
+      setPromoting(true);
+      setPromoteError(null);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/make-admin/`, { method: "POST" });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to promote invigilator to administrator.");
+      }
+      setSuccessMessage("Invigilator promoted to administrator.");
+      setSuccessOpen(true);
+      await refetch();
+    } catch (err: any) {
+      setPromoteError(err?.message || "Failed to promote invigilator to administrator.");
+    } finally {
+      setPromoting(false);
+      setPromoteOpen(false);
+    }
+  };
+
+  const handleDemote = async () => {
+    if (!id) return;
+    try {
+      setDemoting(true);
+      setDemoteError(null);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/remove-admin/`, { method: "POST" });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to remove administrator privileges");
+      }
+      setSuccessMessage("Administrator privileges removed.");
+      setSuccessOpen(true);
+      await refetch();
+    } catch (err: any) {
+      setDemoteError(err?.message || "Failed to remove administrator privileges.");
+    } finally {
+      setDemoting(false);
+      setDemoteOpen(false);
+    }
+  };
+
+  const handleSeniorPromote = async () => {
+    if (!id) return;
+    try {
+      setPromoting(true);
+      setPromoteError(null);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/make-senior-admin/`, { method: "POST" });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to promote administrator to senior administrator.");
+      }
+      setSuccessMessage("Administrator promoted to senior administrator.");
+      setSuccessOpen(true);
+      await refetch();
+    } catch (err: any) {
+      setPromoteError(err?.message || "Failed to promote administrator to senior administrator.");
+    } finally {
+      setPromoting(false);
+      setPromoteOpen(false);
     }
   };
 
@@ -242,20 +356,96 @@ export const AdminInvigilatorProfile: React.FC = () => {
           </Box>
         </Tooltip>
 
-        <ToggleButtonGroup
-          value={availabilityView}
-          exclusive
-          color="primary"
-          onChange={(_, v) => v && setAvailabilityView(v)}
-        >
-          <ToggleButton value="list">
-            <GridView />
-          </ToggleButton>
-          <ToggleButton value="calendar">
-            <CalendarViewMonth />
-          </ToggleButton>
-        </ToggleButtonGroup>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Tooltip
+            title={
+              data.user_is_superuser
+                ? canDemote
+                  ? "Click to remove administrator access."
+                  : "Senior administrators cannot be demoted."
+                : canPromote
+                  ? "Click to grant administrator access."
+                  : "No user account available to promote."
+            }
+          >
+            <span>
+              <PillButton
+                variant={data.user_is_superuser ? "contained" : "outlined"}
+                color="primary"
+                onClick={() => {
+                  if (data.user_is_superuser) {
+                    if (!canDemote) return;
+                    setDemoteOpen(true);
+                    return;
+                  }
+                  if (!canPromote) return;
+                  setPromoteMode("admin");
+                  setPromoteOpen(true);
+                }}
+                disabled={promoting || demoting || data.user_is_senior_admin}
+                aria-disabled={data.user_is_superuser ? !canDemote || data.user_is_senior_admin : !canPromote}
+                sx={!isSeniorAdmin ? { display: "none" } : undefined}
+              >
+                Administrator
+              </PillButton>
+            </span>
+          </Tooltip>
+          {isSeniorAdmin && data.user_is_superuser && (
+            <Tooltip
+              title={
+                data.user_is_senior_admin
+                  ? "Senior access is enabled."
+                  : canSeniorPromote
+                    ? "Toggle on to grant senior admin access."
+                    : "Only admins can be made senior."
+              }
+            >
+              <span>
+                <FormControlLabel
+                  label="Senior"
+                  sx={{ ml: 0 }}
+                  control={
+                    <Switch
+                      checked={Boolean(data.user_is_senior_admin)}
+                      onChange={(_, checked) => {
+                        if (!checked) return;
+                        if (!canSeniorPromote || promoting) return;
+                        setPromoteMode("senior");
+                        setPromoteOpen(true);
+                      }}
+                      disabled={!canSeniorPromote || promoting}
+                      color="primary"
+                    />
+                  }
+                />
+              </span>
+            </Tooltip>
+          )}
+          <ToggleButtonGroup
+            value={availabilityView}
+            exclusive
+            color="primary"
+            onChange={(_, v) => v && setAvailabilityView(v)}
+          >
+            <ToggleButton value="list">
+              <GridView />
+            </ToggleButton>
+            <ToggleButton value="calendar">
+              <CalendarViewMonth />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
       </Stack>
+      {promoteError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {promoteError}
+        </Alert>
+      )}
+      {demoteError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {demoteError}
+        </Alert>
+      )}
 
       {/* Container for left and right columns */}
       <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -297,21 +487,6 @@ export const AdminInvigilatorProfile: React.FC = () => {
                           sx={{ textDecoration: "none", color: "primary.main" }}
                         >
                           {data.mobile_text_only}
-                        </Typography>
-                      </Box>
-                    </Tooltip>
-                  )}
-                  {data.janet_txt && (
-                    <Tooltip title="Janet txt contact">
-                      <Box>
-                        <Typography variant="body2" color="text.secondary">Janet txt</Typography>
-                        <Typography
-                          variant="body1"
-                          component="a"
-                          href={`sms:${data.janet_txt}`}
-                          sx={{ textDecoration: "none", color: "primary.main" }}
-                        >
-                          {data.janet_txt}
                         </Typography>
                       </Box>
                     </Tooltip>
@@ -373,7 +548,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 <Typography variant="h6" fontWeight={700} mb={3}>
                   Qualifications
                 </Typography>
-                <Stack direction="row" spacing={1.5} flexWrap="wrap" gap={1}>
+                <Stack direction="row" flexWrap="wrap" sx={{ columnGap: 1, rowGap: 1.5 }}>
                   {Object.entries(allQualifications).map(([key, label]) => {
                     const hasQual = data.qualifications?.some((q) => q.qualification === key);
                     return (
@@ -401,14 +576,14 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 <Stack spacing={4}>
                   {/* Exam Diets */}
                   <CollapsibleSection title="Exam Diets" defaultExpanded={false}>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} sx={{ rowGap: 1.5 }}>
+                    <Stack direction="row" flexWrap="wrap" sx={{ columnGap: 1, rowGap: 1.5 }}>
                       {dietOptions.map((d) => {
-                        const hasDiet = diets.includes(d.code);
+                        const hasDiet = dietsSelected.has(d.code);
                         return (
                           <Tooltip key={d.code} title={hasDiet ? `Contracted for ${d.label}` : `Not contracted for ${d.label}`}>
                             <Chip
                               label={d.label}
-                              size="small"
+                              size="medium"
                               color={hasDiet ? "primary" : "default"}
                               variant={hasDiet ? "filled" : "outlined"}
                             />
@@ -509,17 +684,6 @@ export const AdminInvigilatorProfile: React.FC = () => {
                             onChange={() => {}}
                             yesLabel="Can work at the Vet School"
                             noLabel="Cannot work at the Vet School"
-                          />
-                        </Box>
-                      </Tooltip>
-                      <Tooltip title={restrictionsUnion.has("sec") ? "Can work at the SEC" : "Cannot work at the SEC"}>
-                        <Box>
-                          <BooleanCheckboxRow
-                            label="SEC"
-                            value={restrictionsUnion.has("sec")}
-                            onChange={() => {}}
-                            yesLabel="Can work at the SEC"
-                            noLabel="Cannot work at the SEC"
                           />
                         </Box>
                       </Tooltip>
@@ -634,19 +798,27 @@ export const AdminInvigilatorProfile: React.FC = () => {
 
               <Grid container spacing={3}>
                 {sortedAvailabilityEntries.slice(0, availabilityLimit).map(([date, slots]) => (
-                  <Grid item xs={12} key={date}>
-                    <Panel sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2, mb: 0 }}>
-                      <Typography variant="subtitle1" fontWeight={600} mb={2}>
-                        {dayjs(date).format("dddd, D MMMM YYYY")}
+                  <Grid item xs={12} key={date} sx={{ display: "flex", justifyContent: "center" }}>
+                    <Panel sx={{ p: 3, bgcolor: "#f9f9f9", borderRadius: 2, mb: 0, width: { xs: "100%", sm: 350 } }}>
+                      <Typography variant="subtitle1" fontWeight={600} mb={2} noWrap title={formatDateWithWeekday(date)}>
+                        {formatDateWithWeekday(date)}
                       </Typography>
                       <Stack direction="row" spacing={1.5} flexWrap="wrap">
                         {slots.map((s, i) => (
                           <Tooltip key={i} title={s.available ? "Available for this slot" : "Unavailable for this slot"}>
                             <Chip
                               label={slotLabelMap[s.slot] || s.slot}
-                              color={s.available ? "success" : "default"}
-                              variant={s.available ? "filled" : "outlined"}
                               size="medium"
+                              sx={{
+                                borderRadius: 999,
+                                border: "1.5px solid transparent",
+                                boxSizing: "border-box",
+                                minWidth: 120,
+                                minHeight: 36,
+                                bgcolor: s.available ? "success.main" : "#d4edda",
+                                color: s.available ? "#fff" : "#155724",
+                                fontWeight: 600,
+                              }}
                             />
                           </Tooltip>
                         ))}
@@ -738,16 +910,24 @@ export const AdminInvigilatorProfile: React.FC = () => {
               {selectedAvailabilityDate && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle1" fontWeight={600} mb={1}>
-                    {selectedAvailabilityDate.format("dddd, D MMMM YYYY")}
+                    {formatDateWithWeekday(selectedAvailabilityDate)}
                   </Typography>
                   <Stack direction="row" spacing={1.5} flexWrap="wrap">
                     {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).map((slot, i) => (
                       <Chip
                         key={i}
                         label={slotLabelMap[slot.slot] || slot.slot}
-                        color={slot.available ? "success" : "default"}
-                        variant={slot.available ? "filled" : "outlined"}
                         size="medium"
+                        sx={{
+                          borderRadius: 999,
+                          border: "1.5px solid transparent",
+                          boxSizing: "border-box",
+                          minWidth: 120,
+                          minHeight: 36,
+                          bgcolor: slot.available ? "success.main" : "#d4edda",
+                          color: slot.available ? "#fff" : "#155724",
+                          fontWeight: 600,
+                        }}
                       />
                     ))}
                     {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).length === 0 && (
@@ -762,7 +942,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
           )}
 
           {/* Contracted Hours */}
-          <Box sx={{ mt: 4, mr: 6 }}>
+          <Box sx={{ mt: 4, mr: { xs: 0, md: 6 }, width: "100%" }}>
             <ContractedHoursReport
               report={contractedHoursReport}
               loading={false}
@@ -818,6 +998,33 @@ export const AdminInvigilatorProfile: React.FC = () => {
           if (!deleting) setDeleteOpen(false);
         }}
         onConfirm={handleDelete}
+      />
+      <DeleteConfirmationDialog
+        open={promoteOpen}
+        title={promoteMode === "senior" ? "Grant senior administrator privileges?" : "Grant administrator privileges?"}
+        description={
+          promoteMode === "senior"
+            ? "This gives this invigilator senior administrator privileges while keeping their existing login and account the same."
+            : "This gives this invigilator full administrator privileges while keeping their existing login and account the same."
+        }
+        confirmText={promoteMode === "senior" ? "Promote" : "Promote"}
+        destructive={false}
+        loading={promoting}
+        onClose={() => {
+          if (!promoting) setPromoteOpen(false);
+        }}
+        onConfirm={promoteMode === "senior" ? handleSeniorPromote : handlePromote}
+      />
+      <DeleteConfirmationDialog
+        open={demoteOpen}
+        title="Remove administrator privileges?"
+        description="This will remove this invigilator's administrator privileges while keeping their existing login and account the same."
+        confirmText="Demote"
+        loading={demoting}
+        onClose={() => {
+          if (!demoting) setDemoteOpen(false);
+        }}
+        onConfirm={handleDemote}
       />
       <Snackbar
         open={successOpen}

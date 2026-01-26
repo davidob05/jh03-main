@@ -22,6 +22,7 @@ import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { ShiftPickupDialog } from "../../components/invigilator/ShiftPickupDialog";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { formatDateTime, formatTime } from "../../utils/dates";
 
 type AvailableShift = {
   id: number;
@@ -194,10 +195,10 @@ export const InvigilatorShifts: React.FC = () => {
             {formattedShifts.map((shift) => {
               const isPicking = pickupMutation.isPending;
               const startLabel = shift.start?.isValid()
-                ? shift.start.format("ddd, D MMM [@] HH:mm")
+                ? formatDateTime(shift.start)
                 : "Start time TBC";
               const endLabel = shift.end?.isValid()
-                ? shift.end.format("HH:mm")
+                ? formatTime(shift.end)
                 : shift.exam_length
                 ? minutesToTime(shift.exam_length)
                 : "End time TBC";
@@ -269,12 +270,7 @@ export const InvigilatorShifts: React.FC = () => {
                           }}
                         />
                       )}
-                      <Chip
-                        icon={<PersonOutlineIcon fontSize="small" sx={{ color: "#b45309 !important" }} />}
-                        label={`Originally: ${invigilatorLabel}`}
-                        size="small"
-                        sx={{ bgcolor: "#fff4e5", color: "#b45309", fontWeight: 700 }}
-                      />
+
                     </Stack>
 
                     {shift.notes && (
@@ -330,11 +326,11 @@ export const InvigilatorShifts: React.FC = () => {
         }
         originalLabel={dialogShift?.invigilator_name || undefined}
         startLabel={
-          dialogShift?.start?.isValid() ? dialogShift.start.format("ddd, D MMM @ HH:mm") : "Start time TBC"
+          dialogShift?.start?.isValid() ? formatDateTime(dialogShift.start) : "Start time TBC"
         }
         endLabel={
           dialogShift?.end?.isValid()
-            ? dialogShift.end.format("HH:mm")
+            ? formatTime(dialogShift.end)
             : dialogShift?.exam_length
             ? minutesToTime(dialogShift.exam_length)
             : "End time TBC"
@@ -374,4 +370,5 @@ export const InvigilatorShifts: React.FC = () => {
 };
 
 export default InvigilatorShifts;
+
 
