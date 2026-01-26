@@ -30,16 +30,15 @@ import {
   MenuItem,
   TextField,
 } from '@mui/material';
-import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, AddLocationAlt as AddLocationAltIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, AddLocationAlt as AddLocationAltIcon, ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
 import { Link } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
-import { formatDateTime } from '../../utils/dates';
 import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
-import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { PillButton } from '../../components/PillButton';
 import { Panel } from '../../components/Panel';
 import { VENUE_TYPES } from '../../components/admin/venueTypes';
+import { useAppDispatch, useAppSelector, setVenuesPrefs } from '../../state/store';
 
 interface ExamVenueData {
   exam_name: string;
@@ -104,6 +103,18 @@ const formatLabel = (text?: string): string => {
   if (!text) return 'Unknown';
   const spaced = text.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+};
+
+const formatDateTime = (dateTime?: string): string => {
+  if (!dateTime) return 'N/A';
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleString('en-GB', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const formatDurationFromLength = (length: number | null | undefined): string => {
@@ -203,12 +214,13 @@ interface EnhancedTableToolbarProps {
   numSelected: number;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onSearchSubmit: () => void;
   onAddVenue: () => void;
   onDeleteSelected: () => void;
   deleteLoading: boolean;
 }
 
-const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddVenue, onDeleteSelected, deleteLoading }: EnhancedTableToolbarProps) => {
+const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onSearchSubmit, onAddVenue, onDeleteSelected, deleteLoading }: EnhancedTableToolbarProps) => {
   return (
     <Toolbar
       sx={[
@@ -240,8 +252,17 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
               placeholder="Search venues…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              sx={{ width: 250 }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSearchSubmit();
+                }
+              }}
+              sx={{ width: 220 }}
             />
+            <IconButton aria-label="Apply search" color="primary" onClick={onSearchSubmit} sx={{ ml: 1 }}>
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
           </Box>
         </Box>
       )}
@@ -274,13 +295,15 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onAddV
 
 export const AdminVenues: React.FC = () => {
   const queryClient = useQueryClient();
-  const [order, setOrder] = React.useState<Order>('asc');
-  const [orderBy, setOrderBy] = React.useState<keyof RowData>('name');
+  const dispatch = useAppDispatch();
+  const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.venues);
+  const allowedSortKeys = ['name', 'capacity', 'type', 'accessibility', 'provisionCapabilities'] as const;
+  type VenueSortKey = typeof allowedSortKeys[number];
+  const orderBy: VenueSortKey = allowedSortKeys.includes(rawOrderBy as VenueSortKey)
+    ? (rawOrderBy as VenueSortKey)
+    : 'name';
+  const [searchDraft, setSearchDraft] = React.useState(searchQuery);
   const [selected, setSelected] = React.useState<readonly string[]>([]);
-  const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(5);
-  const [searchQuery, setSearchQuery] = React.useState('');
   const [openRows, setOpenRows] = React.useState<Record<string, boolean>>({});
   const [addOpen, setAddOpen] = React.useState(false);
   const [successOpen, setSuccessOpen] = React.useState(false);
@@ -288,6 +311,7 @@ export const AdminVenues: React.FC = () => {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [venueTypeOverrides, setVenueTypeOverrides] = React.useState<Record<string, string>>({});
   const [updatingVenueIds, setUpdatingVenueIds] = React.useState<Record<string, boolean>>({});
+  React.useEffect(() => setSearchDraft(searchQuery), [searchQuery]);
 
   const {
     data: venuesData = [],
@@ -320,8 +344,8 @@ export const AdminVenues: React.FC = () => {
     [venuesData, venueTypeOverrides],
   );
 
-  const updateVenueTypeMutation = useMutation({
-    mutationFn: async (payload: { venueName: string; venueType: string; previousType?: string }) => {
+  const updateVenueTypeMutation = useMutation<any, Error, { venueName: string; venueType: string; previousType?: string }>({
+    mutationFn: async (payload) => {
       const res = await apiFetch(`${apiBaseUrl}/venues/${encodeURIComponent(payload.venueName)}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -342,7 +366,7 @@ export const AdminVenues: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['venues'] });
       queryClient.invalidateQueries({ queryKey: ['venue', payload.venueName] });
     },
-    onError: (err: any, payload: { venueName: string; previousType?: string } | undefined) => {
+    onError: (err: any, payload) => {
       if (payload?.venueName) {
         if (payload.previousType) {
           setVenueTypeOverrides((prev) => ({ ...prev, [payload.venueName]: payload.previousType }));
@@ -384,7 +408,6 @@ export const AdminVenues: React.FC = () => {
       setSelected([]);
       setSuccessMessage(`Deleted ${ids.length} venue${ids.length === 1 ? "" : "s"}.`);
       setSuccessOpen(true);
-      setDeleteOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['venues'] });
     },
     onError: (err: any) => {
@@ -400,10 +423,9 @@ export const AdminVenues: React.FC = () => {
     setSelected([]);
   };
 
-  const handleRequestSort = (event: React.MouseEvent<unknown>, property: keyof RowData) => {
+  const handleRequestSort = (_event: React.MouseEvent<unknown>, property: keyof RowData) => {
     const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
+    dispatch(setVenuesPrefs({ order: isAsc ? 'desc' : 'asc', orderBy: property }));
   };
 
   const handleClick = (event: React.MouseEvent<unknown>, id: string) => {
@@ -423,14 +445,8 @@ export const AdminVenues: React.FC = () => {
     setSelected(newSelected);
   };
 
-  const handleDeleteSelected = () => {
-    if (selected.length === 0) return;
-    setDeleteOpen(true);
-  };
-
   const handleSearchChange = (q: string) => {
-    setSearchQuery(q);
-    setPage(0);
+    setSearchDraft(q);
   };
 
   const handleVenueTypeChange = (venueName: string, nextType: string, currentType: string) => {
@@ -463,10 +479,15 @@ export const AdminVenues: React.FC = () => {
   const visibleRows = React.useMemo(
     () =>
       [...filteredRows]
-        .sort(getComparator(order, orderBy))
+        .sort(getComparator(order, orderBy as keyof RowData))
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [order, orderBy, page, rowsPerPage, filteredRows],
   );
+
+  React.useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1);
+    if (page > maxPage) dispatch(setVenuesPrefs({ page: maxPage }));
+  }, [filteredRows.length, rowsPerPage, page, dispatch]);
 
   const summary = React.useMemo(() => {
     const total = venuesData.length;
@@ -515,8 +536,8 @@ export const AdminVenues: React.FC = () => {
             label={`${summary.accessible} Accessible`}
             size="medium"
             sx={{
-              backgroundColor: alpha("#2e7d32", 0.12),
-              color: "success.main",
+              backgroundColor: "#def3dbff",
+              color: "secondary.main",
               fontWeight: 600,
             }}
           />
@@ -534,10 +555,11 @@ export const AdminVenues: React.FC = () => {
       <Panel disableDivider sx={{ width: '100%', mb: 2, p: 0, overflow: 'hidden' }}>
         <EnhancedTableToolbar
           numSelected={selected.length}
-          searchQuery={searchQuery}
+          searchQuery={searchDraft}
           onSearchChange={handleSearchChange}
+          onSearchSubmit={() => dispatch(setVenuesPrefs({ searchQuery: searchDraft.trim(), page: 0 }))}
           onAddVenue={() => setAddOpen(true)}
-          onDeleteSelected={handleDeleteSelected}
+          onDeleteSelected={() => bulkDeleteMutation.mutate([...selected])}
           deleteLoading={bulkDeleteMutation.isPending}
         />
         <Divider />
@@ -680,10 +702,9 @@ export const AdminVenues: React.FC = () => {
           count={filteredRows.length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
+          onPageChange={(_e, newPage) => dispatch(setVenuesPrefs({ page: newPage }))}
           onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
+            dispatch(setVenuesPrefs({ rowsPerPage: parseInt(e.target.value, 10), page: 0 }));
           }}
         />
       </Panel>
@@ -695,23 +716,6 @@ export const AdminVenues: React.FC = () => {
           setSuccessOpen(true);
           queryClient.invalidateQueries({ queryKey: ['venues'] });
           setAddOpen(false);
-        }}
-      />
-      <DeleteConfirmationDialog
-        open={deleteOpen}
-        title={`Delete ${selected.length} venue${selected.length === 1 ? "" : "s"}?`}
-        description="This will permanently delete the selected venue(s)."
-        confirmText="Delete"
-        loading={bulkDeleteMutation.isPending}
-        onClose={() => {
-          if (!bulkDeleteMutation.isPending) setDeleteOpen(false);
-        }}
-        onConfirm={() => {
-          if (selected.length === 0) {
-            setDeleteOpen(false);
-            return;
-          }
-          bulkDeleteMutation.mutate([...selected]);
         }}
       />
       <Snackbar
