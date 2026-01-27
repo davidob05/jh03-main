@@ -20,7 +20,13 @@ from .venue_parser import parse_venue_file
 
 def _score_headers(headers):
     mapping = map_equivalent_columns(headers)
-    canonical = [mapping.get(h, normalize(h)) for h in headers]
+    canonical = []
+    for h in headers:
+        try:
+            mapped = mapping.get(h)
+        except TypeError:
+            mapped = mapping.get(str(h))
+        canonical.append(mapped if mapped is not None else normalize(h))
     canonical_set = set(canonical)
     exam_hits = len(canonical_set & EXAM_INDICATORS)
     provision_hits = len(canonical_set & PROVISION_INDICATORS)
@@ -70,7 +76,14 @@ def _is_missing(value):
     if isinstance(value, str):
         return value.strip() == ""
     try:
-        return pd.isna(value)
+        missing = pd.isna(value)
+        # pandas can return array-like; collapse to a single boolean.
+        if hasattr(missing, "all"):
+            try:
+                return bool(missing.all())
+            except Exception:
+                pass
+        return bool(missing)
     except Exception:
         return False
 

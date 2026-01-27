@@ -19,8 +19,15 @@ def map_equivalent_columns(columns):
         for eq in equivalents:
             normalized_to_canonical[normalize(eq)] = canonical
 
+    def safe_key(value):
+        try:
+            hash(value)
+        except Exception:
+            return str(value)
+        return value
+
     mapping = {}
     for col in columns:
         norm = normalize(col)
-        mapping[col] = normalized_to_canonical.get(norm, norm)
+        mapping[safe_key(col)] = normalized_to_canonical.get(norm, norm)
     return mapping
