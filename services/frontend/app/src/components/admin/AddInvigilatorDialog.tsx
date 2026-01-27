@@ -124,7 +124,6 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
     setTempPassword(DEFAULT_TEMP_PASSWORD);
     setMobile("");
     setMobileTextOnly("");
-    setJanetTxt("");
     setAltPhone("");
     setUniversityEmail("");
     setPersonalEmail("");
