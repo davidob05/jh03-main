@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -88,6 +88,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
   const [personalEmail, setPersonalEmail] = useState("");
   const [contractedHours, setContractedHours] = useState("100");
   const [notes, setNotes] = useState("");
+  const lastDerivedUsername = useRef("");
 
   // Multi-step selections
   const [qualifications, setQualifications] = useState<string[]>([]);
@@ -203,12 +204,20 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
   });
 
   useEffect(() => {
-    // Autofill username from university email to save admin effort.
-    if (!loginUsername && universityEmail) {
-      const atIdx = universityEmail.indexOf("@");
-      const derived = atIdx === -1 ? universityEmail : universityEmail.slice(0, atIdx);
+    // Autofill username from university email until the admin overrides it.
+    const trimmed = (universityEmail || "").trim();
+    if (!trimmed) {
+      lastDerivedUsername.current = "";
+      return;
+    }
+    const atIdx = trimmed.indexOf("@");
+    const derived = atIdx === -1 ? trimmed : trimmed.slice(0, atIdx);
+    const lastDerived = lastDerivedUsername.current;
+    const shouldSync = !loginUsername || loginUsername === lastDerived;
+    if (shouldSync && loginUsername !== derived) {
       setLoginUsername(derived);
     }
+    lastDerivedUsername.current = derived;
   }, [loginUsername, universityEmail]);
 
   const renderStepContent = () => {

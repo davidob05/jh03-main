@@ -79,4 +79,21 @@ describe("AddInvigilatorDialog - diets", () => {
       expect(body.restrictions[0].diet).toBe("DEC_2025");
     });
   }, 15000);
+
+  it("keeps username in sync with updated university email until edited", async () => {
+    renderDialog();
+
+    fireEvent.change(screen.getByLabelText(/Preferred Name/i), { target: { value: "Pat" } });
+    fireEvent.change(screen.getByLabelText(/Full Name/i), { target: { value: "Pat Invig" } });
+    const [mobileInput] = screen.getAllByLabelText(/Mobile\b/i);
+    fireEvent.change(mobileInput, { target: { value: "07123" } });
+    const uniEmail = screen.getByLabelText(/University Email/i);
+    fireEvent.change(uniEmail, { target: { value: "p" } });
+    fireEvent.change(uniEmail, { target: { value: "pat@example.com" } });
+    fireEvent.change(screen.getByLabelText(/Personal Email/i), { target: { value: "pat@example.org" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(screen.getByLabelText(/Username/i)).toHaveValue("pat");
+  });
 });
