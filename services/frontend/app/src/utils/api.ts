@@ -60,7 +60,12 @@ const migrateLegacyStorage = () => {
 
 migrateLegacyStorage();
 
+let inMemoryAuthToken: string | null = null;
+
 const readItem = (key: string): string | null => {
+  if (key === authTokenKey && inMemoryAuthToken) {
+    return inMemoryAuthToken;
+  }
   if (primaryStorage) {
     const value = primaryStorage.getItem(key);
     if (value !== null) return value;
@@ -72,6 +77,9 @@ const readItem = (key: string): string | null => {
 };
 
 const writeItem = (key: string, value: string) => {
+  if (key === authTokenKey) {
+    inMemoryAuthToken = value;
+  }
   if (primaryStorage) {
     primaryStorage.setItem(key, value);
   } else if (safeLocalStorage) {
@@ -80,6 +88,9 @@ const writeItem = (key: string, value: string) => {
 };
 
 const removeItem = (key: string) => {
+  if (key === authTokenKey) {
+    inMemoryAuthToken = null;
+  }
   if (primaryStorage) {
     primaryStorage.removeItem(key);
   }
