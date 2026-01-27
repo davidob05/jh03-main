@@ -52,9 +52,9 @@ const invigilatorResponse = {
   assignments: [],
 };
 
-const renderPage = (opts: { isSeniorAdmin?: boolean } = {}) => {
+const renderPage = (opts: { isSeniorAdmin?: boolean; seedMeCache?: boolean } = {}) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  if (opts.isSeniorAdmin) {
+  if (opts.seedMeCache && opts.isSeniorAdmin) {
     client.setQueryData(["me"], { is_senior_admin: true });
   }
   currentUserIsSenior = Boolean(opts.isSeniorAdmin);
@@ -92,6 +92,11 @@ describe("AdminInvigilatorProfile", () => {
     const trigger = await screen.findByRole("button", { name: "Administrator" });
     fireEvent.click(trigger);
     expect(await screen.findByText("Grant administrator privileges?")).toBeInTheDocument();
+  });
+
+  it("shows admin promotion button when senior admin info loads without cache", async () => {
+    renderPage({ isSeniorAdmin: true, seedMeCache: false });
+    expect(await screen.findByRole("button", { name: "Administrator" })).toBeInTheDocument();
   });
 
   it("hides admin promotion button for junior admins", async () => {
