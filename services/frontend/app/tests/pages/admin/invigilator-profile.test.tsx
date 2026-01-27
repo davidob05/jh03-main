@@ -23,6 +23,7 @@ vi.mock("@mui/x-date-pickers/StaticDatePicker", () => ({
 
 const apiFetchMock = vi.fn();
 let currentUserIsSenior = false;
+let invigilatorIsSuperuser = false;
 
 vi.mock("@/utils/api", () => ({
   apiFetch: (...args: any[]) => apiFetchMock(...args),
@@ -73,12 +74,19 @@ describe("AdminInvigilatorProfile", () => {
   beforeEach(() => {
     apiFetchMock.mockReset();
     currentUserIsSenior = false;
+    invigilatorIsSuperuser = false;
     apiFetchMock.mockImplementation((url: string) => {
       if (url.includes("/auth/me/")) {
         return Promise.resolve({ ok: true, json: async () => ({ is_senior_admin: currentUserIsSenior }) });
       }
       if (url.includes("/invigilators/1/")) {
-        return Promise.resolve({ ok: true, json: async () => invigilatorResponse });
+        return Promise.resolve({
+          ok: true,
+          json: async () =>
+            invigilatorIsSuperuser
+              ? { ...invigilatorResponse, user_is_staff: true, user_is_superuser: true }
+              : invigilatorResponse,
+        });
       }
       if (url.includes("/diets/")) {
         return Promise.resolve({ ok: true, json: async () => [] });
@@ -105,15 +113,7 @@ describe("AdminInvigilatorProfile", () => {
   });
 
   it("shows senior admin promotion dialog for senior admins", async () => {
-    apiFetchMock.mockImplementationOnce((url: string) => {
-      if (url.includes("/invigilators/1/")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ ...invigilatorResponse, user_is_staff: true, user_is_superuser: true }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) });
-    });
+    invigilatorIsSuperuser = true;
     renderPage({ isSeniorAdmin: true });
     const trigger = await screen.findByRole("switch", { name: "Senior" });
     fireEvent.click(trigger);
@@ -121,15 +121,7 @@ describe("AdminInvigilatorProfile", () => {
   });
 
   it("hides senior admin promotion button for junior admins", async () => {
-    apiFetchMock.mockImplementationOnce((url: string) => {
-      if (url.includes("/invigilators/1/")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ ...invigilatorResponse, user_is_staff: true, user_is_superuser: true }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) });
-    });
+    invigilatorIsSuperuser = true;
     renderPage();
     expect(screen.queryByLabelText("Senior")).not.toBeInTheDocument();
   });
