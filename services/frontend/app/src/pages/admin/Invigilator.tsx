@@ -21,7 +21,7 @@ import {
 import { GridView, CalendarViewMonth, Edit, Delete as DeleteIcon } from "@mui/icons-material";
 import dayjs, { Dayjs } from "dayjs";
 import { useParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ContractedHoursReport } from "../../components/admin/ContractedHoursReport";
 import { CollapsibleSection } from "../../components/CollapsibleSection";
@@ -130,7 +130,15 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const [demoteError, setDemoteError] = useState<string | null>(null);
   const { id } = useParams();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+
+  const { data: currentUser, isSuccess: currentUserLoaded } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await apiFetch(`${apiBaseUrl}/auth/me/`);
+      if (!res.ok) throw new Error("Unable to load profile");
+      return res.json();
+    },
+  });
 
   const { data, isLoading, isError, error, refetch } = useQuery<InvigilatorData, Error>({
     queryKey: ["invigilator", id],
@@ -142,7 +150,6 @@ export const AdminInvigilatorProfile: React.FC = () => {
     enabled: Boolean(id),
   });
 
-  const currentUser = queryClient.getQueryData<any>(["me"]);
   const isSeniorAdmin = Boolean(currentUser?.is_senior_admin);
 
   const { data: diets = [] } = useQuery<Diet[]>({
@@ -384,7 +391,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 }}
                 disabled={promoting || demoting || data.user_is_senior_admin}
                 aria-disabled={data.user_is_superuser ? !canDemote || data.user_is_senior_admin : !canPromote}
-                sx={!isSeniorAdmin ? { display: "none" } : undefined}
+                sx={!currentUserLoaded || !isSeniorAdmin ? { display: "none" } : undefined}
               >
                 Administrator
               </PillButton>

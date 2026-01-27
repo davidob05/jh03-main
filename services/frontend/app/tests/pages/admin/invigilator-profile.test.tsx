@@ -22,6 +22,7 @@ vi.mock("@mui/x-date-pickers/StaticDatePicker", () => ({
 }));
 
 const apiFetchMock = vi.fn();
+let currentUserIsSenior = false;
 
 vi.mock("@/utils/api", () => ({
   apiFetch: (...args: any[]) => apiFetchMock(...args),
@@ -56,6 +57,7 @@ const renderPage = (opts: { isSeniorAdmin?: boolean } = {}) => {
   if (opts.isSeniorAdmin) {
     client.setQueryData(["me"], { is_senior_admin: true });
   }
+  currentUserIsSenior = Boolean(opts.isSeniorAdmin);
   return render(
     <MemoryRouter initialEntries={["/admin/invigilators/1"]}>
       <QueryClientProvider client={client}>
@@ -70,7 +72,11 @@ const renderPage = (opts: { isSeniorAdmin?: boolean } = {}) => {
 describe("AdminInvigilatorProfile", () => {
   beforeEach(() => {
     apiFetchMock.mockReset();
+    currentUserIsSenior = false;
     apiFetchMock.mockImplementation((url: string) => {
+      if (url.includes("/auth/me/")) {
+        return Promise.resolve({ ok: true, json: async () => ({ is_senior_admin: currentUserIsSenior }) });
+      }
       if (url.includes("/invigilators/1/")) {
         return Promise.resolve({ ok: true, json: async () => invigilatorResponse });
       }
