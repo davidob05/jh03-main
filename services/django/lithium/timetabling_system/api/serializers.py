@@ -19,6 +19,7 @@ from timetabling_system.models import (
     SlotChoices,
     Diet,
 )
+from timetabling_system.services.venue_stats import examvenue_student_counts
 
 # Backwards-compat attribute so older tests that patch DIET_DATE_RANGES don't crash.
 DIET_DATE_RANGES: dict = {}
@@ -29,6 +30,7 @@ class ExamVenueSerializer(serializers.ModelSerializer):
     exam_name = serializers.CharField(source="exam.exam_name", read_only=True)
     venue_type = serializers.SerializerMethodField()
     venue_accessible = serializers.SerializerMethodField()
+    students_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ExamVenue
@@ -43,6 +45,7 @@ class ExamVenueSerializer(serializers.ModelSerializer):
             "provision_capabilities",
             "venue_type",
             "venue_accessible",
+            "students_count",
         )
 
     def get_venue_name(self, obj):
@@ -56,6 +59,15 @@ class ExamVenueSerializer(serializers.ModelSerializer):
     def get_venue_accessible(self, obj):
         venue = getattr(obj, "venue", None)
         return venue.is_accessible if venue is not None else None
+
+    def get_students_count(self, obj):
+        exam = getattr(obj, "exam", None)
+        if not exam:
+            return 0
+        cache = self.context.setdefault("_examvenue_student_counts", {})
+        if exam.pk not in cache:
+            cache[exam.pk] = examvenue_student_counts(exam)
+        return cache[exam.pk].get(obj.pk, 0)
 
 
 class ExamVenueWriteSerializer(serializers.ModelSerializer):

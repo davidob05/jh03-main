@@ -32,6 +32,7 @@ type ExamVenue = {
   exam_length: number | null;
   core: boolean;
   provision_capabilities: string[];
+  students_count?: number | null;
 };
 
 type ExamData = {
@@ -155,20 +156,27 @@ export const AdminExamDetails: React.FC = () => {
     );
   }
 
-  const examVenueIds = new Set(data.exam_venues.map((ev) => ev.examvenue_id));
-  const assignedInvigilators = assignments.filter(
-    (assignment) => examVenueIds.has(assignment.exam_venue) && !assignment.cancel
-  ).length;
-  const totalStudents = data.no_students || 0;
   const studentsPerInvigilator = 50;
-  const requiredInvigilators = Math.ceil(totalStudents / studentsPerInvigilator);
-  const remainingInvigilators = Math.max(requiredInvigilators - assignedInvigilators, 0);
-  const ratioMet = assignedInvigilators >= requiredInvigilators;
-  const currentRatio =
-    totalStudents > 0 && assignedInvigilators > 0
-      ? Math.round(totalStudents / assignedInvigilators)
-      : null;
-  const ratioLabel = currentRatio ? `1:${currentRatio}` : "N/A";
+  const venueStats = data.exam_venues.map((venue) => {
+    const students = venue.students_count ?? 0;
+    const required = Math.ceil(students / studentsPerInvigilator);
+    const assigned = assignments.filter(
+      (assignment) => assignment.exam_venue === venue.examvenue_id && !assignment.cancel
+    ).length;
+    return {
+      venue,
+      students,
+      required,
+      assigned,
+      remaining: Math.max(required - assigned, 0),
+      ratioMet: assigned >= required,
+    };
+  });
+  const requiredInvigilators = venueStats.reduce((sum, v) => sum + v.required, 0);
+  const assignedInvigilators = venueStats.reduce((sum, v) => sum + v.assigned, 0);
+  const remainingInvigilators = venueStats.reduce((sum, v) => sum + v.remaining, 0);
+  const ratioMet = venueStats.every((v) => v.ratioMet);
+  const ratioLabel = `1:${studentsPerInvigilator}`;
 
   const coreVenue = data.exam_venues.find((ev) => ev.core) || data.exam_venues[0];
   const extraVenues = data.exam_venues.filter((ev) => !coreVenue || ev.examvenue_id !== coreVenue.examvenue_id);
@@ -192,7 +200,19 @@ export const AdminExamDetails: React.FC = () => {
             }}
           />
           <Tooltip
-            title={`Current ratio: ${ratioLabel}${!ratioMet && remainingInvigilators > 0 ? ` • ${remainingInvigilators} more needed` : ""}`}
+            title={(
+              <Stack spacing={0.5}>
+                <Typography variant="caption">Target ratio: {ratioLabel}</Typography>
+                {venueStats.map((v) => (
+                  <Typography key={v.venue.examvenue_id} variant="caption">
+                    {(v.venue.venue_name || "Unassigned")}: {v.assigned}/{v.required} ({v.students} students)
+                  </Typography>
+                ))}
+                {!ratioMet && remainingInvigilators > 0 && (
+                  <Typography variant="caption">{remainingInvigilators} more needed overall</Typography>
+                )}
+              </Stack>
+            )}
           >
             <Chip
               label={`Invigilators: ${assignedInvigilators} / ${requiredInvigilators}`}
