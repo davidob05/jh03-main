@@ -7,9 +7,10 @@ SMOKE_FRONTEND_CMD := npm test -- --passWithNoTests --testNamePattern="smoke|hea
 SMOKE_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py test timetabling_system.utils
 TEST_FRONTEND_CMD := npm test -- --passWithNoTests
 TEST_DJANGO_CMD := . /app/.venv/bin/activate && python manage.py makemigrations --noinput && python manage.py migrate --noinput && python manage.py test
+COVERAGE_FRONTEND_CMD := npm test -- --coverage --passWithNoTests
 
 
-.PHONY: up down logs build reset-django-db migrations makemigrations migrate superuser django frontend test
+.PHONY: up down logs build reset-django-db migrations makemigrations migrate superuser django frontend test coverage-summary
 up:
 	@echo "Installing frontend dependencies locally so the container can run tests without hitting the network..."
 	rm -rf $(FRONTEND_DIR)/node_modules
@@ -84,6 +85,9 @@ test:
 	docker compose -f $(DEV_COMPOSE) exec django bash -lc '$(TEST_DJANGO_CMD)'
 
 coverage:
+	@echo "Calculating frontend test coverage..."
+	docker compose -f $(DEV_COMPOSE) up -d --no-build frontend || true
+	docker compose -f $(DEV_COMPOSE) exec frontend sh -lc 'set -eu; cd /app; $(COVERAGE_FRONTEND_CMD)'
 	@echo "Calculating Django test coverage (per-file missing lines)..."
 	docker compose -f $(DEV_COMPOSE) up -d --no-build django || true
 	docker compose -f $(DEV_COMPOSE) exec django bash -lc '\
@@ -99,3 +103,14 @@ coverage:
 		coverage run --rcfile=/app/.coveragerc manage.py test --keepdb; \
 		coverage report -m; \
 	'
+
+coverage-summary: coverage
+	@echo "Generating combined frontend + Django coverage summary..."
+	docker compose -f $(DEV_COMPOSE) exec django bash -lc '\
+		set -euo pipefail; \
+		cd /app; \
+		. /app/.venv/bin/activate; \
+		coverage json -o /tmp/coverage.json; \
+	'
+	docker compose -f $(DEV_COMPOSE) exec django bash -lc 'cat /tmp/coverage.json' > .django-coverage.json
+	node - <<'NODE'\nconst fs = require('fs');\nconst clover = fs.readFileSync('services/frontend/app/coverage/clover.xml','utf8');\nconst m = clover.match(/<metrics[^>]*\\bstatements=\"(\\d+)\"[^>]*\\bcoveredstatements=\"(\\d+)\"[^>]*\\bloc=\"(\\d+)\"[^>]*\\bncloc=\"(\\d+)\"/);\nif (!m) { console.error('Failed to read frontend clover metrics'); process.exit(1); }\nconst frontendStatements = Number(m[1]);\nconst frontendCoveredStatements = Number(m[2]);\nconst frontendLoc = Number(m[3]);\nconst django = JSON.parse(fs.readFileSync('.django-coverage.json','utf8'));\nconst djangoStatements = django.totals?.num_statements ?? 0;\nconst djangoCoveredStatements = django.totals?.covered_lines ?? 0;\nconst combinedStatementsTotal = frontendStatements + djangoStatements;\nconst combinedStatementsCovered = frontendCoveredStatements + djangoCoveredStatements;\nconst combinedStatementPct = combinedStatementsTotal ? (combinedStatementsCovered / combinedStatementsTotal * 100) : 0;\nconst combinedLineTotal = frontendLoc + djangoStatements;\nconst combinedLineCovered = frontendCoveredStatements + djangoCoveredStatements;\nconst combinedLinePct = combinedLineTotal ? (combinedLineCovered / combinedLineTotal * 100) : 0;\nconsole.log(`Frontend statements: ${frontendCoveredStatements}/${frontendStatements} (${(frontendCoveredStatements/frontendStatements*100).toFixed(2)}%)`);\nconsole.log(`Django statements: ${djangoCoveredStatements}/${djangoStatements} (${(djangoCoveredStatements/djangoStatements*100).toFixed(2)}%)`);\nconsole.log(`Combined statements: ${combinedStatementsCovered}/${combinedStatementsTotal} (${combinedStatementPct.toFixed(2)}%)`);\nconsole.log(`Combined lines: ${combinedLineCovered}/${combinedLineTotal} (${combinedLinePct.toFixed(2)}%)`);\nNODE

@@ -38,6 +38,7 @@
     "@types/react-calendar-timeline": "^0.28.6",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "^3.2.4",
     "baseline-browser-mapping": "^2.9.18",
     "jest": "^30.2.0",
     "jsdom": "^27.0.0",
