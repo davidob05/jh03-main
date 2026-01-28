@@ -93,6 +93,8 @@ interface VenueData {
 }
 
 export const AdminDashboard: React.FC = () => {
+  const ALL_SCHOOLS_LABEL = "All schools";
+  const ALL_SCHOOLS_BULK_LABEL = "All schools (separate files)";
   const [visibleCount, setVisibleCount] = useState(4);
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
   const [announcementSnackbar, setAnnouncementSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
@@ -100,6 +102,7 @@ export const AdminDashboard: React.FC = () => {
   const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
   const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [exporting, setExporting] = useState(false);
+  const [bulkExporting, setBulkExporting] = useState(false);
 
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
@@ -211,8 +214,10 @@ export const AdminDashboard: React.FC = () => {
     exams.forEach((exam) => {
       if (exam.exam_school) unique.add(exam.exam_school);
     });
-    return Array.from(unique).sort((a, b) => a.localeCompare(b));
-  }, [exams]);
+    const sorted = Array.from(unique).sort((a, b) => a.localeCompare(b));
+    const withAll = sorted.includes(ALL_SCHOOLS_LABEL) ? sorted : [ALL_SCHOOLS_LABEL, ...sorted];
+    return withAll.includes(ALL_SCHOOLS_BULK_LABEL) ? withAll : [ALL_SCHOOLS_BULK_LABEL, ...withAll];
+  }, [exams, ALL_SCHOOLS_LABEL, ALL_SCHOOLS_BULK_LABEL]);
 
   const notifications = (notificationsError ? [] : notificationsFromApi) || [];
 
@@ -293,13 +298,18 @@ export const AdminDashboard: React.FC = () => {
     new Date().toISOString();
 
   const handleExport = async () => {
+    if (selectedSchool === ALL_SCHOOLS_BULK_LABEL) {
+      await handleExportAllSchools();
+      return;
+    }
+    const normalizedSchool = selectedSchool === ALL_SCHOOLS_LABEL ? "" : selectedSchool;
     try {
       setExporting(true);
-      await downloadProvisionExport(selectedSchool || undefined);
+      await downloadProvisionExport(normalizedSchool || undefined);
       setExportSnackbar({
         open: true,
-        message: selectedSchool
-          ? `Provisions exported for ${selectedSchool}.`
+        message: normalizedSchool
+          ? `Provisions exported for ${normalizedSchool}.`
           : "Provisions exported.",
       });
     } catch (err) {
@@ -307,6 +317,28 @@ export const AdminDashboard: React.FC = () => {
       alert("Export failed");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleExportAllSchools = async () => {
+    const schools = schoolOptions.filter(
+      (s) => s && s !== ALL_SCHOOLS_LABEL && s !== ALL_SCHOOLS_BULK_LABEL
+    );
+    if (!schools.length) {
+      setExportSnackbar({ open: true, message: "No schools found to export." });
+      return;
+    }
+    try {
+      setBulkExporting(true);
+      for (const school of schools) {
+        await downloadProvisionExport(school);
+      }
+      setExportSnackbar({ open: true, message: "Provisions exported for all schools." });
+    } catch (err) {
+      console.error(err);
+      alert("Export failed");
+    } finally {
+      setBulkExporting(false);
     }
   };
 
@@ -344,12 +376,12 @@ export const AdminDashboard: React.FC = () => {
                   />
                   <PillButton
                     variant="contained"
-                    disabled={exporting}
+                    disabled={exporting || bulkExporting}
                     onClick={handleExport}
                     startIcon={<FileDownloadIcon />}
                     sx={{ minWidth: 200 }}
                   >
-                    {exporting ? "Exporting..." : "Export"}
+                    {bulkExporting || exporting ? "Exporting..." : "Export"}
                   </PillButton>
                 </Stack>
               </Stack>
