@@ -31,10 +31,11 @@ import {
   Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon, ArrowForward as ArrowForwardIcon } from "@mui/icons-material";
+import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon, ArrowForward as ArrowForwardIcon, Close } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { PillButton } from "../../components/PillButton";
 import { useAppDispatch, useAppSelector, setStudentsPrefs } from "../../state/store";
 
 type StudentProvisionRow = {
@@ -232,9 +233,16 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
+      <DialogTitle sx={{ pr: 6 }}>
         Change venue for {studentName}
         <Typography variant="body2" color="text.secondary">{examName}</Typography>
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", right: 12, top: 10 }}
+        >
+          <Close />
+        </IconButton>
       </DialogTitle>
       <DialogContent dividers>
         {isLoading ? (
@@ -303,9 +311,9 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
-        <Button variant="contained" onClick={handleSave} disabled={disableSave}>
+        <PillButton variant="contained" onClick={handleSave} disabled={disableSave}>
           {mutation.isPending ? "Saving..." : "Save"}
-        </Button>
+        </PillButton>
       </DialogActions>
     </Dialog>
   );
@@ -440,12 +448,6 @@ const StudentTableSection: React.FC<SectionProps> = ({
       studentName: row.student_name,
       examName: `${row.course_code} • ${row.exam_name}`,
     });
-  };
-
-  const openDeleteDialogForRow = (row: StudentProvisionRow) => {
-    setDeleteTargets([row]);
-    setDeleteError(null);
-    setDeleteOpen(true);
   };
 
   const openDeleteDialogForSelection = () => {
@@ -636,21 +638,12 @@ const StudentTableSection: React.FC<SectionProps> = ({
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
-                          <IconButton
-                            aria-label={isOpen ? "Collapse details" : "Expand details"}
-                            onClick={() => setOpenRows((prev) => ({ ...prev, [key]: !isOpen }))}
-                          >
-                            <ExpandMoreIcon sx={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
-                          </IconButton>
-                          <IconButton
-                            aria-label="Delete student record"
-                            onClick={() => openDeleteDialogForRow(row)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <DeleteIcon color="error" />
-                          </IconButton>
-                        </Stack>
+                        <IconButton
+                          aria-label={isOpen ? "Collapse details" : "Expand details"}
+                          onClick={() => setOpenRows((prev) => ({ ...prev, [key]: !isOpen }))}
+                        >
+                          <ExpandMoreIcon sx={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                     <TableRow>
@@ -700,14 +693,14 @@ const StudentTableSection: React.FC<SectionProps> = ({
                               ) : null}
                             </Box>
                             <Box sx={{ gridColumn: { xs: "1", sm: "1 / -1" }, display: "flex", justifyContent: "flex-end" }}>
-                              <Button
+                              <PillButton
                                 variant="outlined"
                                 size="small"
                                 onClick={() => openVenueDialogForRow(row)}
                                 disabled={!row.student_exam_id}
                               >
                                 Change venue
-                              </Button>
+                              </PillButton>
                             </Box>
                           </Box>
                         </Collapse>
