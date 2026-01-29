@@ -1,6 +1,6 @@
 # JH03 Platform
 
-An internal tool for uploading and managing university exam timetables, venues, invigilators, and student provisions. The stack ships as two Dockerised services:
+An internal webapp for uploading and managing university exam timetables, venues, invigilators, and student provisions. The tool is designed to take in large excel files, automate provisioning of students and store the data in a database. Pages have been designed to allow for easy manipulation of the data, to perform functions that would previously have been the transfrerring of excel cells. The stack ships as two Dockerised services:
 
 - **Frontend** &mdash; React + Vite UI served from `services/frontend`.
 - **API** &mdash; Django 5 project in `services/django/lithium`, which boots an embedded PostgreSQL instance and exposes application, authentication, bulk delete, and health endpoints.
