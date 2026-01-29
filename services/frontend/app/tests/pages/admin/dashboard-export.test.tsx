@@ -47,6 +47,7 @@ beforeEach(() => {
     if (url.includes("/provisions/export/")) {
       return Promise.resolve({
         ok: true,
+        headers: { get: () => null },
         blob: async () => new Blob(["csv"], { type: "text/csv" }),
         text: async () => "",
       });
