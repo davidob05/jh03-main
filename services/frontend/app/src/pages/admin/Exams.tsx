@@ -159,6 +159,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
             checked={rowCount > 0 && numSelected === rowCount}
             onChange={onSelectAllClick}
             inputProps={{ 'aria-label': 'select all exams' }}
+            disabled={rowCount === 0}
           />
         </TableCell>
         {headCells.map((headCell) => (
@@ -520,6 +521,13 @@ export const AdminExams: React.FC = () => {
                     </React.Fragment>
                   );
                 })}
+                {!filteredRows.length && (
+                  <TableRow>
+                    <TableCell colSpan={8}>
+                      <Typography variant="body2" color="text.secondary">No exam records found.</Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
                 {emptyRows > 0 && <TableRow style={{ height: 53 * emptyRows }}><TableCell colSpan={8} /></TableRow>}
               </TableBody>
             </Table>

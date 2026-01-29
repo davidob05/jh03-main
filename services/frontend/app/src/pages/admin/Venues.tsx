@@ -180,6 +180,7 @@ const EnhancedTableHead = ({
             checked={rowCount > 0 && numSelected === rowCount}
             indeterminate={numSelected > 0 && numSelected < rowCount}
             onChange={onSelectAllClick}
+            disabled={rowCount === 0}
           />
         </TableCell>
 
@@ -703,6 +704,13 @@ export const AdminVenues: React.FC = () => {
                 );
               })}
 
+              {!filteredRows.length && (
+                <TableRow>
+                  <TableCell colSpan={headCells.length + 2}>
+                    <Typography variant="body2" color="text.secondary">No venue records found.</Typography>
+                  </TableCell>
+                </TableRow>
+              )}
               {emptyRows > 0 && (
                 <TableRow style={{ height: 53 * emptyRows }}>
                   <TableCell colSpan={headCells.length + 2} />

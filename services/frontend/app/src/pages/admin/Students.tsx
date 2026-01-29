@@ -527,7 +527,10 @@ const StudentTableSection: React.FC<SectionProps> = ({
                     disabled={!allKeys.length || deleteMutation.isPending}
                   />
                 </TableCell>
-                <TableCell sortDirection={orderBy === "student_name" ? order : false}>
+                <TableCell
+                  sortDirection={orderBy === "student_name" ? order : false}
+                  padding="none"
+                >
                   <TableSortLabel
                     active={orderBy === "student_name"}
                     direction={orderBy === "student_name" ? order : "asc"}
@@ -567,25 +570,26 @@ const StudentTableSection: React.FC<SectionProps> = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginated.map((row) => {
+              {paginated.map((row, index) => {
                 const statusColor = row.matches_needs ? "success" : "warning";
                 const statusLabel = row.matches_needs ? "Allocated" : row.allocation_issue || "Needs allocation";
                 const key = rowKey(row);
+                const labelId = `enhanced-table-checkbox-${index}`;
                 const isOpen = openRows[key] || false;
                 const isSelected = selectedSet.has(key);
                 return (
                   <React.Fragment key={key}>
-                    <TableRow hover role="checkbox" aria-checked={isSelected} selected={isSelected}>
+                    <TableRow hover role="checkbox" aria-checked={isSelected} tabIndex={-1} selected={isSelected}>
                       <TableCell padding="checkbox">
                         <Checkbox
                           color="primary"
                           checked={isSelected}
-                          onChange={() => handleRowSelect(key)}
-                          inputProps={{ "aria-label": `select ${row.student_name}` }}
+                          onClick={() => handleRowSelect(key)}
+                          inputProps={{ "aria-labelledby": labelId }}
                           disabled={deleteMutation.isPending}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell component="th" id={labelId} scope="row" padding="none">
                         <Typography fontWeight={600}>{row.student_name}</Typography>
                         <Typography variant="body2" color="text.secondary">{row.student_id}</Typography>
                       </TableCell>
