@@ -365,18 +365,20 @@ class InvigilatorTimetableExportView(APIView):
         return response
 
 
-def log_notification(type_: str, message: str, when=None, user=None):
+def log_notification(type_: str, message: str, when=None, user=None, invigilator=None):
     """
     Create a notification using the new admin/invigilator message fields.
     Existing callers pass a single `message`; we fan that out to both variants.
     """
     try:
+        resolved_invigilator = invigilator or _resolve_invigilator_for_user(user)
         Notification.objects.create(
             type=type_,
             invigilator_message=message or "",
             admin_message=message or "",
             timestamp=when or timezone.now(),
             triggered_by=user,
+            invigilator=resolved_invigilator,
         )
     except Exception:
         # Do not break main flows if notification logging fails
@@ -1157,13 +1159,25 @@ class NotificationsView(APIView):
         if log_only:
             count = len(recipients)
             method_label = " & ".join(methods) if methods else "mail"
+            admin_message = (
+                f"Sent '{subject_to_use}' mail merge to {count} invigilator{'s' if count != 1 else ''} via {method_label}"
+            )
             Notification.objects.create(
                 type=Notification.NotificationType.MAIL_MERGE,
-                admin_message=f"Sent '{subject_to_use}' mail merge to {count} invigilator{'s' if count != 1 else ''} via {method_label}",
+                admin_message=admin_message,
                 invigilator_message="",
                 timestamp=timezone.now(),
                 triggered_by=request.user,
             )
+            for invigilator in recipients:
+                Notification.objects.create(
+                    type=Notification.NotificationType.MAIL_MERGE,
+                    admin_message=admin_message,
+                    invigilator_message=f"You were sent a mail merge: {subject_to_use}.",
+                    timestamp=timezone.now(),
+                    triggered_by=request.user,
+                    invigilator=invigilator,
+                )
             return Response(
                 {
                     "status": "ok",
@@ -1653,6 +1667,7 @@ class InvigilatorNotificationsView(APIView):
             Notification.NotificationType.EXAM_CHANGE,
             Notification.NotificationType.VENUE_CHANGE,
             Notification.NotificationType.MAIL_MERGE,
+            Notification.NotificationType.ADMIN_MESSAGE,
         ]
         qs = (
             Notification.objects.filter(
@@ -1903,7 +1918,12 @@ class InvigilatorAvailabilityView(APIView):
                 message = f"{inv_name} updated availability for {diet_label}: {count_unavailable} {slot_word} unavailable"
         else:
             message = f"{inv_name} set availability for {diet_label}: all slots available"
-        log_notification(Notification.NotificationType.AVAILABILITY, message, user=request.user)
+        log_notification(
+            Notification.NotificationType.AVAILABILITY,
+            message,
+            user=request.user,
+            invigilator=invigilator,
+        )
 
         refreshed_qs = InvigilatorAvailability.objects.filter(invigilator=invigilator)
         if start_date and end_date:
