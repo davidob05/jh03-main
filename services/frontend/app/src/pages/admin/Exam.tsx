@@ -295,39 +295,43 @@ export const AdminExamDetails: React.FC = () => {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">{formatDateTime(ev.start_time)}</Typography>
                   <Typography variant="body2">Duration: {formatDuration(ev.exam_length)}</Typography>
-                  {(() => {
-                    const stats = venueStatsById.get(ev.examvenue_id);
-                    if (!stats) return null;
-                    return (
-                      <Tooltip
-                        title={(
-                          <Stack spacing={0.5}>
-                            <Typography variant="caption">Target ratio: {ratioLabel}</Typography>
-                            <Typography variant="caption">
-                              {stats.assigned}/{stats.required} ({stats.students} students)
-                            </Typography>
-                            {!stats.ratioMet && stats.remaining > 0 && (
-                              <Typography variant="caption">{stats.remaining} more needed for this venue</Typography>
-                            )}
-                          </Stack>
-                        )}
-                      >
-                        <Chip
-                          label={`Invigilators: ${stats.assigned} / ${stats.required}`}
-                          size="medium"
-                          sx={{
-                            mt: 1,
-                            fontWeight: 700,
-                            backgroundColor: stats.ratioMet ? "#f0fdf4" : "#fff4e5",
-                            color: stats.ratioMet ? "#166534" : "#b45309",
-                          }}
-                        />
-                      </Tooltip>
-                    );
-                  })()}
-                  <Box sx={{ mt: 1 }}>
+                  <Box sx={{ mt: 1, display: "flex", justifyContent: "center", width: "100%" }}>
+                    {(() => {
+                      const stats = venueStatsById.get(ev.examvenue_id);
+                      if (!stats) return null;
+                      return (
+                        <Tooltip
+                          title={(
+                            <Stack spacing={0.5}>
+                              <Typography variant="caption">Target ratio: {ratioLabel}</Typography>
+                              <Typography variant="caption">
+                                {stats.assigned}/{stats.required} ({stats.students} students)
+                              </Typography>
+                              {!stats.ratioMet && stats.remaining > 0 && (
+                                <Typography variant="caption">{stats.remaining} more needed for this venue</Typography>
+                              )}
+                            </Stack>
+                          )}
+                        >
+                          <Chip
+                            label={`Invigilators: ${stats.assigned} / ${stats.required}`}
+                            size="medium"
+                            sx={{
+                              width: "100%",
+                              fontWeight: 700,
+                              backgroundColor: stats.ratioMet ? "#f0fdf4" : "#fff4e5",
+                              color: stats.ratioMet ? "#166534" : "#b45309",
+                              justifyContent: "center",
+                            }}
+                          />
+                        </Tooltip>
+                      );
+                    })()}
+                  </Box>
+                  <Box sx={{ mt: 1, display: "flex", justifyContent: "center", width: "100%" }}>
                     <PillButton
                       variant="outlined"
+                      fullWidth
                       onClick={() => {
                         setAssignVenue(ev);
                         setAssignOpen(true);
