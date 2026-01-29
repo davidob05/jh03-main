@@ -183,6 +183,12 @@ class InvigilatorTimetableExportView(APIView):
     permission_classes = [permissions.IsAdminUser]
 
     def post(self, request, *args, **kwargs):
+        def admin_display_name(user) -> str:
+            if not user:
+                return "Admin"
+            first_name = (getattr(user, "first_name", "") or "").strip()
+            return first_name or getattr(user, "username", "") or getattr(user, "email", "") or "Admin"
+
         invigilator_ids = request.data.get("invigilator_ids")
         if invigilator_ids is None:
             invigilator_id = request.data.get("invigilator_id")
@@ -235,6 +241,24 @@ class InvigilatorTimetableExportView(APIView):
                 .filter(invigilator_id__in=invigilator_ids, cancel=True, confirmed=True)
             )
             assignments = (assignments | cancelled_qs).order_by("invigilator_id", "assigned_start")
+
+        invigilator_map = {
+            inv.id: inv
+            for inv in Invigilator.objects.filter(id__in=invigilator_ids).select_related("user")
+        }
+        invigilator_names = [
+            (
+                getattr(inv.user, "get_full_name", lambda: "")() if inv and inv.user else ""
+            )
+            or (inv.preferred_name if inv else "")
+            or (inv.full_name if inv else "")
+            or f"Invigilator #{inv.id}"
+            for inv in invigilator_map.values()
+        ]
+        if len(invigilator_names) == 1:
+            target_label = invigilator_names[0]
+        else:
+            target_label = f"{len(invigilator_names)} invigilators"
 
         exam_venue_ids = list(
             assignments.values_list("exam_venue_id", flat=True).distinct()
@@ -360,15 +384,18 @@ class InvigilatorTimetableExportView(APIView):
             filename = f"{slugify(name or 'invigilator')}_timetable.csv"
             response = HttpResponse(_csv_for(assignments), content_type="text/csv")
             response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            Notification.objects.create(
+                type=Notification.NotificationType.ADMIN_MESSAGE,
+                admin_message=f"{admin_display_name(request.user)} exported invigilator timetable for {target_label}.",
+                invigilator_message="",
+                timestamp=timezone.now(),
+                triggered_by=request.user,
+            )
             return response
 
         zip_buffer = BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             zip_file.writestr("invigilators_timetables.csv", _csv_for(assignments))
-            invigilator_map = {
-                inv.id: inv
-                for inv in Invigilator.objects.filter(id__in=invigilator_ids).select_related("user")
-            }
             for invigilator_id in invigilator_ids:
                 invigilator = invigilator_map.get(invigilator_id)
                 name = (
@@ -380,6 +407,13 @@ class InvigilatorTimetableExportView(APIView):
 
         response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
         response["Content-Disposition"] = 'attachment; filename="invigilators_timetables.zip"'
+        Notification.objects.create(
+            type=Notification.NotificationType.ADMIN_MESSAGE,
+            admin_message=f"{admin_display_name(request.user)} exported invigilator timetables for {target_label}.",
+            invigilator_message="",
+            timestamp=timezone.now(),
+            triggered_by=request.user,
+        )
         return response
 
 
