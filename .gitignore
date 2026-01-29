@@ -62,5 +62,6 @@ Thumbs.db
 *.log
 .~lock.*
 .git.backup.
+.git.backup.*/
 
 *.sqlite3
