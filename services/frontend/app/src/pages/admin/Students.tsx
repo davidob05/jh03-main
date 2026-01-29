@@ -31,7 +31,7 @@ import {
   Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, ArrowForward as ArrowForwardIcon, Close } from "@mui/icons-material";
+import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon, ArrowForward as ArrowForwardIcon, Close } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
@@ -404,31 +404,25 @@ const StudentTableSection: React.FC<SectionProps> = ({
     () => sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [sorted, page, rowsPerPage]
   );
-  const visibleKeys = useMemo(() => paginated.map(rowKey), [paginated, rowKey]);
-  const visibleKeySet = useMemo(() => new Set(visibleKeys), [visibleKeys]);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const selectedVisibleCount = useMemo(
-    () => visibleKeys.reduce((count, key) => count + (selectedSet.has(key) ? 1 : 0), 0),
-    [visibleKeys, selectedSet]
+  const allKeys = useMemo(() => sorted.map(rowKey), [sorted, rowKey]);
+  const selectedFilteredCount = useMemo(
+    () => allKeys.reduce((count, key) => count + (selectedSet.has(key) ? 1 : 0), 0),
+    [allKeys, selectedSet]
   );
-  const allVisibleSelected = visibleKeys.length > 0 && selectedVisibleCount === visibleKeys.length;
+  const allFilteredSelected = allKeys.length > 0 && selectedFilteredCount === allKeys.length;
 
   useEffect(() => {
-    setSelected((prev) => prev.filter((key) => visibleKeySet.has(key)));
     const maxPage = Math.max(0, Math.ceil(sorted.length / rowsPerPage) - 1);
     if (page > maxPage) setPage(maxPage);
-  }, [visibleKeySet, sorted.length, rowsPerPage, page]);
+  }, [sorted.length, rowsPerPage, page]);
 
   useEffect(() => {
     setSearchDraft(appliedSearch);
   }, [appliedSearch]);
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSelected(event.target.checked ? visibleKeys : []);
-  };
-
-  const handleToggleSelectAll = () => {
-    setSelected(allVisibleSelected ? [] : visibleKeys);
+    setSelected(event.target.checked ? allKeys : []);
   };
 
   const handleRowSelect = (key: string) => {
@@ -462,29 +456,50 @@ const StudentTableSection: React.FC<SectionProps> = ({
       <Toolbar
         sx={[
           { pl: { sm: 2 }, pr: { xs: 1, sm: 1 } },
-          { display: "flex", justifyContent: "flex-start", alignItems: "center", flexWrap: "wrap", rowGap: 1 },
+          selected.length > 0 && {
+            bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity),
+          },
         ]}
       >
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={1} sx={{ flex: "1 1 100%" }}>
-          <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5, minWidth: 260 }}>
-            <SearchIcon sx={{ color: "action.active", mr: 1 }} />
-            <InputBase
-              placeholder="Search students..."
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  onSearchSubmit(searchDraft.trim());
-                }
-              }}
-              sx={{ width: "100%" }}
-            />
-            <IconButton aria-label="Apply search" color="primary" onClick={() => onSearchSubmit(searchDraft.trim())}>
-              <ArrowForwardIcon fontSize="small" />
-            </IconButton>
+        {selected.length ? (
+          <Typography sx={{ flex: "1 1 100%" }} color="inherit" variant="subtitle1" component="div">
+            {selected.length} selected
+          </Typography>
+        ) : (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={1} sx={{ flex: "1 1 100%" }}>
+            <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5, minWidth: 260 }}>
+              <SearchIcon sx={{ color: "action.active", mr: 1 }} />
+              <InputBase
+                placeholder="Search students..."
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    onSearchSubmit(searchDraft.trim());
+                  }
+                }}
+                sx={{ width: "100%" }}
+              />
+              <IconButton aria-label="Apply search" color="primary" onClick={() => onSearchSubmit(searchDraft.trim())}>
+                <ArrowForwardIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          </Stack>
+        )}
+        {selected.length ? (
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <PillButton
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={openDeleteDialogForSelection}
+              disabled={deleteMutation.isPending}
+            >
+              Delete
+            </PillButton>
           </Box>
-        </Stack>
+        ) : null}
       </Toolbar>
       <Divider />
       {query.isLoading ? (
@@ -505,11 +520,11 @@ const StudentTableSection: React.FC<SectionProps> = ({
                 <TableCell padding="checkbox">
                   <Checkbox
                     color="primary"
-                    indeterminate={selectedVisibleCount > 0 && !allVisibleSelected}
-                    checked={allVisibleSelected}
+                    indeterminate={selectedFilteredCount > 0 && !allFilteredSelected}
+                    checked={allFilteredSelected}
                     onChange={handleSelectAllClick}
                     inputProps={{ "aria-label": "select all students" }}
-                    disabled={!visibleKeys.length || deleteMutation.isPending}
+                    disabled={!allKeys.length || deleteMutation.isPending}
                   />
                 </TableCell>
                 <TableCell sortDirection={orderBy === "student_name" ? order : false}>
