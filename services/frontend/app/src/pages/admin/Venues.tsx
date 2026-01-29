@@ -35,6 +35,7 @@ import { visuallyHidden } from '@mui/utils';
 import { Link } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { AddVenueDialog } from '../../components/admin/AddVenueDialog';
+import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmationDialog';
 import { PillButton } from '../../components/PillButton';
 import { Panel } from '../../components/Panel';
 import { VENUE_TYPES } from '../../components/admin/venueTypes';
@@ -305,6 +306,9 @@ export const AdminVenues: React.FC = () => {
   const [searchDraft, setSearchDraft] = React.useState(searchQuery);
   const [selected, setSelected] = React.useState<readonly string[]>([]);
   const [openRows, setOpenRows] = React.useState<Record<string, boolean>>({});
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteTargets, setDeleteTargets] = React.useState<string[]>([]);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [addOpen, setAddOpen] = React.useState(false);
   const [successOpen, setSuccessOpen] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState('');
@@ -406,12 +410,15 @@ export const AdminVenues: React.FC = () => {
     },
     onSuccess: async (_data, ids) => {
       setSelected([]);
+      setDeleteOpen(false);
+      setDeleteTargets([]);
+      setDeleteError(null);
       setSuccessMessage(`Deleted ${ids.length} venue${ids.length === 1 ? "" : "s"}.`);
       setSuccessOpen(true);
       await queryClient.invalidateQueries({ queryKey: ['venues'] });
     },
     onError: (err: any) => {
-      setErrorMessage(err?.message || "Failed to delete venues.");
+      setDeleteError(err?.message || "Failed to delete venues.");
     },
   });
 
@@ -458,6 +465,16 @@ export const AdminVenues: React.FC = () => {
       previousType: currentType,
     });
   };
+
+  const openDeleteDialogForSelection = () => {
+    if (!selected.length) return;
+    setDeleteTargets([...selected]);
+    setDeleteError(null);
+    setDeleteOpen(true);
+  };
+
+  const deleteCount = deleteTargets.length;
+  const deleteTarget = deleteTargets[0];
 
   const filteredRows = React.useMemo(() => {
     if (!searchQuery) return rows;
@@ -559,7 +576,7 @@ export const AdminVenues: React.FC = () => {
           onSearchChange={handleSearchChange}
           onSearchSubmit={() => dispatch(setVenuesPrefs({ searchQuery: searchDraft.trim(), page: 0 }))}
           onAddVenue={() => setAddOpen(true)}
-          onDeleteSelected={() => bulkDeleteMutation.mutate([...selected])}
+          onDeleteSelected={openDeleteDialogForSelection}
           deleteLoading={bulkDeleteMutation.isPending}
         />
         <Divider />
@@ -716,6 +733,41 @@ export const AdminVenues: React.FC = () => {
           setSuccessOpen(true);
           queryClient.invalidateQueries({ queryKey: ['venues'] });
           setAddOpen(false);
+        }}
+      />
+      <DeleteConfirmationDialog
+        open={deleteOpen}
+        title={deleteCount > 1 ? "Delete venues?" : "Delete venue?"}
+        description={
+          <>
+            {deleteCount > 1 ? (
+              <>
+                This will permanently delete <strong>{deleteCount}</strong> venues.
+              </>
+            ) : (
+              <>
+                This will permanently delete the venue record for{" "}
+                <strong>{deleteTarget || "this venue"}</strong>.
+              </>
+            )}
+            {deleteError ? (
+              <Typography sx={{ mt: 2 }} color="error">
+                {deleteError}
+              </Typography>
+            ) : null}
+          </>
+        }
+        confirmText={deleteCount > 1 ? `Delete ${deleteCount}` : "Delete"}
+        loading={bulkDeleteMutation.isPending}
+        onClose={() => {
+          if (!bulkDeleteMutation.isPending) {
+            setDeleteOpen(false);
+            setDeleteTargets([]);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={() => {
+          if (deleteTargets.length) bulkDeleteMutation.mutate(deleteTargets);
         }}
       />
       <Snackbar

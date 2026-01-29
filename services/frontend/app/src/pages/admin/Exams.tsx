@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
 import {
   Box,
@@ -34,6 +34,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs from 'dayjs';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
+import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { useAppDispatch, useAppSelector, setExamsPrefs } from '../../state/store';
 
 interface ExamData {
@@ -182,9 +183,10 @@ interface EnhancedTableToolbarProps {
   onSearchSubmit: () => void;
   onEditSelected: () => void;
   onDeleteSelected: () => void;
+  deleteLoading: boolean;
 }
 
-function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onSearchSubmit, onEditSelected, onDeleteSelected }: EnhancedTableToolbarProps) {
+function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onSearchSubmit, onEditSelected, onDeleteSelected, deleteLoading }: EnhancedTableToolbarProps) {
   return (
     <Toolbar sx={[{ pl: { sm: 2 }, pr: { xs: 1, sm: 1 } }, numSelected > 0 && { bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity) }]}>
       {numSelected > 0 ? (
@@ -230,6 +232,7 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onSear
             color="error"
             startIcon={<DeleteIcon />}
             onClick={onDeleteSelected}
+            disabled={deleteLoading}
           >
             Delete
           </PillButton>
@@ -250,6 +253,9 @@ export const AdminExams: React.FC = () => {
   const [searchDraft, setSearchDraft] = React.useState(searchQuery);
   const [selected, setSelected] = React.useState<readonly number[]>([]);
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteTargets, setDeleteTargets] = React.useState<RowData[]>([]);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   React.useEffect(() => setSearchDraft(searchQuery), [searchQuery]);
@@ -280,6 +286,38 @@ export const AdminExams: React.FC = () => {
       searchIndex: [exam.course_code, exam.exam_name, coreVenue?.venue_name || '', ...otherVenues.map((v) => v.venue_name)].join(' ').toLowerCase(),
     };
   }), [examsData]);
+
+  const rowMap = React.useMemo(() => {
+    const map = new Map<number, RowData>();
+    rows.forEach((row) => map.set(row.id, row));
+    return map;
+  }, [rows]);
+
+  const deleteMutation = useMutation<void, Error, number[]>({
+    mutationFn: async (ids: number[]) => {
+      const res = await apiFetch(`${apiBaseUrl}/exams/bulk-delete/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Bulk delete failed");
+      }
+    },
+    onSuccess: async (_data, ids) => {
+      setSelected((prev) => prev.filter((id) => !ids.includes(id)));
+      setDeleteOpen(false);
+      setDeleteTargets([]);
+      setDeleteError(null);
+      await Promise.all([
+        refetch(),
+        queryClient.invalidateQueries({ queryKey: ['exams-table'] }),
+        queryClient.invalidateQueries({ queryKey: ['exams-calendar'] }),
+      ]);
+    },
+    onError: (err: any) => setDeleteError(err?.message || "Delete failed"),
+  });
 
   const summary = React.useMemo(() => {
     const total = examsData.length;
@@ -322,30 +360,17 @@ export const AdminExams: React.FC = () => {
   const handleEditSelected = () => {
     if (selected.length === 1) navigate(`/admin/exam/${selected[0]}`);
   };
-  const handleDeleteSelected = React.useCallback(async () => {
-    if (selected.length === 0) return;
-    const ok = window.confirm(`Delete ${selected.length} exam${selected.length > 1 ? 's' : ''}?`);
-    if (!ok) return;
-    try {
-      const res = await apiFetch(`${apiBaseUrl}/exams/bulk-delete/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selected }),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Bulk delete failed");
-      }
-      setSelected([]);
-      await Promise.all([
-        refetch(),
-        queryClient.invalidateQueries({ queryKey: ['exams-table'] }),
-        queryClient.invalidateQueries({ queryKey: ['exams-calendar'] }),
-      ]);
-    } catch (err: any) {
-      alert(err?.message || "Delete failed");
-    }
-  }, [selected, refetch, queryClient]);
+  const openDeleteDialogForSelection = React.useCallback(() => {
+    const targets = selected.map((id) => rowMap.get(id)).filter(Boolean) as RowData[];
+    if (!targets.length) return;
+    setDeleteTargets(targets);
+    setDeleteError(null);
+    setDeleteOpen(true);
+  }, [selected, rowMap]);
+  const handleDeleteSelected = openDeleteDialogForSelection;
+
+  const deleteCount = deleteTargets.length;
+  const deleteTarget = deleteTargets[0];
 
   const filteredRows = React.useMemo(() => {
     if (!searchQuery) return rows;
@@ -423,6 +448,7 @@ export const AdminExams: React.FC = () => {
             onSearchSubmit={applySearch}
             onEditSelected={handleEditSelected}
             onDeleteSelected={handleDeleteSelected}
+            deleteLoading={deleteMutation.isPending}
           />
           <Divider />
           <TableContainer>
@@ -501,6 +527,42 @@ export const AdminExams: React.FC = () => {
           <Divider />
           <TablePagination rowsPerPageOptions={[5, 10, 25]} component="div" count={filteredRows.length} rowsPerPage={rowsPerPage} page={page} onPageChange={handleChangePage} onRowsPerPageChange={handleChangeRowsPerPage} />
         </Panel>
+        <DeleteConfirmationDialog
+          open={deleteOpen}
+          title={deleteCount > 1 ? "Delete exams?" : "Delete exam?"}
+          description={
+            <>
+              {deleteCount > 1 ? (
+                <>
+                  This will permanently delete <strong>{deleteCount}</strong> exams.
+                </>
+              ) : (
+                <>
+                  This will permanently delete the exam record for{" "}
+                  <strong>{deleteTarget?.code || "this exam"}</strong>
+                  {deleteTarget?.subject ? ` • ${deleteTarget.subject}.` : "."}
+                </>
+              )}
+              {deleteError ? (
+                <Typography sx={{ mt: 2 }} color="error">
+                  {deleteError}
+                </Typography>
+              ) : null}
+            </>
+          }
+          confirmText={deleteCount > 1 ? `Delete ${deleteCount}` : "Delete"}
+          loading={deleteMutation.isPending}
+          onClose={() => {
+            if (!deleteMutation.isPending) {
+              setDeleteOpen(false);
+              setDeleteTargets([]);
+              setDeleteError(null);
+            }
+          }}
+          onConfirm={() => {
+            if (deleteTargets.length) deleteMutation.mutate(deleteTargets.map((target) => target.id));
+          }}
+        />
       </Box>
     </LocalizationProvider>
   );
