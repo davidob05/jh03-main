@@ -802,6 +802,45 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"], url_path="remove-senior-admin", permission_classes=[IsSeniorAdmin])
+    def remove_senior_admin(self, request, pk=None):
+        invigilator = self.get_object()
+        user = getattr(invigilator, "user", None)
+        if not user:
+            return Response(
+                {"detail": "Invigilator has no linked login to update."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not getattr(user, "is_senior_admin", False):
+            return Response(
+                {"detail": "User is not a senior administrator."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.is_senior_admin = False
+        user.save(update_fields=["is_senior_admin"])
+
+        Notification.objects.create(
+            type=Notification.NotificationType.ADMIN_MESSAGE,
+            admin_message=(
+                f"{self._admin_display_name(request.user)} removed senior administrator access for "
+                f"{self._invigilator_display_name(invigilator)}."
+            ),
+            invigilator_message="",
+            timestamp=timezone.now(),
+            triggered_by=request.user,
+        )
+
+        return Response(
+            {
+                "detail": "Senior administrator privileges removed.",
+                "user_id": user.id,
+                "is_senior_admin": getattr(user, "is_senior_admin", False),
+            },
+            status=status.HTTP_200_OK,
+        )
+
     def perform_update(self, serializer):
         instance = serializer.save()
         name = instance.preferred_name or instance.full_name or "Invigilator"
@@ -2118,7 +2157,6 @@ class InvigilatorAssignmentsView(APIView):
         )
 
         return Response(InvigilatorAssignmentSerializer(assignments, many=True).data)
-
 
 
 

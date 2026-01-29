@@ -128,6 +128,9 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const [demoteOpen, setDemoteOpen] = useState(false);
   const [demoting, setDemoting] = useState(false);
   const [demoteError, setDemoteError] = useState<string | null>(null);
+  const [seniorDemoteOpen, setSeniorDemoteOpen] = useState(false);
+  const [seniorDemoting, setSeniorDemoting] = useState(false);
+  const [seniorDemoteError, setSeniorDemoteError] = useState<string | null>(null);
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -151,6 +154,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
   });
 
   const isSeniorAdmin = Boolean(currentUser?.is_senior_admin);
+  const canSeniorDemote = isSeniorAdmin && Boolean(data?.user_is_senior_admin);
 
   const { data: diets = [] } = useQuery<Diet[]>({
     queryKey: ["diets"],
@@ -331,6 +335,27 @@ export const AdminInvigilatorProfile: React.FC = () => {
     }
   };
 
+  const handleSeniorDemote = async () => {
+    if (!id) return;
+    try {
+      setSeniorDemoting(true);
+      setSeniorDemoteError(null);
+      const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/remove-senior-admin/`, { method: "POST" });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to remove senior administrator privileges.");
+      }
+      setSuccessMessage("Senior administrator privileges removed.");
+      setSuccessOpen(true);
+      await refetch();
+    } catch (err: any) {
+      setSeniorDemoteError(err?.message || "Failed to remove senior administrator privileges.");
+    } finally {
+      setSeniorDemoting(false);
+      setSeniorDemoteOpen(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Box sx={{ p: 4, display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
@@ -401,10 +426,10 @@ export const AdminInvigilatorProfile: React.FC = () => {
             <Tooltip
               title={
                 data.user_is_senior_admin
-                  ? "Senior access is enabled."
+                  ? "Toggle off to remove senior administrator access."
                   : canSeniorPromote
-                    ? "Toggle on to grant senior admin access."
-                    : "Only admins can be made senior."
+                    ? "Toggle on to grant senior administrator access."
+                    : "Only administrators can be made senior."
               }
             >
               <span>
@@ -415,12 +440,16 @@ export const AdminInvigilatorProfile: React.FC = () => {
                     <Switch
                       checked={Boolean(data.user_is_senior_admin)}
                       onChange={(_, checked) => {
-                        if (!checked) return;
-                        if (!canSeniorPromote || promoting) return;
-                        setPromoteMode("senior");
-                        setPromoteOpen(true);
+                        if (checked) {
+                          if (!canSeniorPromote || promoting) return;
+                          setPromoteMode("senior");
+                          setPromoteOpen(true);
+                          return;
+                        }
+                        if (!canSeniorDemote || seniorDemoting) return;
+                        setSeniorDemoteOpen(true);
                       }}
-                      disabled={!canSeniorPromote || promoting}
+                      disabled={data.user_is_senior_admin ? seniorDemoting : (!canSeniorPromote || promoting)}
                       color="primary"
                     />
                   }
@@ -451,6 +480,11 @@ export const AdminInvigilatorProfile: React.FC = () => {
       {demoteError && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {demoteError}
+        </Alert>
+      )}
+      {seniorDemoteError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {seniorDemoteError}
         </Alert>
       )}
 
@@ -1032,6 +1066,17 @@ export const AdminInvigilatorProfile: React.FC = () => {
           if (!demoting) setDemoteOpen(false);
         }}
         onConfirm={handleDemote}
+      />
+      <DeleteConfirmationDialog
+        open={seniorDemoteOpen}
+        title="Remove senior administrator privileges?"
+        description="This will remove senior administrator privileges while keeping this invigilator as an administrator."
+        confirmText="Demote"
+        loading={seniorDemoting}
+        onClose={() => {
+          if (!seniorDemoting) setSeniorDemoteOpen(false);
+        }}
+        onConfirm={handleSeniorDemote}
       />
       <Snackbar
         open={successOpen}
