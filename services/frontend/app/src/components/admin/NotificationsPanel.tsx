@@ -20,10 +20,11 @@ export interface NotificationItem {
   type: NotificationType;
   invigilator_message?: string;
   admin_message?: string;
+  invigilator?: { id: number; name?: string | null } | null;
   timestamp: string;
 }
 
-const typeStyles: Record<
+export const notificationTypeStyles: Record<
   NotificationType,
   { label: string; color: string; bg: string; icon: React.ReactNode }
 > = {
@@ -86,7 +87,81 @@ const typeStyles: Record<
 export const NotificationsPanel: React.FC<{
   notifications: NotificationItem[];
   messageKey?: "invigilator_message" | "admin_message";
-}> = ({ notifications, messageKey = "invigilator_message" }) => {
+  showPanel?: boolean;
+}> = ({ notifications, messageKey = "invigilator_message", showPanel = true }) => {
+  const content = (
+    <Stack spacing={1.5}>
+      {notifications.length === 0 ? (
+        <Box
+          sx={{
+            p: 1.5,
+            borderRadius: 2,
+            border: "1px dashed",
+            borderColor: "divider",
+            backgroundColor: "#f9fafb",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <InfoOutlined fontSize="small" sx={{ color: "text.secondary" }} />
+          <Typography variant="body2" color="text.secondary">
+            No notifications yet.
+          </Typography>
+        </Box>
+      ) : (
+        notifications.map((n) => {
+          const style = notificationTypeStyles[n.type];
+          const message =
+            (messageKey === "admin_message" ? n.admin_message : n.invigilator_message) ||
+            n.invigilator_message ||
+            n.admin_message ||
+            "";
+          return (
+            <Box
+              key={n.id}
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                border: "1px solid",
+                borderColor: "divider",
+                backgroundColor: style.bg,
+              }}
+            >
+              <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Chip
+                    icon={style.icon}
+                    label={style.label}
+                    size="small"
+                    sx={{
+                      backgroundColor: "#fff",
+                      color: style.color,
+                      fontWeight: 700,
+                      border: `1px solid ${style.color}`,
+                      "& .MuiChip-icon": {
+                        color: style.color,
+                      },
+                    }}
+                  />
+                  <Typography variant="body2" sx={{ color: "text.primary" }}>
+                    {message || "No message provided."}
+                  </Typography>
+                </Stack>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary" }}>
+                  <AccessTime fontSize="small" />
+                  <Typography variant="caption">{formatDateTime(n.timestamp)}</Typography>
+                </Stack>
+              </Stack>
+            </Box>
+          );
+        })
+      )}
+    </Stack>
+  );
+
+  if (!showPanel) return content;
+
   return (
     <Panel
       title="Notifications"
@@ -102,74 +177,7 @@ export const NotificationsPanel: React.FC<{
         />
       }
     >
-      <Stack spacing={1.5}>
-        {notifications.length === 0 ? (
-          <Box
-            sx={{
-              p: 1.5,
-              borderRadius: 2,
-              border: "1px dashed",
-              borderColor: "divider",
-              backgroundColor: "#f9fafb",
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-            }}
-          >
-            <InfoOutlined fontSize="small" sx={{ color: "text.secondary" }} />
-            <Typography variant="body2" color="text.secondary">
-              No notifications yet.
-            </Typography>
-          </Box>
-        ) : (
-          notifications.map((n) => {
-            const style = typeStyles[n.type];
-            const message =
-              (messageKey === "admin_message" ? n.admin_message : n.invigilator_message) ||
-              n.invigilator_message ||
-              n.admin_message ||
-              "";
-            return (
-              <Box
-                key={n.id}
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  backgroundColor: style.bg,
-                }}
-              >
-                <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip
-                      icon={style.icon}
-                      label={style.label}
-                      size="small"
-                      sx={{
-                        backgroundColor: "#fff",
-                        color: style.color,
-                        fontWeight: 700,
-                        border: `1px solid ${style.color}`,
-                        "& .MuiChip-icon": {
-                          color: style.color,
-                        },
-                      }}
-                    />
-                    <Typography variant="body2" sx={{ color: "text.primary" }}>
-                      {message || "No message provided."}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary" }}>
-                    <AccessTime fontSize="small" />
-                    <Typography variant="caption">{formatDateTime(n.timestamp)}</Typography>
-                  </Stack>
-                </Stack>
-              </Box>
-            );
-          })
-        )}
-      </Stack>
+      {content}
     </Panel>
   );
 };

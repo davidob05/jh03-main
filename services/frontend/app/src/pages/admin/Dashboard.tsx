@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
+  Chip,
   Fab,
   Grid,
   IconButton,
@@ -11,17 +12,19 @@ import {
   Snackbar,
   Alert,
   TextField,
+  InputBase,
   Autocomplete,
 } from "@mui/material";
 import AddCommentIcon from "@mui/icons-material/AddComment";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import SearchIcon from "@mui/icons-material/Search";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { formatDate } from "../../utils/dates";
-import { NotificationsPanel, NotificationItem } from "../../components/admin/NotificationsPanel";
+import { NotificationsPanel, NotificationItem, notificationTypeStyles, NotificationType } from "../../components/admin/NotificationsPanel";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { AddAnnouncementDialog } from "../../components/admin/AddAnnouncementDialog";
@@ -118,6 +121,9 @@ export const AdminDashboard: React.FC = () => {
   const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [exporting, setExporting] = useState(false);
   const [bulkExporting, setBulkExporting] = useState(false);
+  const [notificationQuery, setNotificationQuery] = useState("");
+  const [selectedNotificationType, setSelectedNotificationType] = useState<NotificationType | null>(null);
+  const [selectedInvigilator, setSelectedInvigilator] = useState<{ id: number; name?: string | null } | null>(null);
 
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
@@ -235,6 +241,33 @@ export const AdminDashboard: React.FC = () => {
   }, [exams, ALL_SCHOOLS_LABEL, ALL_SCHOOLS_BULK_LABEL]);
 
   const notifications = (notificationsError ? [] : notificationsFromApi) || [];
+  const invigilatorOptions = useMemo(() => {
+    const seen = new Map<number, { id: number; name?: string | null }>();
+    notifications.forEach((n) => {
+      if (!n?.invigilator?.id) return;
+      if (!seen.has(n.invigilator.id)) {
+        seen.set(n.invigilator.id, n.invigilator);
+      }
+    });
+    return Array.from(seen.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [notifications]);
+
+  const filteredNotifications = useMemo(() => {
+    const search = notificationQuery.trim().toLowerCase();
+    return notifications.filter((n) => {
+      if (selectedNotificationType && n.type !== selectedNotificationType) return false;
+      if (selectedInvigilator && n.invigilator?.id !== selectedInvigilator.id) return false;
+      if (search) {
+        const adminMessage = (n.admin_message || "").toLowerCase();
+        if (!adminMessage.includes(search)) return false;
+      }
+      return true;
+    });
+  }, [notifications, notificationQuery, selectedInvigilator, selectedNotificationType]);
+
+  useEffect(() => {
+    setVisibleCount(4);
+  }, [notificationQuery, selectedInvigilator, selectedNotificationType]);
 
   const placeholderAnnouncement: Announcement = {
     id: 0,
@@ -578,11 +611,109 @@ export const AdminDashboard: React.FC = () => {
       <DietManager />
 
       {/* Notifications */}
-      <NotificationsPanel
-        notifications={notifications.slice(0, visibleCount)}
-        messageKey="admin_message"
-      />
-      {notifications.length > 0 && (
+      <Panel title="Notifications" disableDivider sx={{ overflow: "hidden" }}>
+        <Stack spacing={2.5}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+              gap: 1.5,
+              alignItems: "center",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                backgroundColor: "action.hover",
+                borderRadius: 1,
+                px: 2,
+                py: 0.5,
+                minHeight: 40,
+              }}
+            >
+              <SearchIcon sx={{ color: "action.active", mr: 1 }} />
+              <InputBase
+                placeholder="Search notifications..."
+                value={notificationQuery}
+                onChange={(e) => setNotificationQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                  }
+                }}
+                sx={{ width: "100%" }}
+              />
+            </Box>
+            <Autocomplete
+              options={invigilatorOptions}
+              value={selectedInvigilator}
+              onChange={(_, value) => setSelectedInvigilator(value)}
+              getOptionLabel={(option) => option?.name || `Invigilator ${option?.id ?? ""}`}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              clearOnEscape
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Filter by invigilator"
+                  size="small"
+                  variant="standard"
+                  InputLabelProps={{ shrink: false }}
+                  InputProps={{
+                    ...params.InputProps,
+                    disableUnderline: true,
+                  }}
+                />
+              )}
+              sx={{
+                backgroundColor: "action.hover",
+                borderRadius: 1,
+                px: 2,
+                height: 40,
+                "& .MuiInputBase-root": {
+                  minHeight: 40,
+                },
+                "& .MuiAutocomplete-inputRoot": {
+                  minHeight: 40,
+                },
+                "& .MuiAutocomplete-input": {
+                  p: 0,
+                },
+              }}
+            />
+          </Box>
+          <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1.2}>
+            {(Object.entries(notificationTypeStyles) as [NotificationType, typeof notificationTypeStyles[NotificationType]][]).map(([type, style]) => {
+              const selected = selectedNotificationType === type;
+              return (
+                <Chip
+                  key={type}
+                  icon={style.icon as any}
+                  label={style.label}
+                  size="small"
+                  onClick={() => setSelectedNotificationType(selected ? null : type)}
+                  sx={{
+                    backgroundColor: selected ? style.bg : "#fff",
+                    color: style.color,
+                    fontWeight: 700,
+                    border: `1px solid ${style.color}`,
+                    opacity: selected ? 1 : 0.7,
+                    "& .MuiChip-icon": {
+                      color: style.color,
+                    },
+                  }}
+                />
+              );
+            })}
+          </Stack>
+          <NotificationsPanel
+            notifications={filteredNotifications.slice(0, visibleCount)}
+            messageKey="admin_message"
+            showPanel={false}
+          />
+        </Stack>
+      </Panel>
+      {filteredNotifications.length > 0 && (
         <Box sx={{ textAlign: "center", mt: 3, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
           <PillButton
             variant="outlined"
@@ -593,10 +724,10 @@ export const AdminDashboard: React.FC = () => {
           </PillButton>
           <PillButton
             variant="contained"
-            onClick={() => setVisibleCount((prev) => Math.min(prev + 4, notifications.length))}
-            disabled={visibleCount >= notifications.length}
+            onClick={() => setVisibleCount((prev) => Math.min(prev + 4, filteredNotifications.length))}
+            disabled={visibleCount >= filteredNotifications.length}
           >
-            {`Show ${Math.min(4, Math.max(notifications.length - visibleCount, 0))} more`}
+            {`Show ${Math.min(4, Math.max(filteredNotifications.length - visibleCount, 0))} more`}
           </PillButton>
         </Box>
       )}
