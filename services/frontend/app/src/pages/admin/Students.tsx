@@ -31,7 +31,7 @@ import {
   Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, Delete as DeleteIcon, ArrowForward as ArrowForwardIcon, Close } from "@mui/icons-material";
+import { Search as SearchIcon, ExpandMore as ExpandMoreIcon, ArrowForward as ArrowForwardIcon, Close } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
@@ -152,8 +152,6 @@ const deleteStudentProvision = async (row: StudentProvisionRow): Promise<void> =
 };
 
 type SectionProps = {
-  title: string;
-  subtitle: string;
   appliedSearch: string;
   onSearchSubmit: (value: string) => void;
   query: ReturnType<typeof useQuery<StudentProvisionRow[], Error>>;
@@ -320,8 +318,6 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
 };
 
 const StudentTableSection: React.FC<SectionProps> = ({
-  title,
-  subtitle,
   appliedSearch,
   onSearchSubmit,
   query,
@@ -466,21 +462,10 @@ const StudentTableSection: React.FC<SectionProps> = ({
       <Toolbar
         sx={[
           { pl: { sm: 2 }, pr: { xs: 1, sm: 1 } },
-          { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", rowGap: 1 },
+          { display: "flex", justifyContent: "flex-start", alignItems: "center", flexWrap: "wrap", rowGap: 1 },
         ]}
       >
-        <Box>
-          <Typography variant="h6" fontWeight={700}>{title}</Typography>
-          <Typography variant="body2" color="text.secondary">{subtitle}</Typography>
-        </Box>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={1}>
-          {selected.length ? (
-            <Chip
-              label={`${selected.length} selected`}
-              size="small"
-              sx={{ backgroundColor: "action.hover", fontWeight: 600 }}
-            />
-          ) : null}
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={1} sx={{ flex: "1 1 100%" }}>
           <Box sx={{ display: "flex", alignItems: "center", backgroundColor: "action.hover", borderRadius: 1, px: 2, py: 0.5, minWidth: 260 }}>
             <SearchIcon sx={{ color: "action.active", mr: 1 }} />
             <InputBase
@@ -499,24 +484,6 @@ const StudentTableSection: React.FC<SectionProps> = ({
               <ArrowForwardIcon fontSize="small" />
             </IconButton>
           </Box>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleToggleSelectAll}
-            disabled={!visibleKeys.length || deleteMutation.isPending}
-          >
-            {allVisibleSelected ? "Clear selection" : "Select all"}
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={openDeleteDialogForSelection}
-            disabled={selected.length === 0 || deleteMutation.isPending}
-          >
-            Delete selected
-          </Button>
         </Stack>
       </Toolbar>
       <Divider />
@@ -532,7 +499,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
       ) : (
         <>
         <TableContainer>
-          <Table size="small">
+          <Table size="medium">
             <TableHead>
               <TableRow>
                 <TableCell padding="checkbox">
@@ -819,8 +786,6 @@ export const AdminStudents: React.FC = () => {
 
       <Stack spacing={3}>
         <StudentTableSection
-          title="All students with provisions"
-          subtitle="Full list of students and their provision requirements."
           appliedSearch={allSearch}
           onSearchSubmit={applySearch}
           query={allQuery}
