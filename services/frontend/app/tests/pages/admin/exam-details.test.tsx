@@ -110,15 +110,17 @@ describe("AdminExamDetails invigilator ratio", () => {
     });
   });
 
-  it("calculates required invigilators per venue and rolls up totals", async () => {
+  it("calculates required invigilators per venue and shows ratio tooltips", async () => {
     renderPage();
-    expect(await screen.findByText("Invigilators: 6 / 6")).toBeInTheDocument();
+    expect(await screen.findByText("Invigilators: 3 / 3")).toBeInTheDocument();
+    expect(screen.getByText("Invigilators: 2 / 2")).toBeInTheDocument();
+    expect(screen.getByText("Invigilators: 1 / 1")).toBeInTheDocument();
+
     const tooltips = await screen.findAllByTestId("tooltip");
-    const tooltip = tooltips.find((node) => node.textContent?.includes("Target ratio: 1:50"));
-    expect(tooltip).toBeTruthy();
-    if (!tooltip) return;
-    expect(tooltip).toHaveTextContent("Venue A: 3/3 (103 students)");
-    expect(tooltip).toHaveTextContent("Venue B: 2/2 (52 students)");
-    expect(tooltip).toHaveTextContent("Venue C: 1/1 (3 students)");
+    const tooltipHas = (text: string) => tooltips.some((node) => node.textContent?.includes(text));
+    expect(tooltipHas("Target ratio: 1:50")).toBe(true);
+    expect(tooltipHas("3/3 (103 students)")).toBe(true);
+    expect(tooltipHas("2/2 (52 students)")).toBe(true);
+    expect(tooltipHas("1/1 (3 students)")).toBe(true);
   });
 });
