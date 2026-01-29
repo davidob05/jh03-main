@@ -157,8 +157,17 @@ export const AdminExamDetails: React.FC = () => {
   }
 
   const studentsPerInvigilator = 50;
+  const coreVenue = data.exam_venues.find((ev) => ev.core) || data.exam_venues[0];
+  const coreVenueId = coreVenue?.examvenue_id ?? null;
+  const extraVenues = data.exam_venues.filter((ev) => !coreVenue || ev.examvenue_id !== coreVenue.examvenue_id);
+  const extraStudentsTotal = extraVenues.reduce((sum, ev) => sum + (ev.students_count ?? 0), 0);
+  const totalStudents = data.no_students ?? 0;
+
   const venueStats = data.exam_venues.map((venue) => {
-    const students = venue.students_count ?? 0;
+    const students =
+      coreVenueId && venue.examvenue_id === coreVenueId
+        ? Math.max(totalStudents - extraStudentsTotal, 0)
+        : (venue.students_count ?? 0);
     const required = Math.ceil(students / studentsPerInvigilator);
     const assigned = assignments.filter(
       (assignment) => assignment.exam_venue === venue.examvenue_id && !assignment.cancel
@@ -174,9 +183,6 @@ export const AdminExamDetails: React.FC = () => {
   });
   const ratioLabel = `1:${studentsPerInvigilator}`;
   const venueStatsById = new Map(venueStats.map((stat) => [stat.venue.examvenue_id, stat]));
-
-  const coreVenue = data.exam_venues.find((ev) => ev.core) || data.exam_venues[0];
-  const extraVenues = data.exam_venues.filter((ev) => !coreVenue || ev.examvenue_id !== coreVenue.examvenue_id);
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 2, md: 4 } }}>
