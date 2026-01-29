@@ -424,8 +424,8 @@ export const AdminExams: React.FC = () => {
               label={`${summary.upcoming} Upcoming`}
               size="medium"
               sx={{
-                backgroundColor: "#def3dbff",
-                color: "secondary.main",
+                backgroundColor: alpha("#2e7d32", 0.12),
+                color: "success.main",
                 fontWeight: 600,
               }}
             />
