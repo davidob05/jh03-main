@@ -132,9 +132,9 @@ class ProvisionExportView(APIView):
 
         def admin_display_name(user) -> str:
             if not user:
-                return "Admin"
+                return "Administrator"
             first_name = (getattr(user, "first_name", "") or "").strip()
-            return first_name or getattr(user, "username", "") or getattr(user, "email", "") or "Admin"
+            return first_name or getattr(user, "username", "") or getattr(user, "email", "") or "Administrator"
 
         def log_export_message(target_label: str):
             Notification.objects.create(
@@ -185,9 +185,9 @@ class InvigilatorTimetableExportView(APIView):
     def post(self, request, *args, **kwargs):
         def admin_display_name(user) -> str:
             if not user:
-                return "Admin"
+                return "Administrator"
             first_name = (getattr(user, "first_name", "") or "").strip()
-            return first_name or getattr(user, "username", "") or getattr(user, "email", "") or "Admin"
+            return first_name or getattr(user, "username", "") or getattr(user, "email", "") or "Administrator"
 
         invigilator_ids = request.data.get("invigilator_ids")
         if invigilator_ids is None:
@@ -645,6 +645,17 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAdminUser]
     throttle_classes: list = []  # Admin-only; allow large bulk operations without throttling
 
+    def _admin_display_name(self, user) -> str:
+        if not user:
+            return "Administrator"
+        first_name = (getattr(user, "first_name", "") or "").strip()
+        return first_name or getattr(user, "username", "") or getattr(user, "email", "") or "Administrator"
+
+    def _invigilator_display_name(self, invigilator) -> str:
+        if not invigilator:
+            return "Invigilator"
+        return invigilator.preferred_name or invigilator.full_name or f"Invigilator #{invigilator.id}"
+
     @action(detail=False, methods=["post"], url_path="bulk-delete")
     def bulk_delete(self, request):
         """
@@ -684,9 +695,20 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
             user.is_superuser = True
             user.save(update_fields=["is_staff", "is_superuser"])
 
+        Notification.objects.create(
+            type=Notification.NotificationType.ADMIN_MESSAGE,
+            admin_message=(
+                f"{self._admin_display_name(request.user)} promoted "
+                f"{self._invigilator_display_name(invigilator)} to administrator."
+            ),
+            invigilator_message="",
+            timestamp=timezone.now(),
+            triggered_by=request.user,
+        )
+
         return Response(
             {
-                "detail": "Invigilator promoted to admin.",
+                "detail": "Invigilator promoted to administrator.",
                 "user_id": user.id,
                 "is_staff": user.is_staff,
                 "is_superuser": user.is_superuser,
@@ -706,7 +728,7 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
 
         if not (user.is_staff or user.is_superuser):
             return Response(
-                {"detail": "User is not an admin."},
+                {"detail": "User is not an administrator."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -718,9 +740,20 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
         else:
             user.save(update_fields=["is_staff", "is_superuser"])
 
+        Notification.objects.create(
+            type=Notification.NotificationType.ADMIN_MESSAGE,
+            admin_message=(
+                f"{self._admin_display_name(request.user)} removed administrator access for "
+                f"{self._invigilator_display_name(invigilator)}."
+            ),
+            invigilator_message="",
+            timestamp=timezone.now(),
+            triggered_by=request.user,
+        )
+
         return Response(
             {
-                "detail": "Admin privileges removed.",
+                "detail": "Administrator privileges removed.",
                 "user_id": user.id,
                 "is_staff": user.is_staff,
                 "is_superuser": user.is_superuser,
@@ -741,7 +774,7 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
 
         if not (user.is_staff or user.is_superuser):
             return Response(
-                {"detail": "User must already be an admin to be promoted."},
+                {"detail": "User must already be an administrator to be promoted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -749,9 +782,20 @@ class InvigilatorViewSet(viewsets.ModelViewSet):
             user.is_senior_admin = True
             user.save(update_fields=["is_senior_admin"])
 
+        Notification.objects.create(
+            type=Notification.NotificationType.ADMIN_MESSAGE,
+            admin_message=(
+                f"{self._admin_display_name(request.user)} promoted "
+                f"{self._invigilator_display_name(invigilator)} to senior administrator."
+            ),
+            invigilator_message="",
+            timestamp=timezone.now(),
+            triggered_by=request.user,
+        )
+
         return Response(
             {
-                "detail": "Admin promoted to senior admin.",
+                "detail": "Administrator promoted to senior administrator.",
                 "user_id": user.id,
                 "is_senior_admin": getattr(user, "is_senior_admin", False),
             },
@@ -1891,7 +1935,7 @@ class InvigilatorAvailabilityView(APIView):
         if cutoff_date and today >= cutoff_date:
             return Response(
                 {
-                    "detail": f"Restrictions for {diet_obj.name or diet} closed on {cutoff_date}. Please contact admin to request changes."
+                    "detail": f"Restrictions for {diet_obj.name or diet} closed on {cutoff_date}. Please contact administrators to request changes."
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
