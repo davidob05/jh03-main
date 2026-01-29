@@ -77,6 +77,7 @@ class ProvisionExportView(APIView):
     def get(self, request, *args, **kwargs):
         school = request.query_params.get("school")
         separate = request.query_params.get("separate")
+        admin_user = getattr(request, "user", None)
         provisions_qs = Provisions.objects.select_related("student", "exam")
         if school:
             provisions_qs = provisions_qs.filter(exam__exam_school__iexact=school)
@@ -129,6 +130,21 @@ class ProvisionExportView(APIView):
                 )
             return buffer.getvalue()
 
+        def admin_display_name(user) -> str:
+            if not user:
+                return "Admin"
+            first_name = (getattr(user, "first_name", "") or "").strip()
+            return first_name or getattr(user, "username", "") or getattr(user, "email", "") or "Admin"
+
+        def log_export_message(target_label: str):
+            Notification.objects.create(
+                type=Notification.NotificationType.ADMIN_MESSAGE,
+                admin_message=f"{admin_display_name(admin_user)} exported student provisions for {target_label}.",
+                invigilator_message="",
+                timestamp=timezone.now(),
+                triggered_by=admin_user,
+            )
+
         if separate:
             schools = list(
                 provisions_qs.values_list("exam__exam_school", flat=True).distinct()
@@ -146,6 +162,7 @@ class ProvisionExportView(APIView):
                     zip_file.writestr(filename, build_csv(school_qs))
             response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
             response["Content-Disposition"] = 'attachment; filename="provisions_export_by_school.zip"'
+            log_export_message("all schools")
             return response
 
         csv_body = build_csv(provisions_qs)
@@ -154,6 +171,7 @@ class ProvisionExportView(APIView):
         if school:
             filename_parts.append(slugify(str(school)))
         response["Content-Disposition"] = f'attachment; filename="{ "_".join(filename_parts) }.csv"'
+        log_export_message(school or "all schools")
         return response
 
 

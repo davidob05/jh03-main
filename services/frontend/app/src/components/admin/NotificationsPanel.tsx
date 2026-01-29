@@ -12,7 +12,8 @@ export type NotificationType =
   | "examChange"
   | "invigilatorUpdate"
   | "venueChange"
-  | "mailMerge";
+  | "mailMerge"
+  | "adminMessage";
 
 export interface NotificationItem {
   id: number;
@@ -73,6 +74,12 @@ const typeStyles: Record<
     color: "#00695c",
     bg: "rgba(0,105,92,0.08)",
     icon: <AlternateEmail fontSize="small" />,
+  },
+  adminMessage: {
+    label: "Administrator Action",
+    color: "#ad1457",
+    bg: "rgba(173,20,87,0.08)",
+    icon: <InfoOutlined fontSize="small" />,
   },
 };
 
