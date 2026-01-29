@@ -188,6 +188,18 @@ class ProvisionExportViewTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertIn("Physics", rows[0])
 
+    def test_export_separate_returns_zip(self):
+        response = self.client.get(f"{self.url}?separate=1")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        with zipfile.ZipFile(BytesIO(response.content), "r") as zip_file:
+            names = set(zip_file.namelist())
+            self.assertIn("provisions_export_science.csv", names)
+            self.assertIn("provisions_export_engineering.csv", names)
+            with zip_file.open("provisions_export_science.csv") as handle:
+                header, rows = self._parse_csv(handle.read())
+                self.assertIn("Exam Name", header)
+                self.assertTrue(any("Physics" in row for row in rows))
+
 
 class InvigilatorTimetableExportViewTests(TestCase):
     def setUp(self):

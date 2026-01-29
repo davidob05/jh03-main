@@ -33,6 +33,23 @@ const fileSafe = (value: string) =>
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+const extractFilename = (contentDisposition: string | null, fallback: string) => {
+  if (!contentDisposition) return fallback;
+  const match = contentDisposition.match(/filename="?([^"]+)"?/i);
+  return match?.[1] || fallback;
+};
+
 const downloadProvisionExport = async (school?: string) => {
   const params = new URLSearchParams();
   if (school) params.set("school", school);
@@ -40,11 +57,9 @@ const downloadProvisionExport = async (school?: string) => {
   const res = await apiFetch(url);
   if (!res.ok) throw new Error("Failed to export provisions");
   const blob = await res.blob();
-  const link = document.createElement("a");
-  link.href = window.URL.createObjectURL(blob);
-  link.download = school ? `provisions_${fileSafe(school)}.csv` : "provisions.csv";
-  link.click();
-  window.URL.revokeObjectURL(link.href);
+  const fallback = school ? `provisions_${fileSafe(school)}.csv` : "provisions.csv";
+  const filename = extractFilename(res.headers.get("Content-Disposition"), fallback);
+  downloadBlob(blob, filename);
 };
 
 type Announcement = {
@@ -330,9 +345,15 @@ export const AdminDashboard: React.FC = () => {
     }
     try {
       setBulkExporting(true);
-      for (const school of schools) {
-        await downloadProvisionExport(school);
-      }
+      const url = `${apiBaseUrl}/provisions/export/?separate=1`;
+      const res = await apiFetch(url);
+      if (!res.ok) throw new Error("Failed to export provisions");
+      const blob = await res.blob();
+      const filename = extractFilename(
+        res.headers.get("Content-Disposition"),
+        "provisions_export_by_school.zip"
+      );
+      downloadBlob(blob, filename);
       setExportSnackbar({ open: true, message: "Provisions exported for all schools." });
     } catch (err) {
       console.error(err);

@@ -533,7 +533,7 @@ export const AdminExams: React.FC = () => {
             </Table>
           </TableContainer>
           <Divider />
-          <TablePagination rowsPerPageOptions={[5, 10, 25]} component="div" count={filteredRows.length} rowsPerPage={rowsPerPage} page={page} onPageChange={handleChangePage} onRowsPerPageChange={handleChangeRowsPerPage} />
+          <TablePagination rowsPerPageOptions={[10, 25, 50, 100]} component="div" count={filteredRows.length} rowsPerPage={rowsPerPage} page={page} onPageChange={handleChangePage} onRowsPerPageChange={handleChangeRowsPerPage} />
         </Panel>
         <DeleteConfirmationDialog
           open={deleteOpen}

@@ -76,6 +76,7 @@ class ProvisionExportView(APIView):
 
     def get(self, request, *args, **kwargs):
         school = request.query_params.get("school")
+        separate = request.query_params.get("separate")
         provisions_qs = Provisions.objects.select_related("student", "exam")
         if school:
             provisions_qs = provisions_qs.filter(exam__exam_school__iexact=school)
@@ -86,47 +87,69 @@ class ProvisionExportView(APIView):
             for se in StudentExam.objects.select_related("exam_venue__venue", "student", "exam")
         }
 
-        buffer = StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow(
-            [
-                "Date",
-                "Start Time",
-                "End Time",
-                "Exam Code",
-                "Exam Name",
-                "School",
-                "Student Name",
-                "Provisions",
-                "Additional Info",
-                "Venue",
-            ]
-        )
-
-        for provision in provisions_qs:
-            student_exam = student_exam_map.get((provision.student_id, provision.exam_id))
-            exam_venue = getattr(student_exam, "exam_venue", None) if student_exam else None
-            venue = getattr(exam_venue, "venue", None)
-            start = getattr(exam_venue, "start_time", None)
-            length = getattr(exam_venue, "exam_length", None)
-            end = start + timedelta(minutes=length) if start and length else None
-
+        def build_csv(provisions):
+            buffer = StringIO()
+            writer = csv.writer(buffer)
             writer.writerow(
                 [
-                    start.date().isoformat() if start else "",
-                    start.time().isoformat(timespec="minutes") if start else "",
-                    end.time().isoformat(timespec="minutes") if end else "",
-                    provision.exam.course_code,
-                    provision.exam.exam_name,
-                    provision.exam.exam_school,
-                    provision.student.student_name,
-                    ", ".join(provision.provisions or []),
-                    provision.notes or "",
-                    venue.venue_name if venue else "",
+                    "Date",
+                    "Start Time",
+                    "End Time",
+                    "Exam Code",
+                    "Exam Name",
+                    "School",
+                    "Student Name",
+                    "Provisions",
+                    "Additional Info",
+                    "Venue",
                 ]
             )
 
-        response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+            for provision in provisions:
+                student_exam = student_exam_map.get((provision.student_id, provision.exam_id))
+                exam_venue = getattr(student_exam, "exam_venue", None) if student_exam else None
+                venue = getattr(exam_venue, "venue", None)
+                start = getattr(exam_venue, "start_time", None)
+                length = getattr(exam_venue, "exam_length", None)
+                end = start + timedelta(minutes=length) if start and length else None
+
+                writer.writerow(
+                    [
+                        start.date().isoformat() if start else "",
+                        start.time().isoformat(timespec="minutes") if start else "",
+                        end.time().isoformat(timespec="minutes") if end else "",
+                        provision.exam.course_code,
+                        provision.exam.exam_name,
+                        provision.exam.exam_school,
+                        provision.student.student_name,
+                        ", ".join(provision.provisions or []),
+                        provision.notes or "",
+                        venue.venue_name if venue else "",
+                    ]
+                )
+            return buffer.getvalue()
+
+        if separate:
+            schools = list(
+                provisions_qs.values_list("exam__exam_school", flat=True).distinct()
+            )
+            zip_buffer = BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                for school_name in schools:
+                    filename_parts = ["provisions_export"]
+                    if school_name:
+                        filename_parts.append(slugify(str(school_name)))
+                    else:
+                        filename_parts.append("unspecified")
+                    filename = f'{ "_".join(filename_parts) }.csv'
+                    school_qs = provisions_qs.filter(exam__exam_school=school_name)
+                    zip_file.writestr(filename, build_csv(school_qs))
+            response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
+            response["Content-Disposition"] = 'attachment; filename="provisions_export_by_school.zip"'
+            return response
+
+        csv_body = build_csv(provisions_qs)
+        response = HttpResponse(csv_body, content_type="text/csv")
         filename_parts = ["provisions_export"]
         if school:
             filename_parts.append(slugify(str(school)))

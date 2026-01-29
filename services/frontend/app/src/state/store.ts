@@ -54,14 +54,14 @@ const initialState: AdminTableState = {
     order: "asc",
     orderBy: "code",
     page: 0,
-    rowsPerPage: 5,
+    rowsPerPage: 10,
     searchQuery: "",
   },
   venues: {
     order: "asc",
     orderBy: "name",
     page: 0,
-    rowsPerPage: 5,
+    rowsPerPage: 10,
     searchQuery: "",
   },
   students: {
