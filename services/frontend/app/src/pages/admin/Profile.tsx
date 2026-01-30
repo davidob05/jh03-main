@@ -29,6 +29,7 @@ import { apiBaseUrl, apiFetch, clearAuthSession, getAuthToken, setAuthSession } 
 import { formatDateTime } from "../../utils/dates";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { Panel } from "../../components/Panel";
+import { sharedInputSx } from "../../components/sharedInputSx";
 
 export const AdminProfile: React.FC = () => {
   const navigate = useNavigate();
@@ -377,7 +378,7 @@ export const AdminProfile: React.FC = () => {
             </Typography>
 
             <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
-              <TextField fullWidth size="small" value={name} onChange={(e) => setName(e.target.value)} />
+              <TextField fullWidth size="small" value={name} onChange={(e) => setName(e.target.value)} sx={sharedInputSx} />
               <PillButton variant="contained" onClick={handleSaveProfile}>Save</PillButton>
             </Stack>
           </Box>
@@ -389,7 +390,7 @@ export const AdminProfile: React.FC = () => {
             </Typography>
 
             <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
-              <TextField fullWidth size="small" value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+              <TextField fullWidth size="small" value={email} onChange={(e) => setEmail(e.target.value)} type="email" sx={sharedInputSx} />
               <PillButton variant="contained" onClick={handleSaveProfile}>Save</PillButton>
             </Stack>
           </Box>
@@ -401,7 +402,7 @@ export const AdminProfile: React.FC = () => {
             </Typography>
 
             <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
-              <TextField fullWidth size="small" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <TextField fullWidth size="small" value={phone} onChange={(e) => setPhone(e.target.value)} sx={sharedInputSx} />
               <PillButton variant="contained" onClick={handleSaveProfile}>Save</PillButton>
             </Stack>
           </Box>
@@ -435,6 +436,7 @@ export const AdminProfile: React.FC = () => {
                     </InputAdornment>
                   ),
                 }}
+                sx={sharedInputSx}
               />
             ))}
             {(() => {
@@ -603,7 +605,7 @@ export const AdminProfile: React.FC = () => {
 
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography>Email Notifications</Typography>
-            <FormControl size="small" sx={{ minWidth: 180 }} disabled>
+            <FormControl size="small" sx={[sharedInputSx, { minWidth: 180 }]} disabled>
               <InputLabel>Email frequency</InputLabel>
               <Select
                 label="Email frequency"
