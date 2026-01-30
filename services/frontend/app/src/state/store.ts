@@ -41,12 +41,20 @@ type CalendarPrefs = {
   page: number;
 };
 
+type DashboardPrefs = {
+  selectedSchool: string;
+  notificationQuery: string;
+  selectedNotificationType: string | null;
+  selectedInvigilatorId: number | null;
+};
+
 type AdminTableState = {
   exams: ExamPrefs;
   venues: VenuePrefs;
   students: StudentPrefs;
   invigilators: InvigilatorPrefs;
   calendar: CalendarPrefs;
+  dashboard: DashboardPrefs;
 };
 
 const initialState: AdminTableState = {
@@ -85,6 +93,12 @@ const initialState: AdminTableState = {
     searchQuery: "",
     page: 1,
   },
+  dashboard: {
+    selectedSchool: "",
+    notificationQuery: "",
+    selectedNotificationType: null,
+    selectedInvigilatorId: null,
+  },
 };
 
 const adminTablesSlice = createSlice({
@@ -106,6 +120,9 @@ const adminTablesSlice = createSlice({
     setCalendarPrefs(state, action: PayloadAction<Partial<CalendarPrefs>>) {
       Object.assign(state.calendar, action.payload);
     },
+    setDashboardPrefs(state, action: PayloadAction<Partial<DashboardPrefs>>) {
+      Object.assign(state.dashboard, action.payload);
+    },
     resetAdminPrefs(state) {
       Object.assign(state, initialState);
     },
@@ -118,6 +135,7 @@ export const {
   setStudentsPrefs,
   setInvigilatorsPrefs,
   setCalendarPrefs,
+  setDashboardPrefs,
   resetAdminPrefs,
 } = adminTablesSlice.actions;
 

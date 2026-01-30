@@ -31,6 +31,7 @@ import { Panel } from "../../components/Panel";
 import { AddAnnouncementDialog } from "../../components/admin/AddAnnouncementDialog";
 import { DietManager } from "../../components/admin/DietManager";
 import { sharedInputSx } from "../../components/sharedInputSx";
+import { useAppDispatch, useAppSelector, setDashboardPrefs } from "../../state/store";
 
 const fileSafe = (value: string) =>
   value
@@ -115,17 +116,20 @@ interface VenueData {
 export const AdminDashboard: React.FC = () => {
   const ALL_SCHOOLS_LABEL = "All schools";
   const ALL_SCHOOLS_BULK_LABEL = "All schools (separate files)";
+  const dispatch = useAppDispatch();
+  const {
+    selectedSchool,
+    notificationQuery,
+    selectedNotificationType,
+    selectedInvigilatorId,
+  } = useAppSelector((s) => s.adminTables.dashboard);
   const [visibleCount, setVisibleCount] = useState(4);
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
   const [announcementSnackbar, setAnnouncementSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [exportSnackbar, setExportSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
-  const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [exporting, setExporting] = useState(false);
   const [bulkExporting, setBulkExporting] = useState(false);
-  const [notificationQuery, setNotificationQuery] = useState("");
-  const [selectedNotificationType, setSelectedNotificationType] = useState<NotificationType | null>(null);
-  const [selectedInvigilator, setSelectedInvigilator] = useState<{ id: number; name?: string | null } | null>(null);
 
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
@@ -254,23 +258,27 @@ export const AdminDashboard: React.FC = () => {
     });
     return Array.from(seen.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [notifications]);
+  const selectedInvigilator = useMemo(
+    () => invigilatorOptions.find((inv) => inv.id === selectedInvigilatorId) || null,
+    [invigilatorOptions, selectedInvigilatorId]
+  );
 
   const filteredNotifications = useMemo(() => {
     const search = notificationQuery.trim().toLowerCase();
     return notifications.filter((n) => {
       if (selectedNotificationType && n.type !== selectedNotificationType) return false;
-      if (selectedInvigilator && n.invigilator?.id !== selectedInvigilator.id) return false;
+      if (selectedInvigilatorId && n.invigilator?.id !== selectedInvigilatorId) return false;
       if (search) {
         const adminMessage = (n.admin_message || "").toLowerCase();
         if (!adminMessage.includes(search)) return false;
       }
       return true;
     });
-  }, [notifications, notificationQuery, selectedInvigilator, selectedNotificationType]);
+  }, [notifications, notificationQuery, selectedInvigilatorId, selectedNotificationType]);
 
   useEffect(() => {
     setVisibleCount(4);
-  }, [notificationQuery, selectedInvigilator, selectedNotificationType]);
+  }, [notificationQuery, selectedInvigilatorId, selectedNotificationType]);
 
   const placeholderAnnouncement: Announcement = {
     id: 0,
@@ -418,8 +426,8 @@ export const AdminDashboard: React.FC = () => {
                     freeSolo
                     options={schoolOptions}
                     value={selectedSchool}
-                    onChange={(_, value) => setSelectedSchool(value ?? "")}
-                    onInputChange={(_, value) => setSelectedSchool(value)}
+                    onChange={(_, value) => dispatch(setDashboardPrefs({ selectedSchool: value ?? "" }))}
+                    onInputChange={(_, value) => dispatch(setDashboardPrefs({ selectedSchool: value }))}
                     disableClearable={!hasSelectedSchool}
                     forcePopupIcon
                     popupIcon={<ArrowDropDownIcon />}
@@ -657,7 +665,7 @@ export const AdminDashboard: React.FC = () => {
               <InputBase
                 placeholder="Search notifications..."
                 value={notificationQuery}
-                onChange={(e) => setNotificationQuery(e.target.value)}
+                onChange={(e) => dispatch(setDashboardPrefs({ notificationQuery: e.target.value }))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -669,11 +677,11 @@ export const AdminDashboard: React.FC = () => {
             <Autocomplete
               options={invigilatorOptions}
               value={selectedInvigilator}
-              onChange={(_, value) => setSelectedInvigilator(value)}
+              onChange={(_, value) => dispatch(setDashboardPrefs({ selectedInvigilatorId: value?.id ?? null }))}
               getOptionLabel={(option) => option?.name || `Invigilator ${option?.id ?? ""}`}
               isOptionEqualToValue={(option, value) => option.id === value.id}
               clearOnEscape
-              disableClearable={!selectedInvigilator}
+              disableClearable={!selectedInvigilatorId}
               forcePopupIcon
               popupIcon={<ArrowDropDownIcon />}
               renderInput={(params) => (
@@ -707,7 +715,7 @@ export const AdminDashboard: React.FC = () => {
                   icon={style.icon as any}
                   label={style.label}
                   size="small"
-                  onClick={() => setSelectedNotificationType(selected ? null : type)}
+                  onClick={() => dispatch(setDashboardPrefs({ selectedNotificationType: selected ? null : type }))}
                   sx={{
                     backgroundColor: selected ? style.bg : "#fff",
                     color: style.color,
