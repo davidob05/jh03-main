@@ -2049,14 +2049,19 @@ class InvigilatorAvailabilityView(APIView):
             summary = _summarize_unavailable()
             if summary:
                 message = f"{inv_name} updated availability for {diet_label}: unavailable on {summary} ({count_unavailable} {slot_word})"
+                invigilator_message = f"You updated availability for {diet_label}: unavailable on {summary} ({count_unavailable} {slot_word})"
             else:
                 message = f"{inv_name} updated availability for {diet_label}: {count_unavailable} {slot_word} unavailable"
+                invigilator_message = f"You updated availability for {diet_label}: {count_unavailable} {slot_word} unavailable"
         else:
             message = f"{inv_name} set availability for {diet_label}: all slots available"
-        log_notification(
-            Notification.NotificationType.AVAILABILITY,
-            message,
-            user=request.user,
+            invigilator_message = f"You set availability for {diet_label}: all slots available"
+        Notification.objects.create(
+            type=Notification.NotificationType.AVAILABILITY,
+            invigilator_message=invigilator_message,
+            admin_message=message,
+            timestamp=timezone.now(),
+            triggered_by=request.user,
             invigilator=invigilator,
         )
 
@@ -2157,7 +2162,6 @@ class InvigilatorAssignmentsView(APIView):
         )
 
         return Response(InvigilatorAssignmentSerializer(assignments, many=True).data)
-
 
 
 

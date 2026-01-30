@@ -17,6 +17,7 @@ import dayjs from "dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
+import { sharedInputSx } from "../../components/sharedInputSx";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { formatDate, formatDateWithWeekday } from "../../utils/dates";
 
@@ -224,7 +225,7 @@ export const InvigilatorRestrictions: React.FC = () => {
                 size="small"
                 value={selectedDiet || ""}
                 onChange={(e) => handleDietChange(e.target.value)}
-                sx={{ minWidth: 200 }}
+                sx={[sharedInputSx, { minWidth: 200 }]}
               >
                 {diets.map((d) => (
                   <MenuItem key={d.code} value={d.code}>

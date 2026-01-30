@@ -34,7 +34,7 @@ import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
 import { sharedInputSx } from "../../components/sharedInputSx";
-import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { apiBaseUrl, apiFetch, getStoredUser } from "../../utils/api";
 import { formatDateWithWeekday, formatDateTime, formatTime } from "../../utils/dates";
 
 dayjs.extend(customParseFormat);
@@ -116,9 +116,15 @@ export const InvigilatorTimetable: React.FC = () => {
     },
   });
 
+  const currentInvigilatorId = getStoredUser()?.invigilator_id ?? null;
+  const visibleAssignments = useMemo(() => {
+    if (!currentInvigilatorId) return assignments || [];
+    return (assignments || []).filter((a) => (a as any).invigilator === currentInvigilatorId);
+  }, [assignments, currentInvigilatorId]);
+
   const examEvents: Exam[] = useMemo(
     () =>
-      (assignments || []).map((a) => {
+      visibleAssignments.map((a) => {
         const assignedStart = a.assigned_start ? dayjs(a.assigned_start) : null;
         const assignedEnd = a.assigned_end ? dayjs(a.assigned_end) : null;
 
@@ -145,7 +151,7 @@ export const InvigilatorTimetable: React.FC = () => {
           cancel: Boolean(a.cancel),
         };
       }),
-    [assignments]
+    [visibleAssignments]
   );
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -574,7 +580,7 @@ export const InvigilatorTimetable: React.FC = () => {
                           ),
                         };
                       })();
-                      const correspondingAssignment = assignments.find((a) => String(a.id) === event.id) || null;
+                      const correspondingAssignment = visibleAssignments.find((a) => String(a.id) === event.id) || null;
                       const coverFilled = correspondingAssignment?.cover_filled === true;
                       const canRequestCancel =
                         !isCancelled &&
