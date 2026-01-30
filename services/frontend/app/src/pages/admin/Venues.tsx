@@ -40,6 +40,7 @@ import { PillButton } from '../../components/PillButton';
 import { Panel } from '../../components/Panel';
 import { VENUE_TYPES } from '../../components/admin/venueTypes';
 import { useAppDispatch, useAppSelector, setVenuesPrefs } from '../../state/store';
+import { sharedInputSx } from "../../components/sharedInputSx";
 
 interface ExamVenueData {
   exam_name: string;
@@ -631,7 +632,7 @@ export const AdminVenues: React.FC = () => {
                           value={row.venueType}
                           onChange={(event) => handleVenueTypeChange(row.id, event.target.value, row.venueType)}
                           disabled={isTypeUpdating}
-                          sx={{ minWidth: 180 }}
+                          sx={[sharedInputSx, { minWidth: 180 }]}
                         >
                           {VENUE_TYPES.map((option) => (
                             <MenuItem key={option.value} value={option.value}>

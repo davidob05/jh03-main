@@ -22,6 +22,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { VENUE_TYPES } from "./venueTypes";
+import { sharedInputSx } from "../sharedInputSx";
 
 const ALLOWED_PROVISION_CHOICES = [
   { value: "use_computer", label: "Use of a computer" },
@@ -134,9 +135,32 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
         {isError && <Alert severity="error">Failed to load venue details.</Alert>}
         {!isLoading && !isError && (
           <Stack spacing={2}>
-            <TextField label="Venue Name" value={venueName} onChange={(e) => setVenueName(e.target.value)} fullWidth required />
-            <TextField label="Capacity" type="number" value={capacity} onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))} fullWidth required />
-            <TextField label="Venue Type" select value={venueType} onChange={(e) => setVenueType(e.target.value)} fullWidth required>
+            <TextField
+              label="Venue Name"
+              value={venueName}
+              onChange={(e) => setVenueName(e.target.value)}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Capacity"
+              type="number"
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Venue Type"
+              select
+              value={venueType}
+              onChange={(e) => setVenueType(e.target.value)}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            >
               {VENUE_TYPES.map((t) => (
                 <MenuItem key={t.value} value={t.value}>
                   {t.label}

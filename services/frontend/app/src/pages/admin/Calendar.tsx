@@ -30,6 +30,7 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { useAppDispatch, useAppSelector, setCalendarPrefs, store, createStoreInstance } from "../../state/store";
+import { sharedInputSx } from "../../components/sharedInputSx";
 import { Provider, ReactReduxContext } from "react-redux";
 
 interface ExamVenueData {
@@ -285,7 +286,16 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
       {/* Controls */}
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems="center" mb={4} spacing={2}>
         <Stack direction="row" alignItems="center" spacing={2}>
-          <Paper elevation={0} sx={{ display: "flex", alignItems: "center", px: 2, py: 1, bgcolor: "#f8f9fa" }}>
+          <Paper
+            elevation={0}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              px: 2,
+              bgcolor: "#0000000A",
+              height: 40,
+            }}
+          >
             <Search sx={{ color: "action.active", mr: 1 }} />
             <InputBase
               placeholder="Search exams..."
@@ -316,7 +326,7 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
                 dispatch(setCalendarPrefs({ currentDate: picked.toISOString(), page: 1 }));
             }}
             InputLabelProps={{ shrink: true }}
-            sx={{ minWidth: 180 }}
+            sx={[sharedInputSx, { minWidth: 180 }]}
           />
 
           <PillButton

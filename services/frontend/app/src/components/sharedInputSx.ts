@@ -8,5 +8,5 @@ export const sharedInputSx = {
   "& .MuiOutlinedInput-notchedOutline": { border: "none" },
   "& .MuiSelect-select": { p: 0, display: "flex", alignItems: "center" },
   "& .MuiInputLabel-root": { transform: "translate(16px, 10px) scale(1)" },
-  "& .MuiInputLabel-shrink": { transform: "translate(16px, -6px) scale(0.75)" },
+  "& .MuiInputLabel-shrink": { transform: "translate(16px, -10px) scale(0.75)" },
 };
