@@ -30,6 +30,7 @@ import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { AddAnnouncementDialog } from "../../components/admin/AddAnnouncementDialog";
 import { DietManager } from "../../components/admin/DietManager";
+import { sharedInputSx } from "../../components/sharedInputSx";
 
 const fileSafe = (value: string) =>
   value
@@ -422,22 +423,14 @@ export const AdminDashboard: React.FC = () => {
                     disableClearable={!hasSelectedSchool}
                     forcePopupIcon
                     popupIcon={<ArrowDropDownIcon />}
-                    sx={{
-                      flex: 1,
-                      backgroundColor: "action.hover",
-                      borderRadius: 1,
-                      px: 2,
-                      height: 40,
-                      "& .MuiInputBase-root": {
-                        minHeight: 40,
+                    sx={[
+                      sharedInputSx,
+                      {
+                        flex: 1,
+                        "& .MuiInputBase-root": { minHeight: 40 },
+                        "& .MuiAutocomplete-inputRoot": { minHeight: 40 },
                       },
-                      "& .MuiAutocomplete-inputRoot": {
-                        minHeight: 40,
-                      },
-                      "& .MuiAutocomplete-input": {
-                        p: 0,
-                      },
-                    }}
+                    ]}
                     renderInput={(params) => (
                       <TextField
                         {...params}
