@@ -70,6 +70,10 @@ describe("AdminDashboard provisions export", () => {
   it("downloads provisions and shows success snackbar", async () => {
     renderPage();
 
+    fireEvent.change(await screen.findByPlaceholderText(/school filter/i), {
+      target: { value: "All schools" },
+    });
+
     fireEvent.click(await screen.findByRole("button", { name: /^export$/i }));
 
     const sawExportCall = apiFetchMock.mock.calls.some(
