@@ -17,6 +17,7 @@ import { Panel } from "../Panel";
 import { PillButton } from "../PillButton";
 import { Close } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { sharedInputSx } from "../sharedInputSx";
 
 type Recipient = {
   id: number;
@@ -127,6 +128,7 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
           fullWidth
           margin="dense"
           onChange={(e) => setSubject(e.target.value)}
+          sx={sharedInputSx}
         />
         <TextField
           label="Message"
@@ -137,6 +139,7 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
           minRows={4}
           margin="dense"
           onChange={(e) => setMessage(e.target.value)}
+          sx={[sharedInputSx, { height: "auto", "& .MuiInputBase-root": { minHeight: 128 }, "& .MuiInputBase-input": { py: 1 } }]}
         />
 
         <Panel sx={{ mt: 2, mb: 0, p: 2 }}>
