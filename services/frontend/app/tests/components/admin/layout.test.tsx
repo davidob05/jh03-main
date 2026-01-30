@@ -75,6 +75,6 @@ describe("Components - AdminLayout", () => {
     setAuthSession("token", { username: "admin", invigilator_id: 12 });
     renderLayout();
     fireEvent.click(screen.getByLabelText(/account menu/i));
-    expect(await screen.findByText("View Invigilator Profile")).toBeInTheDocument();
+    expect(await screen.findByText("View Invigilator Dashboard")).toBeInTheDocument();
   });
 });

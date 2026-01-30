@@ -442,6 +442,10 @@ export const AdminDashboard: React.FC = () => {
                           ...params.InputProps,
                           disableUnderline: true,
                         }}
+                        inputProps={{
+                          ...params.inputProps,
+                          "aria-label": "School filter",
+                        }}
                       />
                     )}
                   />
