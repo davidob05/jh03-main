@@ -5,14 +5,13 @@ import {
   Typography,
   MenuItem,
   Select,
-  InputLabel,
   FormControl,
   Snackbar,
   Alert,
   Stack,
   Chip,
 } from "@mui/material";
-import { Upload as UploadIcon, InsertDriveFile, Eject } from "@mui/icons-material";
+import { Upload as UploadIcon, InsertDriveFile, Eject, ArrowDropDown } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { Panel } from "../Panel";
@@ -116,10 +115,40 @@ export const UploadFile: React.FC = () => {
           Select a file type and upload a CSV or Excel file to populate the database.
         </Typography>
 
-        <FormControl fullWidth size="small">
-          <InputLabel>Select file type...</InputLabel>
-          <Select value={uploadType} onChange={(e) => setUploadType(e.target.value)} label="Select file type...">
-            <MenuItem value="">Choose...</MenuItem>
+        <FormControl fullWidth size="small" variant="standard">
+          <Select
+            value={uploadType}
+            onChange={(e) => setUploadType(e.target.value)}
+            displayEmpty
+            renderValue={(selected) => {
+              if (!selected) {
+                return <Typography color="text.secondary">Select file type...</Typography>;
+              }
+              if (selected === "exam") return "Exam Timetable";
+              if (selected === "provisions") return "Student Provisions";
+              if (selected === "venues") return "Venue Data";
+              return selected;
+            }}
+            IconComponent={ArrowDropDown}
+            disableUnderline
+            sx={{
+              backgroundColor: "action.hover",
+              borderRadius: 1,
+              px: 2,
+              height: 40,
+              display: "flex",
+              alignItems: "center",
+              "& .MuiSelect-select": {
+                display: "flex",
+                alignItems: "center",
+                p: 0,
+              },
+              "& .MuiSelect-icon": {
+                color: "action.active",
+                right: 12,
+              },
+            }}
+          >
             <MenuItem value="exam">Exam Timetable</MenuItem>
             <MenuItem value="provisions">Student Provisions</MenuItem>
             <MenuItem value="venues">Venue Data</MenuItem>
