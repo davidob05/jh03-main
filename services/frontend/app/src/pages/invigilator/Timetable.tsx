@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import dayjs, { Dayjs } from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import "dayjs/locale/en-gb";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { StaticDatePicker, DatePicker } from "@mui/x-date-pickers";
+import { StaticDatePicker } from "@mui/x-date-pickers";
 import {
   Box,
   Chip,
@@ -32,8 +33,11 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import { Panel } from "../../components/Panel";
 import { PillButton } from "../../components/PillButton";
+import { sharedInputSx } from "../../components/sharedInputSx";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { formatDateWithWeekday, formatDateTime, formatTime } from "../../utils/dates";
+
+dayjs.extend(customParseFormat);
 
 interface Exam {
   id: string;
@@ -86,6 +90,7 @@ const formatProvisionLabel = (value: string) => {
 export const InvigilatorTimetable: React.FC = () => {
   const today = dayjs();
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(today);
+  const [dateInput, setDateInput] = useState<string>(today.format("YYYY-MM-DD"));
   const [month, setMonth] = useState(dayjs().startOf("month"));
 
   const {
@@ -224,6 +229,10 @@ export const InvigilatorTimetable: React.FC = () => {
     setMonth(dayValue.startOf("month"));
   };
 
+  useEffect(() => {
+    setDateInput(selectedDate ? selectedDate.format("YYYY-MM-DD") : "");
+  }, [selectedDate]);
+
   const handleToday = () => setDay(today);
   const handlePrevDay = () =>
     setDay((selectedDate || today).subtract(1, "day"));
@@ -317,54 +326,25 @@ export const InvigilatorTimetable: React.FC = () => {
             </Tooltip>
             <Tooltip title="Pick a specific date">
               <Box>
-                <DatePicker
-                  value={selectedDate}
-                  onChange={(newValue) => setDay(newValue)}
-                  slotProps={{
-                    textField: {
-                      variant: "outlined",
-                      size: "small",
-                      sx: {
-                        minWidth: 220,
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: "999px",
-                          bgcolor: "#f8fafc",
-                          border: "1px solid #b9c0d0",
-                          fontWeight: 600,
-                          letterSpacing: 0.2,
-                          transition: "all 0.2s ease",
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "#b9c0d0",
-                            borderRadius: "999px",
-                          },
-                          "&:hover": {
-                            transform: "translateY(-1px)",
-                            boxShadow: "0px 4px 18px rgba(0,0,0,0.12)",
-                          },
-                          "&:hover .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "primary.main",
-                          },
-                          "&.Mui-focused": {
-                            boxShadow:
-                              "0 0 0 2px rgba(25,118,210,0.16), 0px 4px 18px rgba(0,0,0,0.12)",
-                          },
-                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "primary.main",
-                            borderRadius: "999px",
-                          },
-                        },
-                        "& .MuiInputBase-input": {
-                          py: 1.1,
-                        },
-                        "& .MuiSvgIcon-root": { color: "primary.main" },
-                      },
-                      InputProps: {
-                        sx: {
-                          borderRadius: "999px",
-                        },
-                      },
-                    },
+                <TextField
+                  label="Select a date"
+                  type="date"
+                  size="small"
+                  value={dateInput}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setDateInput(value);
+                    if (!value) {
+                      setDay(null);
+                      return;
+                    }
+                    const parsed = dayjs(value, "YYYY-MM-DD", true);
+                    if (parsed.isValid()) {
+                      setDay(parsed);
+                    }
                   }}
+                  InputLabelProps={{ shrink: true }}
+                  sx={[sharedInputSx, { minWidth: 220 }]}
                 />
               </Box>
             </Tooltip>
