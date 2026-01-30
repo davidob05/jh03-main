@@ -24,9 +24,10 @@ import {
   Chip,
   Divider,
   Stack,
+  Fab,
 } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
-import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Edit as EditIcon, ExpandMore as ExpandMoreIcon, Search as SearchIcon, ArrowForward as ArrowForwardIcon, PostAdd as PostAddIcon } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -35,6 +36,7 @@ import dayjs from 'dayjs';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
+import { AddExamDialog } from "../../components/admin/AddExamDialog";
 import { useAppDispatch, useAppSelector, setExamsPrefs } from '../../state/store';
 
 interface ExamData {
@@ -254,6 +256,7 @@ export const AdminExams: React.FC = () => {
   const [searchDraft, setSearchDraft] = React.useState(searchQuery);
   const [selected, setSelected] = React.useState<readonly number[]>([]);
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
+  const [addOpen, setAddOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteTargets, setDeleteTargets] = React.useState<RowData[]>([]);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
@@ -571,6 +574,28 @@ export const AdminExams: React.FC = () => {
             if (deleteTargets.length) deleteMutation.mutate(deleteTargets.map((target) => target.id));
           }}
         />
+        <AddExamDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["exams-table"] });
+          }}
+        />
+        <Tooltip title="Add a new exam">
+          <Fab
+            color="primary"
+            onClick={() => setAddOpen(true)}
+            sx={{
+              position: 'fixed',
+              bottom: 32,
+              right: 32,
+              boxShadow: 3,
+            }}
+            aria-label="Add exam"
+          >
+            <PostAddIcon />
+          </Fab>
+        </Tooltip>
       </Box>
     </LocalizationProvider>
   );

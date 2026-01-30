@@ -21,6 +21,7 @@ import { Add, Close, Delete } from "@mui/icons-material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
+import { sharedInputSx } from "../sharedInputSx";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -78,19 +79,6 @@ const PROVISION_CHOICES: ProvisionOption[] = [
   { value: "use_computer", label: "Use of a computer" },
   { value: "accessible_hall", label: "Accessible hall" },
 ];
-
-const sharedInputSx = {
-  backgroundColor: "action.hover",
-  borderRadius: 1,
-  px: 2,
-  height: 40,
-  "& .MuiInputBase-root": { minHeight: 40 },
-  "& .MuiInputBase-input": { p: 0 },
-  "& .MuiOutlinedInput-notchedOutline": { border: "none" },
-  "& .MuiSelect-select": { p: 0, display: "flex", alignItems: "center" },
-  "& .MuiInputLabel-root": { transform: "translate(16px, 10px) scale(1)" },
-  "& .MuiInputLabel-shrink": { transform: "translate(16px, -10px) scale(0.75)" },
-};
 
 const fetchExam = async (examId: number): Promise<ExamData> => {
   const response = await apiFetch(`${apiBaseUrl}/exams/${examId}/`);
@@ -563,6 +551,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                           if (coreVenue) return;
                           setMainProvisions((prev) => toggleProvision(prev, p.value));
                         }}
+                        disabled={Boolean(coreVenue)}
                         sx={{ cursor: coreVenue ? "not-allowed" : "pointer" }}
                       />
                     );

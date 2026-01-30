@@ -1,0 +1,161 @@
+import React, { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Stack,
+  IconButton,
+  Alert,
+  CircularProgress,
+} from "@mui/material";
+import { Close } from "@mui/icons-material";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { PillButton } from "../PillButton";
+import { sharedInputSx } from "../sharedInputSx";
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  onSuccess?: (name: string) => void;
+};
+
+export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [examType, setExamType] = useState("");
+  const [students, setStudents] = useState<number | "">("");
+  const [school, setSchool] = useState("");
+  const [contact, setContact] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setName("");
+    setCode("");
+    setExamType("");
+    setStudents("");
+    setSchool("");
+    setContact("");
+  }, [open]);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const examRes = await apiFetch(`${apiBaseUrl}/exams/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          exam_name: name,
+          course_code: code,
+          exam_type: examType,
+          no_students: students === "" ? 0 : Number(students),
+          exam_school: school,
+          school_contact: contact ?? "",
+        }),
+      });
+      if (!examRes.ok) {
+        const text = await examRes.text();
+        throw new Error(text || "Failed to create exam");
+      }
+      return examRes.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exams-table"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-exams"] });
+      onSuccess?.(name);
+      onClose();
+    },
+    onError: (err: any) => alert(err?.message || "Failed to create exam"),
+  });
+
+  const canSave = Boolean(name && code && examType && school);
+
+  return (
+    <Dialog open={open} onClose={mutation.isPending ? undefined : onClose} fullWidth maxWidth="sm">
+      <DialogTitle>
+        Add Exam
+        <IconButton
+          aria-label="close"
+          onClick={() => {
+            if (!mutation.isPending) onClose();
+          }}
+          sx={{ position: "absolute", right: 8, top: 8 }}
+        >
+          <Close />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField
+              label="Exam name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Course code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+          </Stack>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField
+              label="Exam type"
+              value={examType}
+              onChange={(e) => setExamType(e.target.value)}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Number of students"
+              type="number"
+              value={students}
+              onChange={(e) => setStudents(e.target.value === "" ? "" : Number(e.target.value))}
+              fullWidth
+              sx={sharedInputSx}
+            />
+          </Stack>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField
+              label="Exam school"
+              value={school}
+              onChange={(e) => setSchool(e.target.value)}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="School contact"
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              fullWidth
+              sx={sharedInputSx}
+            />
+          </Stack>
+          {mutation.isError && (
+            <Alert severity="error">Failed to create exam.</Alert>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <PillButton
+          variant="contained"
+          onClick={() => mutation.mutate()}
+          disabled={!canSave || mutation.isPending}
+          startIcon={mutation.isPending ? <CircularProgress size={18} /> : undefined}
+        >
+          Create
+        </PillButton>
+      </DialogActions>
+    </Dialog>
+  );
+};
