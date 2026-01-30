@@ -145,7 +145,7 @@ export const UploadFile: React.FC = () => {
               },
               "& .MuiSelect-icon": {
                 color: "action.active",
-                right: 12,
+                right: 15,
               },
             }}
           >

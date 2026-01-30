@@ -22,7 +22,7 @@ import {
   Link as MUILink,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Close, ExpandMore, Search } from "@mui/icons-material";
+import { Close, ExpandMore, Search, ArrowDropDown } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../PillButton";
@@ -877,7 +877,16 @@ const AssignInvigilatorDialogBody: React.FC<{
                               onChange={(e) => updateInput(invigilator.id, { start: e.target.value })}
                               disabled={!canEditAssignment}
                               InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
+                              sx={{
+                                flex: 1,
+                                backgroundColor: "action.hover",
+                                borderRadius: 1,
+                                px: 2,
+                                height: 40,
+                                "& .MuiInputBase-root": { minHeight: 40 },
+                                "& .MuiInputBase-input": { p: 0 },
+                                "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                              }}
                             />
                             <TextField
                               label="End"
@@ -887,20 +896,51 @@ const AssignInvigilatorDialogBody: React.FC<{
                               onChange={(e) => updateInput(invigilator.id, { end: e.target.value })}
                               disabled={!canEditAssignment}
                               InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
+                              sx={{
+                                flex: 1,
+                                backgroundColor: "action.hover",
+                                borderRadius: 1,
+                                px: 2,
+                                height: 40,
+                                "& .MuiInputBase-root": { minHeight: 40 },
+                                "& .MuiInputBase-input": { p: 0 },
+                                "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                              }}
                             />
                           </Stack>
-                          <FormControl size="small" sx={{ minWidth: 200 }}>
-                            <InputLabel>Invigilator role</InputLabel>
+                          <FormControl
+                            size="small"
+                            variant="standard"
+                            sx={{
+                              minWidth: 200,
+                              backgroundColor: "action.hover",
+                              borderRadius: 1,
+                              px: 2,
+                              height: 40,
+                              display: "flex",
+                              justifyContent: "center",
+                            }}
+                          >
                             <Select
-                              label="Invigilator role"
                               value={getInputFor(invigilator.id).role}
                               onChange={(e) => updateInput(invigilator.id, { role: e.target.value as string })}
                               disabled={!canEditAssignment}
+                              displayEmpty
+                              disableUnderline
+                              IconComponent={ArrowDropDown}
+                              renderValue={(selected) => {
+                                if (!selected) {
+                                  return <Typography color="text.secondary">Invigilator role</Typography>;
+                                }
+                                const match = roleOptions.find((o) => o.value === selected);
+                                return match?.label || selected;
+                              }}
+                              sx={{
+                                height: 40,
+                                "& .MuiSelect-select": { p: 0, display: "flex", alignItems: "center" },
+                                "& .MuiSelect-icon": { color: "action.active" },
+                              }}
                             >
-                              <MenuItem value="">
-                                <em>Choose...</em>
-                              </MenuItem>
                               {roleOptions.map((option) => (
                                 <MenuItem key={option.value} value={option.value}>
                                   {option.label}
@@ -978,8 +1018,6 @@ const AssignInvigilatorDialogBody: React.FC<{
     </Stack>
   );
 };
-
-
 
 
 
