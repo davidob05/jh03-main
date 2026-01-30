@@ -25,6 +25,7 @@ import { CollapsibleSection } from "../../components/CollapsibleSection";
 import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
+import { sharedInputSx } from "../sharedInputSx";
 
 const STEPS = ["Personal Details", "Login Details", "Qualifications", "Restrictions", "Availability"];
 
@@ -224,16 +225,24 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
     switch (activeStep) {
       case 0:
         return (
-          <Stack spacing={2}>
-            <TextField label="Preferred Name" value={preferredName} onChange={e => setPreferredName(e.target.value)} fullWidth required />
-            <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required />
-            <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required />
-            <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth />
-            <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth />
-            <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required />
-            <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required />
-            <TextField label="Contracted Hours" type="number" value={contractedHours} onChange={e => setContractedHours(e.target.value)} fullWidth />
-            <TextField label="Notes" value={notes} onChange={e => setNotes(e.target.value)} fullWidth multiline rows={3} />
+          <Stack spacing={2.5}>
+            <TextField label="Preferred Name" value={preferredName} onChange={e => setPreferredName(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth sx={sharedInputSx} />
+            <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth sx={sharedInputSx} />
+            <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Contracted Hours" type="number" value={contractedHours} onChange={e => setContractedHours(e.target.value)} fullWidth sx={sharedInputSx} />
+            <TextField
+              label="Notes"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              fullWidth
+              multiline
+              rows={3}
+              sx={[sharedInputSx, { height: "auto", "& .MuiInputBase-root": { minHeight: 96 }}]}
+            />
             <BooleanCheckboxRow
               label="Resigned"
               value={resigned}
@@ -246,7 +255,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
 
       case 1:
         return (
-          <Stack spacing={2} divider={<Divider flexItem />}>
+          <Stack spacing={5}>
             <TextField
               label="Username"
               value={loginUsername}
@@ -254,6 +263,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
               fullWidth
               required
               helperText="Auto-filled from University Email if left blank."
+              sx={sharedInputSx}
             />
             <TextField
               label="Temporary Password"
@@ -263,6 +273,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
               required
               helperText="Starter password which the invigilator can change after first login."
               type={showPassword ? "text" : "password"}
+              sx={sharedInputSx}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -299,7 +310,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
 
       case 3:
         return (
-          <Stack spacing={2}>
+          <Stack spacing={2.5}>
             {/* General Requirements */}
             <CollapsibleSection title="General Requirements" defaultExpanded>
               {["accessibility_required", "separate_room_only", "purple_cluster", "computer_cluster"].map(r => {
@@ -420,7 +431,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
         </IconButton>
       </DialogTitle>
 
-      <DialogContent>
+      <DialogContent sx={{ overflowY: "visible" }}>
         <Stepper activeStep={activeStep} alternativeLabel>
           {STEPS.map(step => (
             <Step key={step}>

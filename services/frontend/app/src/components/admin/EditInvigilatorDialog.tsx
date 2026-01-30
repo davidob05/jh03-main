@@ -24,6 +24,7 @@ import { CollapsibleSection } from "../../components/CollapsibleSection";
 import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
+import { sharedInputSx } from "../sharedInputSx";
 
 const STEPS = ["Personal Details", "Qualifications", "Restrictions", "Availability"];
 
@@ -239,16 +240,24 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
     switch (activeStep) {
       case 0:
         return (
-          <Stack spacing={2}>
-            <TextField label="Preferred Name" value={preferredName} onChange={e => setPreferredName(e.target.value)} fullWidth required />
-            <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required />
-            <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required />
-            <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth />
-            <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth />
-            <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required />
-            <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required />
-            <TextField label="Contracted Hours" type="number" value={contractedHours} onChange={e => setContractedHours(e.target.value)} fullWidth />
-            <TextField label="Notes" value={notes} onChange={e => setNotes(e.target.value)} fullWidth multiline rows={3} />
+          <Stack spacing={2.5}>
+            <TextField label="Preferred Name" value={preferredName} onChange={e => setPreferredName(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth sx={sharedInputSx} />
+            <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth sx={sharedInputSx} />
+            <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required sx={sharedInputSx} />
+            <TextField label="Contracted Hours" type="number" value={contractedHours} onChange={e => setContractedHours(e.target.value)} fullWidth sx={sharedInputSx} />
+            <TextField
+              label="Notes"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              fullWidth
+              multiline
+              rows={3}
+              sx={[sharedInputSx, { height: "auto", "& .MuiInputBase-root": { minHeight: 96 }, "& .MuiInputBase-input": { py: 1 } }]}
+            />
             <BooleanCheckboxRow
               label="Resigned"
               value={resigned}

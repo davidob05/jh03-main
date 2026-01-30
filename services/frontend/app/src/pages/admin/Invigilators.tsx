@@ -67,6 +67,7 @@ import { apiBaseUrl, apiFetch } from '../../utils/api';
 import { formatMonthYear } from '../../utils/dates';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
+import { sharedInputSx } from "../../components/sharedInputSx";
 
 interface Invigilator {
   id: number;
@@ -809,13 +810,14 @@ export const AdminInvigilators: React.FC = () => {
                 ? "Deselect all invigilators"
                 : `Select all ${filtered.length} invigilators`}
             </PillButton>
-            <FormControl size="small" sx={{ minWidth: 200 }}>
+            <FormControl size="small" sx={[sharedInputSx, { minWidth: 280 }]}>
               <InputLabel>With all selected users...</InputLabel>
               <Select
                 label="With all selected users..."
                 value={bulkAction}
                 disabled={selected.length === 0}
                 onChange={(e) => setBulkAction(e.target.value)}
+                disableUnderline
               >
                 <MenuItem value="">
                   <em>Choose...</em>
