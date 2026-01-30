@@ -41,6 +41,7 @@ type CalendarPrefs = {
   currentDate: string; // ISO date string
   searchQuery: string;
   page: number;
+  searchDraft: string;
 };
 
 type DashboardPrefs = {
@@ -96,6 +97,7 @@ const initialState: AdminTableState = {
     currentDate: "",
     searchQuery: "",
     page: 1,
+    searchDraft: "",
   },
   dashboard: {
     selectedSchool: "",

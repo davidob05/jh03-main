@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useContext } from "react";
+import React, { useMemo, useState, useEffect, useContext, useRef } from "react";
 import {
   Box,
   Typography,
@@ -149,8 +149,7 @@ const minutesSinceMidnight = (dateTime: string) => {
 
 const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
   const dispatch = useAppDispatch();
-  const { viewMode, currentDate: currentDateIso, searchQuery, page } = useAppSelector((s) => s.adminTables.calendar);
-  const [searchDraft, setSearchDraft] = useState(searchQuery);
+  const { viewMode, currentDate: currentDateIso, searchQuery, searchDraft, page } = useAppSelector((s) => s.adminTables.calendar);
   const currentDate = useMemo(() => {
     const d = new Date(currentDateIso);
     return Number.isNaN(d.getTime()) ? new Date() : d;
@@ -220,9 +219,14 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
     return acc;
   }, {} as Record<string, ExamDetails[]>);
 
+  const searchDraftInitialized = useRef(false);
   useEffect(() => {
-    setSearchDraft(searchQuery);
-  }, [searchQuery]);
+    if (searchDraftInitialized.current) return;
+    if (!searchDraft && searchQuery) {
+      dispatch(setCalendarPrefs({ searchDraft: searchQuery }));
+    }
+    searchDraftInitialized.current = true;
+  }, [dispatch, searchDraft, searchQuery]);
 
   const { startMinutes, endMinutes } = useMemo(() => {
     const defaultStart = 8 * 60;
@@ -299,17 +303,32 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
             <Search sx={{ color: "action.active", mr: 1 }} />
             <InputBase
               placeholder="Search exams..."
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
+              value={searchDraft || searchQuery}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "") {
+                  dispatch(setCalendarPrefs({ searchDraft: "", searchQuery: "", page: 1 }));
+                  return;
+                }
+                dispatch(setCalendarPrefs({ searchDraft: value }));
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  dispatch(setCalendarPrefs({ searchQuery: searchDraft.trim(), page: 1 }));
+                  const trimmed = (searchDraft || "").trim();
+                  dispatch(setCalendarPrefs({ searchQuery: trimmed, searchDraft: trimmed, page: 1 }));
                 }
               }}
               sx={{ width: 300 }}
             />
-            <IconButton aria-label="Apply search" color="primary" onClick={() => dispatch(setCalendarPrefs({ searchQuery: searchDraft.trim(), page: 1 }))}>
+            <IconButton
+              aria-label="Apply search"
+              color="primary"
+              onClick={() => {
+                const trimmed = (searchDraft || "").trim();
+                dispatch(setCalendarPrefs({ searchQuery: trimmed, searchDraft: trimmed, page: 1 }));
+              }}
+            >
               <ArrowForward />
             </IconButton>
           </Paper>
