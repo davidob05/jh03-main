@@ -447,7 +447,7 @@ export const AdminDashboard: React.FC = () => {
                   />
                   <PillButton
                     variant="contained"
-                    disabled={exporting || bulkExporting}
+                    disabled={exporting || bulkExporting || !selectedSchool}
                     onClick={handleExport}
                     startIcon={<FileDownloadIcon />}
                     sx={{ minWidth: 200 }}

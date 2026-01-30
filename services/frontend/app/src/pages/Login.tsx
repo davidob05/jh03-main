@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { apiBaseUrl, getAuthToken, getStoredRole, setAuthSession } from "../utils/api";
 import { Panel } from "../components/Panel";
 import { PillButton } from "../components/PillButton";
+import { sharedInputSx } from "../components/sharedInputSx";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -121,20 +122,7 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: "999px",
-                    height: 48,
-                    "& .MuiInputBase-input": {
-                      py: 0,
-                      display: "flex",
-                      alignItems: "center",
-                    },
-                  },
-                  "& .MuiInputLabel-root": {
-                    top: -3,
-                  },
-                }}
+                sx={sharedInputSx}
               />
 
               <TextField
@@ -145,20 +133,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 type={showPassword ? "text" : "password"}
                 required
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: "999px",
-                    height: 48,
-                    "& .MuiInputBase-input": {
-                      py: 0,
-                      display: "flex",
-                      alignItems: "center",
-                    },
-                  },
-                  "& .MuiInputLabel-root": {
-                    top: -3,
-                  },
-                }}
+                sx={sharedInputSx}
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
