@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from "react-router-dom";
 import { Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -68,6 +68,7 @@ import { formatMonthYear } from '../../utils/dates';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { sharedInputSx } from "../../components/sharedInputSx";
+import { setInvigilatorsPrefs, useAppDispatch, useAppSelector } from "../../state/store";
 
 interface Invigilator {
   id: number;
@@ -114,6 +115,7 @@ type SortOrder = 'asc' | 'desc';
 type NotifyMethod = 'email' | 'sms' | 'call';
 
 export const AdminInvigilators: React.FC = () => {
+  const dispatch = useAppDispatch();
   const { data: invigilatorsData = [], isLoading, isError, error } = useQuery<Invigilator[], Error>({ queryKey: ['invigilators'], queryFn: fetchInvigilators });
   const [invigilators, setInvigilators] = useState<Invigilator[]>([]);
   const [filtered, setFiltered] = useState<Invigilator[]>([]);
@@ -128,24 +130,24 @@ export const AdminInvigilators: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialView = (searchParams.get("view") as ViewMode) || "grid";
-  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
+  const viewParam = searchParams.get("view") as ViewMode | null;
+  const {
+    viewMode,
+    firstLetter,
+    lastLetter,
+    page,
+    showAll,
+    searchQuery,
+    searchDraft,
+    sortField,
+    sortOrder,
+  } = useAppSelector((state) => state.adminTables.invigilators);
 
-  const [firstLetter, setFirstLetter] = useState<string>('All');
-  const [lastLetter, setLastLetter] = useState<string>('All');
-  const [page, setPage] = useState(1);
   const itemsPerPage = viewMode === 'grid' ? 12 : 10;
 
   // Calendar state
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
-
-  // Searching state
-  const [searchQuery, setSearchQuery] = useState<string>('');
-
-  // Sorting state
-  const [sortField, setSortField] = useState<SortField>('firstName');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   // Month index for calendar view
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
@@ -153,8 +155,7 @@ export const AdminInvigilators: React.FC = () => {
   // Selection state
   const [selected, setSelected] = useState<number[]>([]);
 
-  // Show all state
-  const [showAll, setShowAll] = useState(false);
+  const searchDraftInitialized = useRef(false);
 
   // Bulk action state
   const [bulkAction, setBulkAction] = useState("");
@@ -168,11 +169,34 @@ export const AdminInvigilators: React.FC = () => {
     setFiltered(invigilatorsData);
   }, [invigilatorsData]);
 
+  useEffect(() => {
+    if (viewParam && viewParam !== viewMode) {
+      dispatch(setInvigilatorsPrefs({ viewMode: viewParam }));
+    }
+  }, [dispatch, viewMode, viewParam]);
+
+  useEffect(() => {
+    if (!viewParam && viewMode) {
+      setSearchParams(prev => {
+        const newParams = new URLSearchParams(prev);
+        newParams.set("view", viewMode);
+        return newParams;
+      });
+    }
+  }, [setSearchParams, viewMode, viewParam]);
+
+  useEffect(() => {
+    if (!searchDraftInitialized.current && searchQuery && !searchDraft) {
+      dispatch(setInvigilatorsPrefs({ searchDraft: searchQuery }));
+      searchDraftInitialized.current = true;
+    }
+  }, [dispatch, searchDraft, searchQuery]);
+
   // Handle view mode change
   const handleViewChange = (event: React.MouseEvent<HTMLElement>, value: ViewMode) => {
     if (!value) return;
 
-    setViewMode(value);
+    dispatch(setInvigilatorsPrefs({ viewMode: value }));
 
     setSearchParams(prev => {
       const newParams = new URLSearchParams(prev);
@@ -223,8 +247,8 @@ export const AdminInvigilators: React.FC = () => {
     result = sortInvigilators(result);
 
     setFiltered(result);
-    setPage(1);
-  }, [firstLetter, lastLetter, invigilators, sortField, sortOrder, searchQuery]);
+    dispatch(setInvigilatorsPrefs({ page: 1 }));
+  }, [dispatch, firstLetter, lastLetter, invigilators, sortField, sortOrder, searchQuery]);
 
   // Sorting function
   const sortInvigilators = (data: Invigilator[]) => {
@@ -443,8 +467,14 @@ export const AdminInvigilators: React.FC = () => {
             <Search sx={{ color: "action.active", mr: 1 }} />
             <InputBase
               placeholder="Search invigilators..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchDraft || searchQuery}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                dispatch(setInvigilatorsPrefs({
+                  searchDraft: nextValue,
+                  searchQuery: nextValue,
+                }));
+              }}
               sx={{ width: 250 }}
             />
           </Box>
@@ -460,10 +490,9 @@ export const AdminInvigilators: React.FC = () => {
             }
             onClick={() => {
               if (sortField === 'firstName') {
-                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                dispatch(setInvigilatorsPrefs({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' }));
               } else {
-                setSortField('firstName');
-                setSortOrder('asc');
+                dispatch(setInvigilatorsPrefs({ sortField: 'firstName', sortOrder: 'asc' }));
               }
             }}
             sx={{
@@ -485,10 +514,9 @@ export const AdminInvigilators: React.FC = () => {
             }
             onClick={() => {
               if (sortField === 'lastName') {
-                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                dispatch(setInvigilatorsPrefs({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' }));
               } else {
-                setSortField('lastName');
-                setSortOrder('asc');
+                dispatch(setInvigilatorsPrefs({ sortField: 'lastName', sortOrder: 'asc' }));
               }
             }}
             sx={{
@@ -504,17 +532,35 @@ export const AdminInvigilators: React.FC = () => {
         <Stack spacing={2} mb={3}>
           <Typography variant="subtitle2">First name</Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip label="All" color={firstLetter === 'All' ? 'primary' : 'default'} onClick={() => setFirstLetter('All')} />
+            <Chip
+              label="All"
+              color={firstLetter === 'All' ? 'primary' : 'default'}
+              onClick={() => dispatch(setInvigilatorsPrefs({ firstLetter: 'All' }))}
+            />
             {alphabet.map(l => (
-              <Chip key={l} label={l} color={firstLetter === l ? 'primary' : 'default'} onClick={() => setFirstLetter(l)} />
+              <Chip
+                key={l}
+                label={l}
+                color={firstLetter === l ? 'primary' : 'default'}
+                onClick={() => dispatch(setInvigilatorsPrefs({ firstLetter: l }))}
+              />
             ))}
           </Stack>
 
           <Typography variant="subtitle2" sx={{ mt: 2 }}>Last name</Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip label="All" color={lastLetter === 'All' ? 'primary' : 'default'} onClick={() => setLastLetter('All')} />
+            <Chip
+              label="All"
+              color={lastLetter === 'All' ? 'primary' : 'default'}
+              onClick={() => dispatch(setInvigilatorsPrefs({ lastLetter: 'All' }))}
+            />
             {alphabet.map(l => (
-              <Chip key={l} label={l} color={lastLetter === l ? 'primary' : 'default'} onClick={() => setLastLetter(l)} />
+              <Chip
+                key={l}
+                label={l}
+                color={lastLetter === l ? 'primary' : 'default'}
+                onClick={() => dispatch(setInvigilatorsPrefs({ lastLetter: l }))}
+              />
             ))}
           </Stack>
         </Stack>
@@ -900,7 +946,12 @@ export const AdminInvigilators: React.FC = () => {
             </Tooltip>
           </Stack>
 
-          <Pagination count={totalPages} page={page} onChange={(e, v) => setPage(v)} color="primary" />
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(e, v) => dispatch(setInvigilatorsPrefs({ page: v }))}
+            color="primary"
+          />
         </Stack>
 
         {/* Show All Button */}
@@ -908,14 +959,14 @@ export const AdminInvigilators: React.FC = () => {
           <Box sx={{ textAlign: 'center', mt: 2, display: 'flex', justifyContent: 'center', gap: 1.5 }}>
             <PillButton
               variant="outlined"
-              onClick={() => setShowAll(false)}
+              onClick={() => dispatch(setInvigilatorsPrefs({ showAll: false }))}
               disabled={!showAll}
             >
               Show less
             </PillButton>
             <PillButton
               variant="contained"
-              onClick={() => setShowAll(true)}
+              onClick={() => dispatch(setInvigilatorsPrefs({ showAll: true }))}
               disabled={showAll}
             >
               {`Show all ${filtered.length}`}

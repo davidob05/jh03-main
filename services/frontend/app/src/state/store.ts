@@ -31,6 +31,7 @@ type InvigilatorPrefs = {
   firstLetter: string;
   lastLetter: string;
   searchQuery: string;
+  searchDraft: string;
   sortField: "firstName" | "lastName";
   sortOrder: "asc" | "desc";
   page: number;
@@ -89,6 +90,7 @@ const initialState: AdminTableState = {
     firstLetter: "All",
     lastLetter: "All",
     searchQuery: "",
+    searchDraft: "",
     sortField: "firstName",
     sortOrder: "asc",
     page: 1,
