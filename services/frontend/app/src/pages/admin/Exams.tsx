@@ -247,13 +247,12 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onSear
 
 export const AdminExams: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.exams);
+  const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery, searchDraft } = useAppSelector((s) => s.adminTables.exams);
   const allowedSortKeys = ['code', 'subject', 'coreVenue', 'startTime', 'endTime'] as const;
   type ExamSortKey = typeof allowedSortKeys[number];
   const orderBy: ExamSortKey = allowedSortKeys.includes(rawOrderBy as ExamSortKey)
     ? (rawOrderBy as ExamSortKey)
     : 'code';
-  const [searchDraft, setSearchDraft] = React.useState(searchQuery);
   const [selected, setSelected] = React.useState<readonly number[]>([]);
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
   const [addOpen, setAddOpen] = React.useState(false);
@@ -262,7 +261,14 @@ export const AdminExams: React.FC = () => {
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  React.useEffect(() => setSearchDraft(searchQuery), [searchQuery]);
+  const searchDraftInitialized = React.useRef(false);
+  React.useEffect(() => {
+    if (searchDraftInitialized.current) return;
+    if (!searchDraft && searchQuery) {
+      dispatch(setExamsPrefs({ searchDraft: searchQuery }));
+    }
+    searchDraftInitialized.current = true;
+  }, [dispatch, searchDraft, searchQuery]);
 
   const { data: examsData = [], isLoading, isError, error, refetch } = useQuery<ExamData[], Error>({ queryKey: ['exams-table'], queryFn: fetchExams });
 
@@ -359,8 +365,17 @@ export const AdminExams: React.FC = () => {
     const next = parseInt(event.target.value, 10);
     dispatch(setExamsPrefs({ rowsPerPage: next, page: 0 }));
   };
-  const applySearch = () => dispatch(setExamsPrefs({ searchQuery: searchDraft.trim(), page: 0 }));
-  const handleSearchChange = (query: string) => { setSearchDraft(query); };
+  const applySearch = () => {
+    const trimmed = searchDraft.trim();
+    dispatch(setExamsPrefs({ searchQuery: trimmed, searchDraft: trimmed, page: 0 }));
+  };
+  const handleSearchChange = (query: string) => {
+    if (query === "") {
+      dispatch(setExamsPrefs({ searchDraft: "", searchQuery: "", page: 0 }));
+      return;
+    }
+    dispatch(setExamsPrefs({ searchDraft: query }));
+  };
   const handleEditSelected = () => {
     if (selected.length === 1) navigate(`/admin/exam/${selected[0]}`);
   };
@@ -447,7 +462,7 @@ export const AdminExams: React.FC = () => {
         <Panel disableDivider sx={{ p: 0, overflow: 'hidden'}}>
           <EnhancedTableToolbar
             numSelected={selected.length}
-            searchQuery={searchDraft}
+            searchQuery={searchDraft || searchQuery}
             onSearchChange={handleSearchChange}
             onSearchSubmit={applySearch}
             onEditSelected={handleEditSelected}

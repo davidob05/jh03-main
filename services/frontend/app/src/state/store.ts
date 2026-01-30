@@ -7,6 +7,7 @@ type ExamPrefs = {
   page: number;
   rowsPerPage: number;
   searchQuery: string;
+  searchDraft: string;
 };
 
 type VenuePrefs = {
@@ -64,6 +65,7 @@ const initialState: AdminTableState = {
     page: 0,
     rowsPerPage: 10,
     searchQuery: "",
+    searchDraft: "",
   },
   venues: {
     order: "asc",
