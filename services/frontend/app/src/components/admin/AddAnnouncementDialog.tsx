@@ -17,6 +17,7 @@ import { Close, Upload } from "@mui/icons-material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
+import { sharedInputSx } from "../sharedInputSx";
 
 type Audience = "invigilator" | "all";
 
@@ -140,6 +141,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
             onChange={(e) => setTitle(e.target.value)}
             fullWidth
             required
+            sx={sharedInputSx}
           />
           <TextField
             label="Body"
@@ -149,6 +151,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
             required
             multiline
             minRows={3}
+            sx={[sharedInputSx, { height: "auto", "& .MuiInputBase-root": { minHeight: 96 }, "& .MuiInputBase-input": { py: 1 } }]}
           />
 
           <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ md: "center" }}>
@@ -158,6 +161,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               value={audience}
               onChange={(e) => setAudience(e.target.value as Audience | "")}
               fullWidth
+              sx={sharedInputSx}
             >
               <MenuItem value="" disabled>
                 Select audience
@@ -171,6 +175,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               value={priority === "" ? "" : String(priority)}
               onChange={(e) => setPriority(Number(e.target.value))}
               fullWidth
+              sx={sharedInputSx}
             >
               <MenuItem value="" disabled>
                 Select priority
@@ -200,6 +205,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               onChange={(e) => setPublishedAt(e.target.value)}
               fullWidth
               InputLabelProps={{ shrink: true }}
+              sx={sharedInputSx}
             />
             <TextField
               label="Expires at (optional)"
@@ -208,6 +214,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               onChange={(e) => setExpiresAt(e.target.value)}
               fullWidth
               InputLabelProps={{ shrink: true }}
+              sx={sharedInputSx}
             />
           </Stack>
 
