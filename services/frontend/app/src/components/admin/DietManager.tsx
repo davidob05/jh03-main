@@ -24,6 +24,7 @@ import { PillButton } from "../PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { formatDate } from "../../utils/dates";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
+import { sharedInputSx } from "../sharedInputSx";
 
 export interface Diet {
   id: number;
@@ -245,7 +246,7 @@ export const DietManager: React.FC = () => {
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
+          <Stack spacing={4} sx={{ mt: 1 }}>
             {error && <Alert severity="error">{error}</Alert>}
             <TextField
               label="Code"
@@ -254,6 +255,7 @@ export const DietManager: React.FC = () => {
               fullWidth
               required
               helperText="Stable identifier, e.g. DEC_2026"
+              sx={sharedInputSx}
             />
             <TextField
               label="Name"
@@ -262,6 +264,7 @@ export const DietManager: React.FC = () => {
               fullWidth
               required
               helperText="Display label, e.g. December 2025"
+              sx={sharedInputSx}
             />
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField
@@ -271,6 +274,8 @@ export const DietManager: React.FC = () => {
                 onChange={(e) => setDraft((d) => ({ ...d, start_date: e.target.value }))}
                 InputLabelProps={{ shrink: true }}
                 fullWidth
+                sx={sharedInputSx}
+                helperText="First day of this diet period"
               />
               <TextField
                 label="End date"
@@ -279,6 +284,8 @@ export const DietManager: React.FC = () => {
                 onChange={(e) => setDraft((d) => ({ ...d, end_date: e.target.value }))}
                 InputLabelProps={{ shrink: true }}
                 fullWidth
+                sx={sharedInputSx}
+                helperText="Last day of this diet period"
               />
             </Stack>
             <TextField
@@ -289,6 +296,7 @@ export const DietManager: React.FC = () => {
               InputLabelProps={{ shrink: true }}
               helperText="Last date invigilators can submit restrictions for this diet"
               fullWidth
+              sx={sharedInputSx}
             />
             <FormControlLabel
               control={
