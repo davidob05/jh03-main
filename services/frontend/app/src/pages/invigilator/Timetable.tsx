@@ -849,9 +849,18 @@ export const InvigilatorTimetable: React.FC = () => {
                     minRows={3}
                     value={cancelNote}
                     onChange={(e) => setCancelNote(e.target.value)}
-                    helperText={!cancelNote.trim() ? "Please provide a brief reason for your request." : " "}
-                    FormHelperTextProps={{ sx: { minHeight: 20 } }}
+                    sx={[
+                      sharedInputSx,
+                      {
+                        height: "auto",
+                        "& .MuiInputBase-root": { minHeight: 96 },
+                        "& .MuiInputBase-input": { py: 1 },
+                      },
+                    ]}
                   />
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                    {!cancelNote.trim() ? "Please provide a brief reason for your request." : " "}
+                  </Typography>
 
                   {(drawerMode === "request" ? requestCancelMutation.isError : undoCancelMutation.isError) && (
                     <Alert severity="error">
@@ -860,7 +869,7 @@ export const InvigilatorTimetable: React.FC = () => {
                     </Alert>
                   )}
 
-                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 1 }}>
                     <PillButton
                       variant="contained"
                       color={drawerMode === "undo" ? "primary" : "error"}
