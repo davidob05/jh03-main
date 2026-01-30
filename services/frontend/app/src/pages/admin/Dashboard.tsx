@@ -19,6 +19,7 @@ import AddCommentIcon from "@mui/icons-material/AddComment";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import SearchIcon from "@mui/icons-material/Search";
 import { useQuery } from "@tanstack/react-query";
 import { UploadFile } from "../../components/admin/UploadFile";
@@ -239,6 +240,7 @@ export const AdminDashboard: React.FC = () => {
     const withAll = sorted.includes(ALL_SCHOOLS_LABEL) ? sorted : [ALL_SCHOOLS_LABEL, ...sorted];
     return withAll.includes(ALL_SCHOOLS_BULK_LABEL) ? withAll : [ALL_SCHOOLS_BULK_LABEL, ...withAll];
   }, [exams, ALL_SCHOOLS_LABEL, ALL_SCHOOLS_BULK_LABEL]);
+  const hasSelectedSchool = schoolOptions.includes(selectedSchool);
 
   const notifications = (notificationsError ? [] : notificationsFromApi) || [];
   const invigilatorOptions = useMemo(() => {
@@ -417,14 +419,36 @@ export const AdminDashboard: React.FC = () => {
                     value={selectedSchool}
                     onChange={(_, value) => setSelectedSchool(value ?? "")}
                     onInputChange={(_, value) => setSelectedSchool(value)}
-                    sx={{ flex: 1 }}
+                    disableClearable={!hasSelectedSchool}
+                    forcePopupIcon
+                    popupIcon={<ArrowDropDownIcon />}
+                    sx={{
+                      flex: 1,
+                      backgroundColor: "action.hover",
+                      borderRadius: 1,
+                      px: 2,
+                      height: 40,
+                      "& .MuiInputBase-root": {
+                        minHeight: 40,
+                      },
+                      "& .MuiAutocomplete-inputRoot": {
+                        minHeight: 40,
+                      },
+                      "& .MuiAutocomplete-input": {
+                        p: 0,
+                      },
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="School filter"
-                        placeholder="Start typing to search"
+                        placeholder="School filter"
                         size="small"
-                        fullWidth
+                        variant="standard"
+                        InputLabelProps={{ shrink: false }}
+                        InputProps={{
+                          ...params.InputProps,
+                          disableUnderline: true,
+                        }}
                       />
                     )}
                   />
@@ -652,6 +676,9 @@ export const AdminDashboard: React.FC = () => {
               getOptionLabel={(option) => option?.name || `Invigilator ${option?.id ?? ""}`}
               isOptionEqualToValue={(option, value) => option.id === value.id}
               clearOnEscape
+              disableClearable={!selectedInvigilator}
+              forcePopupIcon
+              popupIcon={<ArrowDropDownIcon />}
               renderInput={(params) => (
                 <TextField
                   {...params}
