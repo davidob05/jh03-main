@@ -120,6 +120,19 @@ export default AssignInvigilatorDialog;
 const displayName = (invigilator: Invigilator) =>
   invigilator.preferred_name || invigilator.full_name || `Invigilator #${invigilator.id}`;
 
+const sharedInputSx = {
+  backgroundColor: "action.hover",
+  borderRadius: 1,
+  px: 2,
+  height: 40,
+  "& .MuiInputBase-root": { minHeight: 40 },
+  "& .MuiInputBase-input": { p: 0 },
+  "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+  "& .MuiSelect-select": { p: 0, display: "flex", alignItems: "center" },
+  "& .MuiInputLabel-root": { transform: "translate(16px, 10px) scale(1)" },
+  "& .MuiInputLabel-shrink": { transform: "translate(16px, -10px) scale(0.75)" },
+};
+
 const qualificationLabels: Record<string, string> = {
   SENIOR_INVIGILATOR: "Senior Invigilator",
   AKT_TRAINED: "AKT Trained",
@@ -877,16 +890,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                               onChange={(e) => updateInput(invigilator.id, { start: e.target.value })}
                               disabled={!canEditAssignment}
                               InputLabelProps={{ shrink: true }}
-                              sx={{
-                                flex: 1,
-                                backgroundColor: "action.hover",
-                                borderRadius: 1,
-                                px: 2,
-                                height: 40,
-                                "& .MuiInputBase-root": { minHeight: 40 },
-                                "& .MuiInputBase-input": { p: 0 },
-                                "& .MuiOutlinedInput-notchedOutline": { border: "none" },
-                              }}
+                              sx={[sharedInputSx, { flex: 1 }]}
                             />
                             <TextField
                               label="End"
@@ -896,16 +900,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                               onChange={(e) => updateInput(invigilator.id, { end: e.target.value })}
                               disabled={!canEditAssignment}
                               InputLabelProps={{ shrink: true }}
-                              sx={{
-                                flex: 1,
-                                backgroundColor: "action.hover",
-                                borderRadius: 1,
-                                px: 2,
-                                height: 40,
-                                "& .MuiInputBase-root": { minHeight: 40 },
-                                "& .MuiInputBase-input": { p: 0 },
-                                "& .MuiOutlinedInput-notchedOutline": { border: "none" },
-                              }}
+                              sx={[sharedInputSx, { flex: 1 }]}
                             />
                           </Stack>
                           <FormControl
@@ -913,10 +908,7 @@ const AssignInvigilatorDialogBody: React.FC<{
                             variant="standard"
                             sx={{
                               minWidth: 200,
-                              backgroundColor: "action.hover",
-                              borderRadius: 1,
-                              px: 2,
-                              height: 40,
+                              ...sharedInputSx,
                               display: "flex",
                               justifyContent: "center",
                             }}
@@ -1018,6 +1010,5 @@ const AssignInvigilatorDialogBody: React.FC<{
     </Stack>
   );
 };
-
 
 

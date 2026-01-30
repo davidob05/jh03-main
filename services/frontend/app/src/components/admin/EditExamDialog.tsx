@@ -79,6 +79,19 @@ const PROVISION_CHOICES: ProvisionOption[] = [
   { value: "accessible_hall", label: "Accessible hall" },
 ];
 
+const sharedInputSx = {
+  backgroundColor: "action.hover",
+  borderRadius: 1,
+  px: 2,
+  height: 40,
+  "& .MuiInputBase-root": { minHeight: 40 },
+  "& .MuiInputBase-input": { p: 0 },
+  "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+  "& .MuiSelect-select": { p: 0, display: "flex", alignItems: "center" },
+  "& .MuiInputLabel-root": { transform: "translate(16px, 10px) scale(1)" },
+  "& .MuiInputLabel-shrink": { transform: "translate(16px, -10px) scale(0.75)" },
+};
+
 const fetchExam = async (examId: number): Promise<ExamData> => {
   const response = await apiFetch(`${apiBaseUrl}/exams/${examId}/`);
   if (!response.ok) throw new Error("Unable to load exam");
@@ -475,22 +488,57 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
         {(isCreate || (!isLoading && !isError)) && (
           <Stack spacing={3}>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField label="Exam name" value={name} onChange={(e) => setName(e.target.value)} fullWidth required />
-              <TextField label="Course code" value={code} onChange={(e) => setCode(e.target.value)} fullWidth required />
+              <TextField
+                label="Exam name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                fullWidth
+                required
+                sx={sharedInputSx}
+              />
+              <TextField
+                label="Course code"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                fullWidth
+                required
+                sx={sharedInputSx}
+              />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField label="Exam type" value={examType} onChange={(e) => setExamType(e.target.value)} fullWidth required />
+              <TextField
+                label="Exam type"
+                value={examType}
+                onChange={(e) => setExamType(e.target.value)}
+                fullWidth
+                required
+                sx={sharedInputSx}
+              />
               <TextField
                 label="Number of students"
                 type="number"
                 value={students}
                 onChange={(e) => setStudents(e.target.value === "" ? "" : Number(e.target.value))}
                 fullWidth
+                sx={sharedInputSx}
               />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField label="Exam school" value={school} onChange={(e) => setSchool(e.target.value)} fullWidth required />
-              <TextField label="School contact" value={contact} onChange={(e) => setContact(e.target.value)} fullWidth />
+              <TextField
+                label="Exam school"
+                value={school}
+                onChange={(e) => setSchool(e.target.value)}
+                fullWidth
+                required
+                sx={sharedInputSx}
+              />
+              <TextField
+                label="School contact"
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                fullWidth
+                sx={sharedInputSx}
+              />
             </Stack>
 
             <Stack spacing={1}>
@@ -502,7 +550,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
               )}
               <Box>
                 <Typography variant="body2" fontWeight={700} mb={0.5}>Provision capabilities</Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1}>
+                <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1} sx={{ mb: 1 }}>
                   {PROVISION_CHOICES.map((p) => {
                     const selected = mainProvisions.includes(p.value);
                     return (
@@ -529,6 +577,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                   onChange={(e) => setMainVenue(e.target.value)}
                   fullWidth
                   disabled={Boolean(coreVenue)}
+                  sx={sharedInputSx}
                 >
                   {filteredVenueOptions(
                     mainProvisions,
@@ -547,6 +596,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                   fullWidth
                   disabled={Boolean(coreVenue)}
                   InputLabelProps={{ shrink: true }}
+                  sx={sharedInputSx}
                 />
                 <TextField
                   label="Duration (minutes)"
@@ -555,6 +605,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                   onChange={(e) => setMainLength(e.target.value === "" ? "" : Number(e.target.value))}
                   fullWidth
                   disabled={Boolean(coreVenue)}
+                  sx={sharedInputSx}
                 />
               </Stack>
             </Stack>
@@ -597,7 +648,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                         value={v.venue_name}
                         onChange={(e) => updateExtraVenue(v.id, "venue_name", e.target.value)}
                         fullWidth
-                        sx={{ minWidth: { sm: 220, xs: "100%" } }}
+                        sx={[sharedInputSx, { minWidth: { sm: 220, xs: "100%" } }]}
                       >
                         {filteredVenueOptions(
                           v.provision_capabilities,
@@ -617,6 +668,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                         onChange={(e) => updateExtraVenue(v.id, "start_time", e.target.value)}
                         fullWidth
                         InputLabelProps={{ shrink: true }}
+                        sx={sharedInputSx}
                       />
                     </Grid>
                     <Grid item xs={10} sm={2.5}>
@@ -628,6 +680,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                           updateExtraVenue(v.id, "exam_length", e.target.value === "" ? null : Number(e.target.value))
                         }
                         fullWidth
+                        sx={sharedInputSx}
                       />
                     </Grid>
                     <Grid item xs={2} sm={0.5} sx={{ display: "flex", justifyContent: "flex-end" }}>
