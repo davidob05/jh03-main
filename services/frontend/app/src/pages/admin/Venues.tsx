@@ -299,13 +299,12 @@ const EnhancedTableToolbar = ({ numSelected, searchQuery, onSearchChange, onSear
 export const AdminVenues: React.FC = () => {
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
-  const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery } = useAppSelector((s) => s.adminTables.venues);
+  const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery, searchDraft } = useAppSelector((s) => s.adminTables.venues);
   const allowedSortKeys = ['name', 'capacity', 'type', 'accessibility', 'provisionCapabilities'] as const;
   type VenueSortKey = typeof allowedSortKeys[number];
   const orderBy: VenueSortKey = allowedSortKeys.includes(rawOrderBy as VenueSortKey)
     ? (rawOrderBy as VenueSortKey)
     : 'name';
-  const [searchDraft, setSearchDraft] = React.useState(searchQuery);
   const [selected, setSelected] = React.useState<readonly string[]>([]);
   const [openRows, setOpenRows] = React.useState<Record<string, boolean>>({});
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -317,7 +316,14 @@ export const AdminVenues: React.FC = () => {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [venueTypeOverrides, setVenueTypeOverrides] = React.useState<Record<string, string>>({});
   const [updatingVenueIds, setUpdatingVenueIds] = React.useState<Record<string, boolean>>({});
-  React.useEffect(() => setSearchDraft(searchQuery), [searchQuery]);
+  const searchDraftInitialized = React.useRef(false);
+  React.useEffect(() => {
+    if (searchDraftInitialized.current) return;
+    if (!searchDraft && searchQuery) {
+      dispatch(setVenuesPrefs({ searchDraft: searchQuery }));
+    }
+    searchDraftInitialized.current = true;
+  }, [dispatch, searchDraft, searchQuery]);
 
   const {
     data: venuesData = [],
@@ -455,7 +461,11 @@ export const AdminVenues: React.FC = () => {
   };
 
   const handleSearchChange = (q: string) => {
-    setSearchDraft(q);
+    if (q === "") {
+      dispatch(setVenuesPrefs({ searchDraft: "", searchQuery: "", page: 0 }));
+      return;
+    }
+    dispatch(setVenuesPrefs({ searchDraft: q }));
   };
 
   const handleVenueTypeChange = (venueName: string, nextType: string, currentType: string) => {
@@ -574,9 +584,12 @@ export const AdminVenues: React.FC = () => {
       <Panel disableDivider sx={{ width: '100%', mb: 2, p: 0, overflow: 'hidden' }}>
         <EnhancedTableToolbar
           numSelected={selected.length}
-          searchQuery={searchDraft}
+          searchQuery={searchDraft || searchQuery}
           onSearchChange={handleSearchChange}
-          onSearchSubmit={() => dispatch(setVenuesPrefs({ searchQuery: searchDraft.trim(), page: 0 }))}
+          onSearchSubmit={() => {
+            const trimmed = searchDraft.trim();
+            dispatch(setVenuesPrefs({ searchQuery: trimmed, searchDraft: trimmed, page: 0 }));
+          }}
           onAddVenue={() => setAddOpen(true)}
           onDeleteSelected={openDeleteDialogForSelection}
           deleteLoading={bulkDeleteMutation.isPending}

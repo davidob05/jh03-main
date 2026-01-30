@@ -16,6 +16,7 @@ type VenuePrefs = {
   page: number;
   rowsPerPage: number;
   searchQuery: string;
+  searchDraft: string;
 };
 
 type StudentPrefs = {
@@ -73,6 +74,7 @@ const initialState: AdminTableState = {
     page: 0,
     rowsPerPage: 10,
     searchQuery: "",
+    searchDraft: "",
   },
   students: {
     searchQuery: "",
