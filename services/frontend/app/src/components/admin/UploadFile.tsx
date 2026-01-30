@@ -15,6 +15,7 @@ import { Upload as UploadIcon, InsertDriveFile, Eject, ArrowDropDown } from "@mu
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { Panel } from "../Panel";
+import { sharedInputSx } from "../sharedInputSx";
 
 export const UploadFile: React.FC = () => {
   const [uploadType, setUploadType] = useState(""); // exam, provisions, venues
@@ -131,23 +132,17 @@ export const UploadFile: React.FC = () => {
             }}
             IconComponent={ArrowDropDown}
             disableUnderline
-            sx={{
-              backgroundColor: "action.hover",
-              borderRadius: 1,
-              px: 2,
-              height: 40,
-              display: "flex",
-              alignItems: "center",
-              "& .MuiSelect-select": {
+            sx={[
+              sharedInputSx,
+              {
                 display: "flex",
                 alignItems: "center",
-                p: 0,
+                "& .MuiSelect-icon": {
+                  color: "action.active",
+                  right: 15,
+                },
               },
-              "& .MuiSelect-icon": {
-                color: "action.active",
-                right: 15,
-              },
-            }}
+            ]}
           >
             <MenuItem value="exam">Exam Timetable</MenuItem>
             <MenuItem value="provisions">Student Provisions</MenuItem>
