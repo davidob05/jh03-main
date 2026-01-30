@@ -173,7 +173,11 @@ export const InvigilatorDashboard: React.FC = () => {
 
   const filteredNotifications = useMemo(() => {
     const search = notificationQuery.trim().toLowerCase();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
     return notifications.filter((n) => {
+      const ts = new Date(n.timestamp);
+      if (Number.isNaN(ts.getTime()) || ts < cutoff) return false;
       if (!invigilatorNotificationTypes.includes(n.type)) return false;
       if (selectedNotificationType && n.type !== selectedNotificationType) return false;
       if (search) {
