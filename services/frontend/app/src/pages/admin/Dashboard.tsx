@@ -685,21 +685,13 @@ export const AdminDashboard: React.FC = () => {
                   }}
                 />
               )}
-              sx={{
-                backgroundColor: "action.hover",
-                borderRadius: 1,
-                px: 2,
-                height: 40,
-                "& .MuiInputBase-root": {
-                  minHeight: 40,
+              sx={[
+                sharedInputSx,
+                {
+                  "& .MuiInputBase-root": { minHeight: 40 },
+                  "& .MuiAutocomplete-inputRoot": { minHeight: 40 },
                 },
-                "& .MuiAutocomplete-inputRoot": {
-                  minHeight: 40,
-                },
-                "& .MuiAutocomplete-input": {
-                  p: 0,
-                },
-              }}
+              ]}
             />
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" rowGap={1.2}>
