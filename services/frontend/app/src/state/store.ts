@@ -21,6 +21,7 @@ type VenuePrefs = {
 
 type StudentPrefs = {
   searchQuery: string;
+  searchDraft: string;
   sortOrder: "asc" | "desc";
   sortBy: string;
 };
@@ -79,6 +80,7 @@ const initialState: AdminTableState = {
   },
   students: {
     searchQuery: "",
+    searchDraft: "",
     sortOrder: "asc",
     sortBy: "student_name",
   },

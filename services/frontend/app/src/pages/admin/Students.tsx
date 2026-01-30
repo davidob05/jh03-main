@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -159,6 +159,8 @@ type SectionProps = {
   order: Order;
   orderBy: keyof StudentProvisionRow;
   onSortChange: (order: Order, orderBy: keyof StudentProvisionRow) => void;
+  searchDraft: string;
+  onSearchDraftChange: (value: string) => void;
 };
 
 type VenueDialogState = {
@@ -325,10 +327,11 @@ const StudentTableSection: React.FC<SectionProps> = ({
   order,
   orderBy,
   onSortChange,
+  searchDraft,
+  onSearchDraftChange,
 }) => {
   const rows = query.data || [];
   const rowKey = useCallback((row: StudentProvisionRow) => `${row.student_id}::${row.exam_id}`, []);
-  const [searchDraft, setSearchDraft] = useState(appliedSearch);
   const [selected, setSelected] = useState<string[]>([]);
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
   const [venueDialog, setVenueDialog] = useState<VenueDialogState | null>(null);
@@ -417,9 +420,6 @@ const StudentTableSection: React.FC<SectionProps> = ({
     if (page > maxPage) setPage(maxPage);
   }, [sorted.length, rowsPerPage, page]);
 
-  useEffect(() => {
-    setSearchDraft(appliedSearch);
-  }, [appliedSearch]);
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelected(event.target.checked ? allKeys : []);
@@ -471,8 +471,8 @@ const StudentTableSection: React.FC<SectionProps> = ({
               <SearchIcon sx={{ color: "action.active", mr: 1 }} />
               <InputBase
                 placeholder="Search students..."
-                value={searchDraft}
-                onChange={(e) => setSearchDraft(e.target.value)}
+                value={searchDraft || appliedSearch}
+                onChange={(e) => onSearchDraftChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -770,8 +770,26 @@ const StudentTableSection: React.FC<SectionProps> = ({
 
 export const AdminStudents: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { searchQuery: allSearch, sortOrder, sortBy } = useAppSelector((s) => s.adminTables.students);
-  const applySearch = (value: string) => dispatch(setStudentsPrefs({ searchQuery: value.trim() }));
+  const { searchQuery: allSearch, searchDraft, sortOrder, sortBy } = useAppSelector((s) => s.adminTables.students);
+  const applySearch = (value: string) => {
+    const trimmed = value.trim();
+    dispatch(setStudentsPrefs({ searchQuery: trimmed, searchDraft: trimmed }));
+  };
+  const searchDraftInitialized = useRef(false);
+  useEffect(() => {
+    if (searchDraftInitialized.current) return;
+    if (!searchDraft && allSearch) {
+      dispatch(setStudentsPrefs({ searchDraft: allSearch }));
+    }
+    searchDraftInitialized.current = true;
+  }, [dispatch, searchDraft, allSearch]);
+  const handleSearchDraftChange = (value: string) => {
+    if (value === "") {
+      dispatch(setStudentsPrefs({ searchDraft: "", searchQuery: "" }));
+      return;
+    }
+    dispatch(setStudentsPrefs({ searchDraft: value }));
+  };
 
   const unallocatedQuery = useQuery<StudentProvisionRow[], Error>({
     queryKey: ["student-provisions", "unallocated"],
@@ -807,6 +825,8 @@ export const AdminStudents: React.FC = () => {
         <StudentTableSection
           appliedSearch={allSearch}
           onSearchSubmit={applySearch}
+          searchDraft={searchDraft}
+          onSearchDraftChange={handleSearchDraftChange}
           query={allQuery}
           emptyLabel="No student provision records found."
           order={sortOrder}
