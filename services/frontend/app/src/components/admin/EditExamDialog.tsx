@@ -22,6 +22,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { sharedInputSx } from "../sharedInputSx";
+import {
+  resetAddExamDraft,
+  resetEditExamDraft,
+  setAddExamDraft,
+  setEditExamDraft,
+  useAppDispatch,
+  useAppSelector,
+} from "../../state/store";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -117,8 +125,14 @@ const toIsoString = (localValue: string) => {
 };
 
 export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSuccess }) => {
+  const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
   const isCreate = !examId;
+  const addDraft = useAppSelector((state) => state.adminTables.examDialogs.add);
+  const editDraft = useAppSelector((state) =>
+    examId ? state.adminTables.examDialogs.edit[examId] : undefined
+  );
+  const draft = isCreate ? addDraft : editDraft;
   const { data: venues } = useQuery<VenueOption[], Error>({
     queryKey: ["venues"],
     queryFn: fetchVenues,
@@ -132,18 +146,39 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
   });
 
   const coreVenue = useMemo(() => exam?.exam_venues.find((ev) => ev.core) || exam?.exam_venues[0], [exam]);
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [examType, setExamType] = useState("");
-  const [students, setStudents] = useState<number | "">("");
-  const [school, setSchool] = useState("");
-  const [contact, setContact] = useState("");
-  const [mainVenue, setMainVenue] = useState("");
-  const [mainStart, setMainStart] = useState("");
-  const [mainLength, setMainLength] = useState<number | "">("");
-  const [mainProvisions, setMainProvisions] = useState<string[]>([]);
-  const [extraVenues, setExtraVenues] = useState<EditableVenue[]>([]);
+  const name = draft?.name ?? "";
+  const code = draft?.code ?? "";
+  const examType = draft?.examType ?? "";
+  const students = draft?.students ?? "";
+  const school = draft?.school ?? "";
+  const contact = draft?.contact ?? "";
+  const mainVenue = draft?.mainVenue ?? "";
+  const mainStart = draft?.mainStart ?? "";
+  const mainLength = draft?.mainLength ?? "";
+  const mainProvisions = draft?.mainProvisions ?? [];
+  const extraVenues = draft?.extraVenues ?? [];
   const [initialExtraIds, setInitialExtraIds] = useState<Set<number>>(new Set());
+
+  const updateDraft = (updates: Partial<{
+    name: string;
+    code: string;
+    examType: string;
+    students: number | "";
+    school: string;
+    contact: string;
+    mainVenue: string;
+    mainStart: string;
+    mainLength: number | "";
+    mainProvisions: string[];
+    extraVenues: EditableVenue[];
+    initialized?: boolean;
+  }>) => {
+    if (isCreate) {
+      dispatch(setAddExamDraft(updates));
+    } else if (examId) {
+      dispatch(setEditExamDraft({ examId, draft: updates }));
+    }
+  };
 
   const formatProvisionLabel = (prov: string) => {
     const spaced = prov.replace(/_/g, " ");
@@ -216,49 +251,52 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
 
   useEffect(() => {
     if (!exam) return;
-    setName(exam.exam_name);
-    setCode(exam.course_code);
-    setExamType(exam.exam_type);
-    setStudents(exam.no_students);
-    setSchool(exam.exam_school);
-    setContact(exam.school_contact);
-    setMainVenue(coreVenue?.venue_name || "");
-    setMainStart(toLocalInputValue(coreVenue?.start_time));
-    setMainLength(coreVenue?.exam_length ?? "");
-    setMainProvisions(coreVenue?.provision_capabilities || []);
+    if (!examId || editDraft?.initialized) return;
+    updateDraft({
+      name: exam.exam_name,
+      code: exam.course_code,
+      examType: exam.exam_type,
+      students: exam.no_students,
+      school: exam.exam_school,
+      contact: exam.school_contact ?? "",
+      mainVenue: coreVenue?.venue_name || "",
+      mainStart: toLocalInputValue(coreVenue?.start_time),
+      mainLength: coreVenue?.exam_length ?? "",
+      mainProvisions: coreVenue?.provision_capabilities || [],
+      initialized: true,
+    });
 
     const extras = (exam.exam_venues || []).filter((ev) => !coreVenue || ev.examvenue_id !== coreVenue.examvenue_id);
     setInitialExtraIds(new Set(extras.map((ev) => ev.examvenue_id)));
-    setExtraVenues(
+    updateDraft({
+      extraVenues:
       extras.map((ev) => ({
         id: ev.examvenue_id,
         venue_name: ev.venue_name || "",
         start_time: toLocalInputValue(ev.start_time),
         exam_length: ev.exam_length,
         provision_capabilities: ev.provision_capabilities || [],
-      }))
-    );
-  }, [exam, coreVenue]);
+      })),
+    });
+  }, [coreVenue, editDraft?.initialized, exam, examId]);
 
   useEffect(() => {
     if (!open || !isCreate) return;
-    setName("");
-    setCode("");
-    setExamType("");
-    setStudents("");
-    setSchool("");
-    setContact("");
-    setMainVenue("");
-    setMainStart("");
-    setMainLength("");
-    setMainProvisions([]);
+    dispatch(resetAddExamDraft());
     setInitialExtraIds(new Set());
-    setExtraVenues([]);
-  }, [open, isCreate]);
+  }, [dispatch, isCreate, open]);
+
+  useEffect(() => {
+    if (!open || !examId) return;
+    return () => {
+      dispatch(resetEditExamDraft(examId));
+    };
+  }, [dispatch, examId, open]);
 
   const addExtraVenue = () => {
-    setExtraVenues((prev) => [
-      ...prev,
+    updateDraft({
+      extraVenues: [
+        ...extraVenues,
       {
         id: `new-${Date.now()}`,
         venue_name: coreVenue?.venue_name || "",
@@ -266,28 +304,31 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
         exam_length: typeof mainLength === "number" ? mainLength : null,
         provision_capabilities: [],
       },
-    ]);
+      ],
+    });
   };
 
   const removeExtraVenue = (id: number | string) => {
-    setExtraVenues((prev) => prev.filter((v) => v.id !== id));
+    updateDraft({ extraVenues: extraVenues.filter((v) => v.id !== id) });
   };
 
   const updateExtraVenue = <K extends keyof EditableVenue>(id: number | string, field: K, value: EditableVenue[K]) => {
-    setExtraVenues((prev) => prev.map((v) => (v.id === id ? { ...v, [field]: value } : v)));
+    updateDraft({
+      extraVenues: extraVenues.map((v) => (v.id === id ? { ...v, [field]: value } : v)),
+    });
   };
 
   const lacksSeparateRoomCap = (caps: string[]) =>
     !caps.includes("separate_room_on_own") && !caps.includes("separate_room_not_on_own");
 
   const updateExtraProvisionCaps = (id: number | string, nextCaps: string[]) => {
-    setExtraVenues((prev) =>
-      prev.map((v) => {
+    updateDraft({
+      extraVenues: extraVenues.map((v) => {
         if (v.id !== id) return v;
         const defaultVenue = lacksSeparateRoomCap(nextCaps) ? coreVenue?.venue_name || v.venue_name : v.venue_name;
         return { ...v, provision_capabilities: nextCaps, venue_name: defaultVenue };
-      })
-    );
+      }),
+    });
   };
 
   const mutation = useMutation({
@@ -443,6 +484,9 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
       }
       queryClient.invalidateQueries({ queryKey: ["exams"] });
       onSuccess?.(name);
+      if (isCreate) {
+        dispatch(resetAddExamDraft());
+      }
       onClose();
     },
     onError: (err: any) => alert(err?.message || "Failed to update exam"),
@@ -479,7 +523,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
               <TextField
                 label="Exam name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => updateDraft({ name: e.target.value })}
                 fullWidth
                 required
                 sx={sharedInputSx}
@@ -487,7 +531,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
               <TextField
                 label="Course code"
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => updateDraft({ code: e.target.value })}
                 fullWidth
                 required
                 sx={sharedInputSx}
@@ -497,7 +541,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
               <TextField
                 label="Exam type"
                 value={examType}
-                onChange={(e) => setExamType(e.target.value)}
+                onChange={(e) => updateDraft({ examType: e.target.value })}
                 fullWidth
                 required
                 sx={sharedInputSx}
@@ -506,7 +550,9 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                 label="Number of students"
                 type="number"
                 value={students}
-                onChange={(e) => setStudents(e.target.value === "" ? "" : Number(e.target.value))}
+                onChange={(e) =>
+                  updateDraft({ students: e.target.value === "" ? "" : Number(e.target.value) })
+                }
                 fullWidth
                 sx={sharedInputSx}
               />
@@ -515,7 +561,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
               <TextField
                 label="Exam school"
                 value={school}
-                onChange={(e) => setSchool(e.target.value)}
+                onChange={(e) => updateDraft({ school: e.target.value })}
                 fullWidth
                 required
                 sx={sharedInputSx}
@@ -523,7 +569,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
               <TextField
                 label="School contact"
                 value={contact}
-                onChange={(e) => setContact(e.target.value)}
+                onChange={(e) => updateDraft({ contact: e.target.value })}
                 fullWidth
                 sx={sharedInputSx}
               />
@@ -549,7 +595,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                         variant={selected ? "filled" : "outlined"}
                         onClick={() => {
                           if (coreVenue) return;
-                          setMainProvisions((prev) => toggleProvision(prev, p.value));
+                          updateDraft({ mainProvisions: toggleProvision(mainProvisions, p.value) });
                         }}
                         disabled={Boolean(coreVenue)}
                         sx={{ cursor: coreVenue ? "not-allowed" : "pointer" }}
@@ -563,7 +609,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                   label="Venue"
                   select
                   value={mainVenue}
-                  onChange={(e) => setMainVenue(e.target.value)}
+                  onChange={(e) => updateDraft({ mainVenue: e.target.value })}
                   fullWidth
                   disabled={Boolean(coreVenue)}
                   sx={sharedInputSx}
@@ -581,7 +627,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                   label="Start time"
                   type="datetime-local"
                   value={mainStart}
-                  onChange={(e) => setMainStart(e.target.value)}
+                  onChange={(e) => updateDraft({ mainStart: e.target.value })}
                   fullWidth
                   disabled={Boolean(coreVenue)}
                   InputLabelProps={{ shrink: true }}
@@ -591,7 +637,9 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
                   label="Duration (minutes)"
                   type="number"
                   value={mainLength}
-                  onChange={(e) => setMainLength(e.target.value === "" ? "" : Number(e.target.value))}
+                  onChange={(e) =>
+                    updateDraft({ mainLength: e.target.value === "" ? "" : Number(e.target.value) })
+                  }
                   fullWidth
                   disabled={Boolean(coreVenue)}
                   sx={sharedInputSx}

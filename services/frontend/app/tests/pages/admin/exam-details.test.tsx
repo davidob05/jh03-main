@@ -4,6 +4,8 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AdminExamDetails } from "@/pages/admin/Exam";
+import { Provider } from "react-redux";
+import { createStoreInstance } from "@/state/store";
 
 vi.mock("@mui/material", async () => {
   const actual = await vi.importActual<typeof import("@mui/material")>("@mui/material");
@@ -82,14 +84,17 @@ const assignmentsResponse = [
 
 const renderPage = () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const store = createStoreInstance();
   return render(
-    <MemoryRouter initialEntries={["/admin/exams/101"]}>
-      <QueryClientProvider client={client}>
-        <Routes>
-          <Route path="/admin/exams/:examId" element={<AdminExamDetails />} />
-        </Routes>
-      </QueryClientProvider>
-    </MemoryRouter>
+    <Provider store={store}>
+      <MemoryRouter initialEntries={["/admin/exams/101"]}>
+        <QueryClientProvider client={client}>
+          <Routes>
+            <Route path="/admin/exams/:examId" element={<AdminExamDetails />} />
+          </Routes>
+        </QueryClientProvider>
+      </MemoryRouter>
+    </Provider>
   );
 };
 

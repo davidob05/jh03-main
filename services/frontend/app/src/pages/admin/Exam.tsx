@@ -14,6 +14,7 @@ import {
   Snackbar,
   Grid,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { useNavigate, useParams } from "react-router-dom";
 import { Edit, Delete } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
@@ -260,8 +261,8 @@ export const AdminExamDetails: React.FC = () => {
                       size="medium"
                       sx={{
                         fontWeight: 700,
-                        backgroundColor: stats.ratioMet ? "#f0fdf4" : "#fff4e5",
-                        color: stats.ratioMet ? "#166534" : "#b45309",
+                        backgroundColor: stats.ratioMet ? alpha("#2e7d32", 0.12) : "#fff4e5",
+                        color: stats.ratioMet ? "success.main" : "#b45309",
                       }}
                     />
                   </Tooltip>
@@ -319,8 +320,8 @@ export const AdminExamDetails: React.FC = () => {
                             sx={{
                               width: "100%",
                               fontWeight: 700,
-                              backgroundColor: stats.ratioMet ? "#f0fdf4" : "#fff4e5",
-                              color: stats.ratioMet ? "#166534" : "#b45309",
+                              backgroundColor: stats.ratioMet ? alpha("#2e7d32", 0.12) : "#fff4e5",
+                              color: stats.ratioMet ? "success.main" : "#b45309",
                               justifyContent: "center",
                             }}
                           />

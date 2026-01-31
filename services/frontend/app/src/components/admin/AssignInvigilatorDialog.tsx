@@ -29,6 +29,12 @@ import { PillButton } from "../PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { formatDateTime } from "../../utils/dates";
 import { sharedInputSx } from "../sharedInputSx";
+import {
+  resetAssignInvigilatorDraft,
+  setAssignInvigilatorDraft,
+  useAppDispatch,
+  useAppSelector,
+} from "../../state/store";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -155,11 +161,15 @@ const AssignInvigilatorDialogBody: React.FC<{
   onAssigned?: (summary?: { assigned: number; unassigned: number; updated: number }) => void;
   onClose: () => void;
 }> = ({ open, examVenue, invigilators, assignments, onAssigned, onClose }) => {
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [search, setSearch] = useState("");
-  const [onlyAvailable, setOnlyAvailable] = useState(true);
-  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
-  const [assignmentInputs, setAssignmentInputs] = useState<Map<number, { start: string; end: string; role: string }>>(new Map());
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector((state) =>
+    examVenue ? state.adminTables.assignInvigilatorDialogs[examVenue.examvenue_id] : undefined
+  );
+  const selectedIds = draft?.selectedIds ?? [];
+  const search = draft?.search ?? "";
+  const onlyAvailable = draft?.onlyAvailable ?? true;
+  const expandedIds = useMemo(() => new Set(draft?.expandedIds ?? []), [draft?.expandedIds]);
+  const assignmentInputs = draft?.assignmentInputs ?? {};
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const queryClient = useQueryClient();
@@ -194,37 +204,60 @@ const AssignInvigilatorDialogBody: React.FC<{
     return { start, end: start.add(examVenue.exam_length, "minute") };
   }, [examVenue?.start_time, examVenue?.exam_length]);
 
-  useEffect(() => {
-    if (!open) return;
-    setSelectedIds(Array.from(new Set(assignedAssignments.map((a) => a.invigilator))));
-    setError(null);
+  const updateDraft = (updates: Partial<{
+    selectedIds: number[];
+    search: string;
+    onlyAvailable: boolean;
+    expandedIds: number[];
+    assignmentInputs: Record<number, { start: string; end: string; role: string }>;
+    initialized?: boolean;
+  }>) => {
+    if (!examVenue) return;
+    dispatch(setAssignInvigilatorDraft({ key: examVenue.examvenue_id, draft: updates }));
+  };
 
-    // Seed per-invigilator inputs with existing assignments or exam defaults
-    setAssignmentInputs(() => {
-      const next = new Map<number, { start: string; end: string; role: string }>();
-      const defaultStart = examWindow?.start ? examWindow.start.format("YYYY-MM-DDTHH:mm") : "";
-      const defaultEnd = examWindow?.end ? examWindow.end.format("YYYY-MM-DDTHH:mm") : "";
-      assignedAssignments.forEach((a) => {
-        const start = dayjs(a.assigned_start);
-        const end = dayjs(a.assigned_end);
-        next.set(a.invigilator, {
-          start: start.isValid() ? start.format("YYYY-MM-DDTHH:mm") : defaultStart,
-          end: end.isValid() ? end.format("YYYY-MM-DDTHH:mm") : defaultEnd,
-          role: a.role || "",
+  useEffect(() => {
+    if (!open || !examVenue) return;
+    if (draft?.initialized) return;
+    updateDraft({
+      selectedIds: Array.from(new Set(assignedAssignments.map((a) => a.invigilator))),
+      search: "",
+      onlyAvailable: true,
+      expandedIds: [],
+      assignmentInputs: (() => {
+        const next: Record<number, { start: string; end: string; role: string }> = {};
+        const defaultStart = examWindow?.start ? examWindow.start.format("YYYY-MM-DDTHH:mm") : "";
+        const defaultEnd = examWindow?.end ? examWindow.end.format("YYYY-MM-DDTHH:mm") : "";
+        assignedAssignments.forEach((a) => {
+          const start = dayjs(a.assigned_start);
+          const end = dayjs(a.assigned_end);
+          next[a.invigilator] = {
+            start: start.isValid() ? start.format("YYYY-MM-DDTHH:mm") : defaultStart,
+            end: end.isValid() ? end.format("YYYY-MM-DDTHH:mm") : defaultEnd,
+            role: a.role || "",
+          };
         });
-      });
-      invigilators.forEach((i) => {
-        if (!next.has(i.id)) {
-          next.set(i.id, {
-            start: defaultStart,
-            end: defaultEnd,
-            role: "",
-          });
-        }
-      });
-      return next;
+        invigilators.forEach((i) => {
+          if (!next[i.id]) {
+            next[i.id] = {
+              start: defaultStart,
+              end: defaultEnd,
+              role: "",
+            };
+          }
+        });
+        return next;
+      })(),
+      initialized: true,
     });
-  }, [assignedAssignments, examVenue?.examvenue_id, open]);
+    setError(null);
+  }, [assignedAssignments, draft?.initialized, examVenue, examWindow, invigilators, open]);
+
+  useEffect(() => {
+    if (!examVenue) return;
+    if (open) return;
+    dispatch(resetAssignInvigilatorDraft(examVenue.examvenue_id));
+  }, [dispatch, examVenue, open]);
 
   const hasConflict = (invigilatorId: number) => {
     if (!examWindow) return false;
@@ -256,7 +289,7 @@ const AssignInvigilatorDialogBody: React.FC<{
   }, [assignedIds, invigilators, search, onlyAvailable, slotInfo, examWindow, assignments]);
 
   const getInputFor = (id: number) =>
-    assignmentInputs.get(id)
+    assignmentInputs[id]
     || {
       start: examWindow?.start?.format("YYYY-MM-DDTHH:mm") || "",
       end: examWindow?.end?.format("YYYY-MM-DDTHH:mm") || "",
@@ -478,24 +511,27 @@ const AssignInvigilatorDialogBody: React.FC<{
     && selectionDelta.hasChanges;
 
   const toggleSelected = (id: number) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]));
-  };
-
-  const toggleExpanded = (id: number) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+    updateDraft({
+      selectedIds: selectedIds.includes(id)
+        ? selectedIds.filter((value) => value !== id)
+        : [...selectedIds, id],
     });
   };
 
+  const toggleExpanded = (id: number) => {
+    const next = new Set(expandedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    updateDraft({ expandedIds: Array.from(next) });
+  };
+
   const updateInput = (id: number, patch: Partial<{ start: string; end: string; role: string }>) => {
-    setAssignmentInputs((prev) => {
-      const next = new Map(prev);
-      const current = next.get(id) || { start: "", end: "", role: "" };
-      next.set(id, { ...current, ...patch });
-      return next;
+    const current = assignmentInputs[id] || { start: "", end: "", role: "" };
+    updateDraft({
+      assignmentInputs: {
+        ...assignmentInputs,
+        [id]: { ...current, ...patch },
+      },
     });
   };
   const requirementLabelsFor = (invigilator: Invigilator) => {
@@ -562,7 +598,12 @@ const AssignInvigilatorDialogBody: React.FC<{
             </Typography>
           </Box>
           <FormControlLabel
-            control={<Checkbox checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} />}
+            control={
+              <Checkbox
+                checked={onlyAvailable}
+                onChange={(e) => updateDraft({ onlyAvailable: e.target.checked })}
+              />
+            }
             label="Available"
             sx={{ m: 0, "& .MuiFormControlLabel-label": { fontSize: 12, color: "text.secondary" } }}
           />
@@ -581,7 +622,7 @@ const AssignInvigilatorDialogBody: React.FC<{
           <InputBase
             placeholder="Search invigilators..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => updateDraft({ search: e.target.value })}
             sx={{ width: "100%" }}
           />
         </Box>

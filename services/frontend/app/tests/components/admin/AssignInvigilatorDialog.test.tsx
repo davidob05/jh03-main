@@ -2,11 +2,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AssignInvigilatorDialog } from "@/components/admin/AssignInvigilatorDialog";
+import { Provider } from "react-redux";
+import { createStoreInstance } from "@/state/store";
 
 const renderDialog = (props: Partial<React.ComponentProps<typeof AssignInvigilatorDialog>> = {}) => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  const store = createStoreInstance();
 
   const defaultProps: React.ComponentProps<typeof AssignInvigilatorDialog> = {
     open: true,
@@ -23,9 +26,11 @@ const renderDialog = (props: Partial<React.ComponentProps<typeof AssignInvigilat
   };
 
   return render(
-    <QueryClientProvider client={queryClient}>
-      <AssignInvigilatorDialog {...defaultProps} {...props} />
-    </QueryClientProvider>
+    <Provider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <AssignInvigilatorDialog {...defaultProps} {...props} />
+      </QueryClientProvider>
+    </Provider>
   );
 };
 

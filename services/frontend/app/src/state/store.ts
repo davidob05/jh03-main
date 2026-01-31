@@ -46,6 +46,49 @@ type CalendarPrefs = {
   searchDraft: string;
 };
 
+type AssignInvigilatorInputs = {
+  start: string;
+  end: string;
+  role: string;
+};
+
+type AssignInvigilatorDraft = {
+  selectedIds: number[];
+  search: string;
+  onlyAvailable: boolean;
+  expandedIds: number[];
+  assignmentInputs: Record<number, AssignInvigilatorInputs>;
+  initialized?: boolean;
+};
+
+type ExamVenueDraft = {
+  id: number | string;
+  venue_name: string;
+  start_time: string;
+  exam_length: number | null;
+  provision_capabilities: string[];
+};
+
+type ExamDialogDraft = {
+  name: string;
+  code: string;
+  examType: string;
+  students: number | "";
+  school: string;
+  contact: string;
+  mainVenue: string;
+  mainStart: string;
+  mainLength: number | "";
+  mainProvisions: string[];
+  extraVenues: ExamVenueDraft[];
+  initialized?: boolean;
+};
+
+type ExamDialogState = {
+  add: ExamDialogDraft;
+  edit: Record<number, ExamDialogDraft>;
+};
+
 type DashboardPrefs = {
   selectedSchool: string;
   notificationQuery: string;
@@ -59,7 +102,23 @@ type AdminTableState = {
   students: StudentPrefs;
   invigilators: InvigilatorPrefs;
   calendar: CalendarPrefs;
+  examDialogs: ExamDialogState;
+  assignInvigilatorDialogs: Record<number, AssignInvigilatorDraft>;
   dashboard: DashboardPrefs;
+};
+
+const emptyExamDraft: ExamDialogDraft = {
+  name: "",
+  code: "",
+  examType: "",
+  students: "",
+  school: "",
+  contact: "",
+  mainVenue: "",
+  mainStart: "",
+  mainLength: "",
+  mainProvisions: [],
+  extraVenues: [],
 };
 
 const initialState: AdminTableState = {
@@ -103,6 +162,11 @@ const initialState: AdminTableState = {
     page: 1,
     searchDraft: "",
   },
+  examDialogs: {
+    add: { ...emptyExamDraft },
+    edit: {},
+  },
+  assignInvigilatorDialogs: {},
   dashboard: {
     selectedSchool: "",
     notificationQuery: "",
@@ -130,6 +194,44 @@ const adminTablesSlice = createSlice({
     setCalendarPrefs(state, action: PayloadAction<Partial<CalendarPrefs>>) {
       Object.assign(state.calendar, action.payload);
     },
+    setAssignInvigilatorDraft(
+      state,
+      action: PayloadAction<{ key: number; draft: Partial<AssignInvigilatorDraft> }>
+    ) {
+      const { key, draft } = action.payload;
+      state.assignInvigilatorDialogs[key] = {
+        ...(state.assignInvigilatorDialogs[key] || {
+          selectedIds: [],
+          search: "",
+          onlyAvailable: true,
+          expandedIds: [],
+          assignmentInputs: {},
+        }),
+        ...draft,
+      };
+    },
+    resetAssignInvigilatorDraft(state, action: PayloadAction<number>) {
+      delete state.assignInvigilatorDialogs[action.payload];
+    },
+    setAddExamDraft(state, action: PayloadAction<Partial<ExamDialogDraft>>) {
+      Object.assign(state.examDialogs.add, action.payload);
+    },
+    resetAddExamDraft(state) {
+      state.examDialogs.add = { ...emptyExamDraft };
+    },
+    setEditExamDraft(
+      state,
+      action: PayloadAction<{ examId: number; draft: Partial<ExamDialogDraft> }>
+    ) {
+      const { examId, draft } = action.payload;
+      state.examDialogs.edit[examId] = {
+        ...(state.examDialogs.edit[examId] || { ...emptyExamDraft }),
+        ...draft,
+      };
+    },
+    resetEditExamDraft(state, action: PayloadAction<number>) {
+      delete state.examDialogs.edit[action.payload];
+    },
     setDashboardPrefs(state, action: PayloadAction<Partial<DashboardPrefs>>) {
       Object.assign(state.dashboard, action.payload);
     },
@@ -145,6 +247,12 @@ export const {
   setStudentsPrefs,
   setInvigilatorsPrefs,
   setCalendarPrefs,
+  setAssignInvigilatorDraft,
+  resetAssignInvigilatorDraft,
+  setAddExamDraft,
+  resetAddExamDraft,
+  setEditExamDraft,
+  resetEditExamDraft,
   setDashboardPrefs,
   resetAdminPrefs,
 } = adminTablesSlice.actions;

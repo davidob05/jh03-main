@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -15,6 +15,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { sharedInputSx } from "../sharedInputSx";
+import { resetAddExamDraft, setAddExamDraft, useAppDispatch, useAppSelector } from "../../state/store";
 
 type Props = {
   open: boolean;
@@ -24,22 +25,15 @@ type Props = {
 
 export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [examType, setExamType] = useState("");
-  const [students, setStudents] = useState<number | "">("");
-  const [school, setSchool] = useState("");
-  const [contact, setContact] = useState("");
+  const dispatch = useAppDispatch();
+  const { name, code, examType, students, school, contact } = useAppSelector(
+    (state) => state.adminTables.examDialogs.add
+  );
 
   useEffect(() => {
     if (!open) return;
-    setName("");
-    setCode("");
-    setExamType("");
-    setStudents("");
-    setSchool("");
-    setContact("");
-  }, [open]);
+    dispatch(resetAddExamDraft());
+  }, [dispatch, open]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -65,6 +59,7 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
       queryClient.invalidateQueries({ queryKey: ["exams-table"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-exams"] });
       onSuccess?.(name);
+      dispatch(resetAddExamDraft());
       onClose();
     },
     onError: (err: any) => alert(err?.message || "Failed to create exam"),
@@ -92,7 +87,7 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
             <TextField
               label="Exam name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => dispatch(setAddExamDraft({ name: e.target.value }))}
               fullWidth
               required
               sx={sharedInputSx}
@@ -100,7 +95,7 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
             <TextField
               label="Course code"
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => dispatch(setAddExamDraft({ code: e.target.value }))}
               fullWidth
               required
               sx={sharedInputSx}
@@ -110,7 +105,7 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
             <TextField
               label="Exam type"
               value={examType}
-              onChange={(e) => setExamType(e.target.value)}
+              onChange={(e) => dispatch(setAddExamDraft({ examType: e.target.value }))}
               fullWidth
               required
               sx={sharedInputSx}
@@ -119,7 +114,9 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
               label="Number of students"
               type="number"
               value={students}
-              onChange={(e) => setStudents(e.target.value === "" ? "" : Number(e.target.value))}
+              onChange={(e) =>
+                dispatch(setAddExamDraft({ students: e.target.value === "" ? "" : Number(e.target.value) }))
+              }
               fullWidth
               sx={sharedInputSx}
             />
@@ -128,7 +125,7 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
             <TextField
               label="Exam school"
               value={school}
-              onChange={(e) => setSchool(e.target.value)}
+              onChange={(e) => dispatch(setAddExamDraft({ school: e.target.value }))}
               fullWidth
               required
               sx={sharedInputSx}
@@ -136,7 +133,7 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
             <TextField
               label="School contact"
               value={contact}
-              onChange={(e) => setContact(e.target.value)}
+              onChange={(e) => dispatch(setAddExamDraft({ contact: e.target.value }))}
               fullWidth
               sx={sharedInputSx}
             />
