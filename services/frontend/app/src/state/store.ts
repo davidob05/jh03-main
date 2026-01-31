@@ -61,6 +61,15 @@ type AssignInvigilatorDraft = {
   initialized?: boolean;
 };
 
+type VenueDialogDraft = {
+  venueName: string;
+  capacity: number | "";
+  venueType: string;
+  isAccessible: boolean;
+  provisions: string[];
+  initialized?: boolean;
+};
+
 type ExamVenueDraft = {
   id: number | string;
   venue_name: string;
@@ -104,6 +113,10 @@ type AdminTableState = {
   calendar: CalendarPrefs;
   examDialogs: ExamDialogState;
   assignInvigilatorDialogs: Record<number, AssignInvigilatorDraft>;
+  venueDialogs: {
+    add: VenueDialogDraft;
+    edit: Record<string, VenueDialogDraft>;
+  };
   dashboard: DashboardPrefs;
 };
 
@@ -119,6 +132,14 @@ const emptyExamDraft: ExamDialogDraft = {
   mainLength: "",
   mainProvisions: [],
   extraVenues: [],
+};
+
+const emptyVenueDraft: VenueDialogDraft = {
+  venueName: "",
+  capacity: "",
+  venueType: "",
+  isAccessible: true,
+  provisions: [],
 };
 
 const initialState: AdminTableState = {
@@ -167,6 +188,10 @@ const initialState: AdminTableState = {
     edit: {},
   },
   assignInvigilatorDialogs: {},
+  venueDialogs: {
+    add: { ...emptyVenueDraft },
+    edit: {},
+  },
   dashboard: {
     selectedSchool: "",
     notificationQuery: "",
@@ -213,6 +238,25 @@ const adminTablesSlice = createSlice({
     resetAssignInvigilatorDraft(state, action: PayloadAction<number>) {
       delete state.assignInvigilatorDialogs[action.payload];
     },
+    setAddVenueDraft(state, action: PayloadAction<Partial<VenueDialogDraft>>) {
+      Object.assign(state.venueDialogs.add, action.payload);
+    },
+    resetAddVenueDraft(state) {
+      state.venueDialogs.add = { ...emptyVenueDraft };
+    },
+    setEditVenueDraft(
+      state,
+      action: PayloadAction<{ venueId: string; draft: Partial<VenueDialogDraft> }>
+    ) {
+      const { venueId, draft } = action.payload;
+      state.venueDialogs.edit[venueId] = {
+        ...(state.venueDialogs.edit[venueId] || { ...emptyVenueDraft }),
+        ...draft,
+      };
+    },
+    resetEditVenueDraft(state, action: PayloadAction<string>) {
+      delete state.venueDialogs.edit[action.payload];
+    },
     setAddExamDraft(state, action: PayloadAction<Partial<ExamDialogDraft>>) {
       Object.assign(state.examDialogs.add, action.payload);
     },
@@ -249,6 +293,10 @@ export const {
   setCalendarPrefs,
   setAssignInvigilatorDraft,
   resetAssignInvigilatorDraft,
+  setAddVenueDraft,
+  resetAddVenueDraft,
+  setEditVenueDraft,
+  resetEditVenueDraft,
   setAddExamDraft,
   resetAddExamDraft,
   setEditExamDraft,

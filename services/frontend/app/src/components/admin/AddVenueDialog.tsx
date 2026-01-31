@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -22,6 +22,7 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { VENUE_TYPES } from "./venueTypes";
 import { sharedInputSx } from "../sharedInputSx";
+import { resetAddVenueDraft, setAddVenueDraft, useAppDispatch, useAppSelector } from "../../state/store";
 
 const PROVISION_CHOICES = [
   { value: "use_computer", label: "Use of a computer" },
@@ -36,19 +37,15 @@ interface Props {
 
 export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
-  const [venueName, setVenueName] = useState("");
-  const [capacity, setCapacity] = useState<number | "">("");
-  const [venueType, setVenueType] = useState("");
-  const [isAccessible, setIsAccessible] = useState(true);
-  const [provisions, setProvisions] = useState<string[]>([]);
+  const dispatch = useAppDispatch();
+  const { venueName, capacity, venueType, isAccessible, provisions } = useAppSelector(
+    (state) => state.adminTables.venueDialogs.add
+  );
 
-  const resetForm = () => {
-    setVenueName("");
-    setCapacity("");
-    setVenueType("");
-    setIsAccessible(true);
-    setProvisions([]);
-  };
+  useEffect(() => {
+    if (!open) return;
+    dispatch(resetAddVenueDraft());
+  }, [dispatch, open]);
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -75,7 +72,7 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["venues"] });
       onSuccess?.(data.venue_name);
-      resetForm();
+      dispatch(resetAddVenueDraft());
       onClose();
     },
     onError: (err: any) => {
@@ -84,7 +81,10 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
   });
 
   const toggleProvision = (value: string) => {
-    setProvisions((prev) => (prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value]));
+    const next = provisions.includes(value)
+      ? provisions.filter((p) => p !== value)
+      : [...provisions, value];
+    dispatch(setAddVenueDraft({ provisions: next }));
   };
 
   const mandatoryFilled = venueName && capacity !== "" && venueType;
@@ -108,7 +108,7 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
           <TextField
             label="Venue Name"
             value={venueName}
-            onChange={(e) => setVenueName(e.target.value)}
+            onChange={(e) => dispatch(setAddVenueDraft({ venueName: e.target.value }))}
             fullWidth
             required
             sx={sharedInputSx}
@@ -117,7 +117,9 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
             label="Capacity"
             type="number"
             value={capacity}
-            onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))}
+            onChange={(e) =>
+              dispatch(setAddVenueDraft({ capacity: e.target.value === "" ? "" : Number(e.target.value) }))
+            }
             fullWidth
             required
             sx={sharedInputSx}
@@ -126,7 +128,7 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
             label="Venue Type"
             select
             value={venueType}
-            onChange={(e) => setVenueType(e.target.value)}
+            onChange={(e) => dispatch(setAddVenueDraft({ venueType: e.target.value }))}
             fullWidth
             required
             sx={sharedInputSx}
@@ -138,7 +140,12 @@ export const AddVenueDialog: React.FC<Props> = ({ open, onClose, onSuccess }) =>
             ))}
           </TextField>
           <FormControlLabel
-            control={<Checkbox checked={isAccessible} onChange={(e) => setIsAccessible(e.target.checked)} />}
+            control={
+              <Checkbox
+                checked={isAccessible}
+                onChange={(e) => dispatch(setAddVenueDraft({ isAccessible: e.target.checked }))}
+              />
+            }
             label="Accessible"
           />
           <Box>

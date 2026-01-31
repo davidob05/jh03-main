@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -23,6 +23,12 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { VENUE_TYPES } from "./venueTypes";
 import { sharedInputSx } from "../sharedInputSx";
+import {
+  resetEditVenueDraft,
+  setEditVenueDraft,
+  useAppDispatch,
+  useAppSelector,
+} from "../../state/store";
 
 const ALLOWED_PROVISION_CHOICES = [
   { value: "use_computer", label: "Use of a computer" },
@@ -49,12 +55,16 @@ interface VenueData {
 const ALLOWED_CAPS = new Set(ALLOWED_PROVISION_CHOICES.map((p) => p.value));
 
 export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId, onClose, onSuccess }) => {
+  const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
-  const [venueName, setVenueName] = useState("");
-  const [capacity, setCapacity] = useState<number | "">("");
-  const [venueType, setVenueType] = useState("");
-  const [isAccessible, setIsAccessible] = useState(true);
-  const [provisions, setProvisions] = useState<string[]>([]);
+  const draft = useAppSelector((state) =>
+    venueId ? state.adminTables.venueDialogs.edit[venueId] : undefined
+  );
+  const venueName = draft?.venueName ?? "";
+  const capacity = draft?.capacity ?? "";
+  const venueType = draft?.venueType ?? "";
+  const isAccessible = draft?.isAccessible ?? true;
+  const provisions = draft?.provisions ?? [];
 
   const { data, isLoading, isError } = useQuery<VenueData>({
     queryKey: ["venue", venueId],
@@ -68,15 +78,32 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
 
   useEffect(() => {
     if (!data) return;
-    setVenueName(data.venue_name);
-    setCapacity(data.capacity);
-    setVenueType(data.venuetype);
-    setIsAccessible(data.is_accessible);
-    setProvisions((data.provision_capabilities || []).filter((p) => ALLOWED_CAPS.has(p)));
-  }, [data]);
+    if (!venueId || draft?.initialized) return;
+    dispatch(setEditVenueDraft({
+      venueId,
+      draft: {
+        venueName: data.venue_name,
+        capacity: data.capacity,
+        venueType: data.venuetype,
+        isAccessible: data.is_accessible,
+        provisions: (data.provision_capabilities || []).filter((p) => ALLOWED_CAPS.has(p)),
+        initialized: true,
+      },
+    }));
+  }, [data, dispatch, draft?.initialized, venueId]);
+
+  useEffect(() => {
+    if (!venueId) return;
+    if (open) return;
+    dispatch(resetEditVenueDraft(venueId));
+  }, [dispatch, open, venueId]);
 
   const toggleProvision = (value: string) => {
-    setProvisions((prev) => (prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value]));
+    const next = provisions.includes(value)
+      ? provisions.filter((p) => p !== value)
+      : [...provisions, value];
+    if (!venueId) return;
+    dispatch(setEditVenueDraft({ venueId, draft: { provisions: next } }));
   };
 
   const mandatoryFilled = venueName && capacity !== "" && venueType;
@@ -107,6 +134,9 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
       queryClient.invalidateQueries({ queryKey: ["venues"] });
       queryClient.invalidateQueries({ queryKey: ["venue", venueId] });
       onSuccess?.(updated.venue_name);
+      if (venueId) {
+        dispatch(resetEditVenueDraft(venueId));
+      }
       onClose();
     },
     onError: (err: any) => alert(err?.message || "Failed to update venue"),
@@ -138,7 +168,10 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
             <TextField
               label="Venue Name"
               value={venueName}
-              onChange={(e) => setVenueName(e.target.value)}
+              onChange={(e) => {
+                if (!venueId) return;
+                dispatch(setEditVenueDraft({ venueId, draft: { venueName: e.target.value } }));
+              }}
               fullWidth
               required
               sx={sharedInputSx}
@@ -147,7 +180,13 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
               label="Capacity"
               type="number"
               value={capacity}
-              onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))}
+              onChange={(e) => {
+                if (!venueId) return;
+                dispatch(setEditVenueDraft({
+                  venueId,
+                  draft: { capacity: e.target.value === "" ? "" : Number(e.target.value) },
+                }));
+              }}
               fullWidth
               required
               sx={sharedInputSx}
@@ -156,7 +195,10 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
               label="Venue Type"
               select
               value={venueType}
-              onChange={(e) => setVenueType(e.target.value)}
+              onChange={(e) => {
+                if (!venueId) return;
+                dispatch(setEditVenueDraft({ venueId, draft: { venueType: e.target.value } }));
+              }}
               fullWidth
               required
               sx={sharedInputSx}
@@ -167,7 +209,18 @@ export const EditVenueDialog: React.FC<EditVenueDialogProps> = ({ open, venueId,
                 </MenuItem>
               ))}
             </TextField>
-            <FormControlLabel control={<Checkbox checked={isAccessible} onChange={(e) => setIsAccessible(e.target.checked)} />} label="Accessible" />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isAccessible}
+                  onChange={(e) => {
+                    if (!venueId) return;
+                    dispatch(setEditVenueDraft({ venueId, draft: { isAccessible: e.target.checked } }));
+                  }}
+                />
+              }
+              label="Accessible"
+            />
             <Box>
               <Typography variant="body2" fontWeight={600} mb={1}>
                 Provision Capabilities
