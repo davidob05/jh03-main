@@ -4,6 +4,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AdminInvigilatorProfile } from "@/pages/admin/Invigilator";
+import { Provider } from "react-redux";
+import { createStoreInstance } from "@/state/store";
 
 vi.mock("@mui/material/Tooltip", () => ({
   __esModule: true,
@@ -59,14 +61,17 @@ const renderPage = (opts: { isSeniorAdmin?: boolean; seedMeCache?: boolean } = {
     client.setQueryData(["me"], { is_senior_admin: true });
   }
   currentUserIsSenior = Boolean(opts.isSeniorAdmin);
+  const store = createStoreInstance();
   return render(
-    <MemoryRouter initialEntries={["/admin/invigilators/1"]}>
-      <QueryClientProvider client={client}>
-        <Routes>
-          <Route path="/admin/invigilators/:id" element={<AdminInvigilatorProfile />} />
-        </Routes>
-      </QueryClientProvider>
-    </MemoryRouter>
+    <Provider store={store}>
+      <MemoryRouter initialEntries={["/admin/invigilators/1"]}>
+        <QueryClientProvider client={client}>
+          <Routes>
+            <Route path="/admin/invigilators/:id" element={<AdminInvigilatorProfile />} />
+          </Routes>
+        </QueryClientProvider>
+      </MemoryRouter>
+    </Provider>
   );
 };
 

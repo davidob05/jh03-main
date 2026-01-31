@@ -2,6 +2,8 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { UploadFile } from "@/components/admin/UploadFile";
 import { apiFetch, apiBaseUrl } from "@/utils/api";
+import { Provider } from "react-redux";
+import { createStoreInstance } from "@/state/store";
 
 // Mock MUI Select/MenuItem to work in tests
 vi.mock("@mui/material", async () => {
@@ -25,6 +27,10 @@ vi.mock("@/utils/api", () => ({
 
 describe("Components - UploadFile", () => {
   const mockFile = new File(["test"], "test.csv", { type: "text/csv" });
+  const renderWithStore = (ui: React.ReactElement) => {
+    const store = createStoreInstance();
+    return render(<Provider store={store}>{ui}</Provider>);
+  };
   const uploadWithFireEvent = (input: HTMLInputElement, file: File) => {
     fireEvent.change(input, { target: { files: [file] } });
   };
@@ -34,7 +40,7 @@ describe("Components - UploadFile", () => {
   });
 
   it("renders initial UI", () => {
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
 
     expect(screen.getByText("Upload data")).toBeInTheDocument();
     expect(screen.getByText(/Select a file type and upload/i)).toBeInTheDocument();
@@ -42,7 +48,7 @@ describe("Components - UploadFile", () => {
   });
 
   it("enables file selection once upload type is chosen", () => {
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
     const chooseFileButton = screen.getByText("Choose File");
 
     expect(chooseFileButton).toHaveAttribute("aria-disabled", "true");
@@ -53,7 +59,7 @@ describe("Components - UploadFile", () => {
   });
 
   it("shows selected file name after choosing a file", async () => {
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "provisions" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
@@ -63,7 +69,7 @@ describe("Components - UploadFile", () => {
   });
 
   it("enables Upload button only after type and file are selected", async () => {
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
     const uploadButton = screen.getByRole("button", { name: /upload/i });
     expect(uploadButton).toBeDisabled();
 
@@ -81,7 +87,7 @@ describe("Components - UploadFile", () => {
       json: async () => ({ records_created: 5, records_updated: 2, records_deleted: 1 }),
     });
 
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
@@ -102,7 +108,7 @@ describe("Components - UploadFile", () => {
   it("shows error message when upload fails", async () => {
     (apiFetch as jest.Mock).mockResolvedValue({ ok: false });
 
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
@@ -116,7 +122,7 @@ describe("Components - UploadFile", () => {
   it("shows generic error when apiFetch throws", async () => {
     (apiFetch as jest.Mock).mockRejectedValue(new Error("Network error"));
 
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
@@ -133,7 +139,7 @@ describe("Components - UploadFile", () => {
       () => new Promise((res) => (resolveFetch = res))
     );
 
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
@@ -161,7 +167,7 @@ describe("Components - UploadFile", () => {
       json: async () => ({ records_created: 1 }),
     });
 
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const input = screen.getByTestId("file-upload") as HTMLInputElement;
@@ -178,7 +184,7 @@ describe("Components - UploadFile", () => {
       json: async () => ({ records_created: 0, records_updated: 0, records_deleted: 0 }),
     });
 
-    render(<UploadFile />);
+    renderWithStore(<UploadFile />);
     fireEvent.change(screen.getByTestId("upload-type-select"), { target: { value: "exam" } });
 
     const zeroByteFile = new File([""], "empty.csv", { type: "text/csv" });

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -25,6 +25,12 @@ import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { sharedInputSx } from "../sharedInputSx";
+import {
+  resetEditInvigilatorDraft,
+  setEditInvigilatorDraft,
+  useAppDispatch,
+  useAppSelector,
+} from "../../state/store";
 
 const STEPS = ["Personal Details", "Qualifications", "Restrictions", "Availability"];
 
@@ -103,35 +109,33 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
-  const [activeStep, setActiveStep] = useState(0);
+  const draft = useAppSelector((state) =>
+    invigilatorId != null ? state.adminTables.invigilatorDialogs.edit[invigilatorId] : undefined
+  );
+  const activeStep = draft?.activeStep ?? 0;
 
   // Personal details
-  const [preferredName, setPreferredName] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [mobileTextOnly, setMobileTextOnly] = useState("");
-  const [altPhone, setAltPhone] = useState("");
-  const [universityEmail, setUniversityEmail] = useState("");
-  const [personalEmail, setPersonalEmail] = useState("");
-  const [contractedHours, setContractedHours] = useState<string>("");
-  const [notes, setNotes] = useState("");
+  const preferredName = draft?.preferredName ?? "";
+  const fullName = draft?.fullName ?? "";
+  const mobile = draft?.mobile ?? "";
+  const mobileTextOnly = draft?.mobileTextOnly ?? "";
+  const altPhone = draft?.altPhone ?? "";
+  const universityEmail = draft?.universityEmail ?? "";
+  const personalEmail = draft?.personalEmail ?? "";
+  const contractedHours = draft?.contractedHours ?? "";
+  const notes = draft?.notes ?? "";
 
   // Multi-step selections
-  const [qualifications, setQualifications] = useState<string[]>([]);
-  const [restrictions, setRestrictions] = useState<string[]>([]);
-  const [resigned, setResigned] = useState(false);
-  const [availabilityDiets, setAvailabilityDiets] = useState<string[]>([]);
+  const qualifications = draft?.qualifications ?? [];
+  const restrictions = draft?.restrictions ?? [];
+  const resigned = draft?.resigned ?? false;
+  const availabilityDiets = draft?.availabilityDiets ?? [];
   const [dietOptions, setDietOptions] = useState<{ code: string; label: string; is_active?: boolean }[]>([]);
 
-  const toggleArrayValue = (
-    value: string,
-    setter: React.Dispatch<React.SetStateAction<string[]>>
-  ) => {
-    setter(prev =>
-      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
-    );
-  };
+  const toggleArrayValue = (current: string[], value: string) =>
+    current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
 
   const { data, isLoading, isError } = useQuery<InvigilatorData>({
     queryKey: ["invigilator", invigilatorId],
@@ -167,29 +171,42 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
 
   useEffect(() => {
     if (!data) return;
-    setPreferredName(data.preferred_name || "");
-    setFullName(data.full_name || "");
-    setMobile(data.mobile || "");
-    setMobileTextOnly(data.mobile_text_only || "");
-    setAltPhone(data.alt_phone || "");
-    setUniversityEmail(data.university_email || "");
-    setPersonalEmail(data.personal_email || "");
-    setContractedHours(
-      data.contracted_hours != null && Number.isFinite(Number(data.contracted_hours))
-        ? String(data.contracted_hours)
-        : ""
-    );
-    setNotes(data.notes || "");
-    setResigned(Boolean(data.resigned));
-    setQualifications(data.qualifications?.map((q) => q.qualification) || []);
-    const restrictionCodes = data.restrictions?.flatMap((r) => r.restrictions || []) || [];
-    setRestrictions(restrictionCodes);
-    const diets = data.restrictions?.map((r) => r.diet) || [];
-    setAvailabilityDiets(diets);
-  }, [data]);
+    if (invigilatorId == null || draft?.initialized) return;
+    dispatch(setEditInvigilatorDraft({
+      invigilatorId,
+      draft: {
+        preferredName: data.preferred_name || "",
+        fullName: data.full_name || "",
+        mobile: data.mobile || "",
+        mobileTextOnly: data.mobile_text_only || "",
+        altPhone: data.alt_phone || "",
+        universityEmail: data.university_email || "",
+        personalEmail: data.personal_email || "",
+        contractedHours:
+          data.contracted_hours != null && Number.isFinite(Number(data.contracted_hours))
+            ? String(data.contracted_hours)
+            : "",
+        notes: data.notes || "",
+        resigned: Boolean(data.resigned),
+        qualifications: data.qualifications?.map((q) => q.qualification) || [],
+        restrictions: data.restrictions?.flatMap((r) => r.restrictions || []) || [],
+        availabilityDiets: data.restrictions?.map((r) => r.diet) || [],
+        activeStep: 0,
+        initialized: true,
+      },
+    }));
+  }, [data, dispatch, draft?.initialized, invigilatorId]);
+
+  useEffect(() => {
+    if (invigilatorId == null) return;
+    if (open) return;
+    dispatch(resetEditInvigilatorDraft(invigilatorId));
+  }, [dispatch, invigilatorId, open]);
 
   const handleClose = () => {
-    setActiveStep(0);
+    if (invigilatorId != null) {
+      dispatch(resetEditInvigilatorDraft(invigilatorId));
+    }
     onClose();
   };
 
@@ -241,18 +258,99 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
       case 0:
         return (
           <Stack spacing={2.5}>
-            <TextField label="Preferred Name" value={preferredName} onChange={e => setPreferredName(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth sx={sharedInputSx} />
-            <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth sx={sharedInputSx} />
-            <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Contracted Hours" type="number" value={contractedHours} onChange={e => setContractedHours(e.target.value)} fullWidth sx={sharedInputSx} />
+            <TextField
+              label="Preferred Name"
+              value={preferredName}
+              onChange={e => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { preferredName: e.target.value } }));
+              }}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Full Name"
+              value={fullName}
+              onChange={e => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { fullName: e.target.value } }));
+              }}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Mobile"
+              value={mobile}
+              onChange={e => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { mobile: e.target.value } }));
+              }}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Mobile Text Only"
+              value={mobileTextOnly}
+              onChange={e => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { mobileTextOnly: e.target.value } }));
+              }}
+              fullWidth
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Alternative Phone"
+              value={altPhone}
+              onChange={e => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { altPhone: e.target.value } }));
+              }}
+              fullWidth
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="University Email"
+              value={universityEmail}
+              onChange={e => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { universityEmail: e.target.value } }));
+              }}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Personal Email"
+              value={personalEmail}
+              onChange={e => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { personalEmail: e.target.value } }));
+              }}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Contracted Hours"
+              type="number"
+              value={contractedHours}
+              onChange={e => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { contractedHours: e.target.value } }));
+              }}
+              fullWidth
+              sx={sharedInputSx}
+            />
             <TextField
               label="Notes"
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={e => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { notes: e.target.value } }));
+              }}
               fullWidth
               multiline
               rows={3}
@@ -261,7 +359,10 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
             <BooleanCheckboxRow
               label="Resigned"
               value={resigned}
-              onChange={setResigned}
+              onChange={(value) => {
+                if (invigilatorId == null) return;
+                dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { resigned: value } }));
+              }}
               yesLabel="Has resigned"
               noLabel="Active invigilator"
             />
@@ -277,7 +378,13 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
                   <BooleanCheckboxRow
                     label={q.label}
                     value={qualifications.includes(q.value)}
-                    onChange={() => toggleArrayValue(q.value, setQualifications)}
+                    onChange={() => {
+                      if (invigilatorId == null) return;
+                      dispatch(setEditInvigilatorDraft({
+                        invigilatorId,
+                        draft: { qualifications: toggleArrayValue(qualifications, q.value) },
+                      }));
+                    }}
                   />
                 </Box>
               </Tooltip>
@@ -299,7 +406,13 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
                       <BooleanCheckboxRow
                         label={choice.label}
                         value={restrictions.includes(choice.value)}
-                        onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                        onChange={() => {
+                          if (invigilatorId == null) return;
+                          dispatch(setEditInvigilatorDraft({
+                            invigilatorId,
+                            draft: { restrictions: toggleArrayValue(restrictions, choice.value) },
+                          }));
+                        }}
                         yesLabel={choice.yes}
                         noLabel={choice.no}
                       />
@@ -320,7 +433,13 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
                       <BooleanCheckboxRow
                         label={choice.label}
                         value={restrictions.includes(choice.value)}
-                        onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                        onChange={() => {
+                          if (invigilatorId == null) return;
+                          dispatch(setEditInvigilatorDraft({
+                            invigilatorId,
+                            draft: { restrictions: toggleArrayValue(restrictions, choice.value) },
+                          }));
+                        }}
                         yesLabel={choice.yes}
                         noLabel={choice.no}
                       />
@@ -341,7 +460,13 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
                       <BooleanCheckboxRow
                         label={choice.label}
                         value={restrictions.includes(choice.value)}
-                        onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                        onChange={() => {
+                          if (invigilatorId == null) return;
+                          dispatch(setEditInvigilatorDraft({
+                            invigilatorId,
+                            draft: { restrictions: toggleArrayValue(restrictions, choice.value) },
+                          }));
+                        }}
                         yesLabel={choice.yes}
                         noLabel={choice.no}
                       />
@@ -366,11 +491,12 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
                     color={selected ? "primary" : "default"}
                     variant={selected ? "filled" : "outlined"}
                     onClick={() =>
-                      setAvailabilityDiets(prev =>
-                        prev.includes(diet.code)
-                          ? prev.filter(d => d !== diet.code)
-                          : [...prev, diet.code]
-                      )
+                      invigilatorId == null
+                        ? null
+                        : dispatch(setEditInvigilatorDraft({
+                            invigilatorId,
+                            draft: { availabilityDiets: toggleArrayValue(availabilityDiets, diet.code) },
+                          }))
                     }
                   />
                 </Tooltip>
@@ -431,14 +557,22 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
 
       <DialogActions>
         {activeStep > 0 && (
-          <PillButton onClick={() => setActiveStep(s => s - 1)}>
+          <PillButton
+            onClick={() => {
+              if (invigilatorId == null) return;
+              dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { activeStep: activeStep - 1 } }));
+            }}
+          >
             Back
           </PillButton>
         )}
         {activeStep < STEPS.length - 1 ? (
           <PillButton
             variant="contained"
-            onClick={() => setActiveStep(s => s + 1)}
+            onClick={() => {
+              if (invigilatorId == null) return;
+              dispatch(setEditInvigilatorDraft({ invigilatorId, draft: { activeStep: activeStep + 1 } }));
+            }}
             disabled={activeStep === 0 && !mandatoryFieldsFilled}
           >
             Next

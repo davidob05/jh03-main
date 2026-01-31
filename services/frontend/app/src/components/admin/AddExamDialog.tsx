@@ -9,6 +9,7 @@ import {
   IconButton,
   Alert,
   CircularProgress,
+  Snackbar,
 } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +27,7 @@ type Props = {
 export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
+  const [snackbarOpen, setSnackbarOpen] = React.useState(false);
   const { name, code, examType, students, school, contact } = useAppSelector(
     (state) => state.adminTables.examDialogs.add
   );
@@ -33,6 +35,7 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
   useEffect(() => {
     if (!open) return;
     dispatch(resetAddExamDraft());
+    setSnackbarOpen(false);
   }, [dispatch, open]);
 
   const mutation = useMutation({
@@ -60,6 +63,7 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
       queryClient.invalidateQueries({ queryKey: ["dashboard-exams"] });
       onSuccess?.(name);
       dispatch(resetAddExamDraft());
+      setSnackbarOpen(true);
       onClose();
     },
     onError: (err: any) => alert(err?.message || "Failed to create exam"),
@@ -153,6 +157,27 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
           Create
         </PillButton>
       </DialogActions>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            border: "1px solid #155724",
+            borderRadius: "50px",
+            fontWeight: 500,
+          }}
+        >
+          Exam added successfully!
+        </Alert>
+      </Snackbar>
     </Dialog>
   );
 };

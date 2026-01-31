@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { EditInvigilatorDialog } from "@/components/admin/EditInvigilatorDialog";
+import { Provider } from "react-redux";
+import { createStoreInstance } from "@/state/store";
 
 const apiFetchMock = vi.fn();
 
@@ -38,11 +40,14 @@ const renderDialog = () => {
       mutations: { retry: false },
     },
   });
+  const store = createStoreInstance();
 
   return render(
-    <QueryClientProvider client={client}>
-      <EditInvigilatorDialog open invigilatorId={1} onClose={() => {}} />
-    </QueryClientProvider>
+    <Provider store={store}>
+      <QueryClientProvider client={client}>
+        <EditInvigilatorDialog open invigilatorId={1} onClose={() => {}} />
+      </QueryClientProvider>
+    </Provider>
   );
 };
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   Alert,
   Box,
@@ -25,6 +25,7 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { formatDate } from "../../utils/dates";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { sharedInputSx } from "../sharedInputSx";
+import { setDietManagerDraft, useAppDispatch, useAppSelector } from "../../state/store";
 
 export interface Diet {
   id: number;
@@ -49,11 +50,10 @@ const emptyDraft: DraftDiet = {
 
 export const DietManager: React.FC = () => {
   const queryClient = useQueryClient();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [draft, setDraft] = useState<DraftDiet>(emptyDraft);
-  const [error, setError] = useState<string>("");
-  const [dietToDelete, setDietToDelete] = useState<Diet | null>(null);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const dispatch = useAppDispatch();
+  const { dialogOpen, draft, error, dietToDelete, snackbar } = useAppSelector(
+    (state) => state.adminTables.dietManager
+  );
 
   const { data: diets = [], isLoading, isError } = useQuery<Diet[]>({
     queryKey: ["diets"],
@@ -91,16 +91,15 @@ export const DietManager: React.FC = () => {
     },
     onSuccess: (_data, payload) => {
       queryClient.invalidateQueries({ queryKey: ["diets"] });
-      setDialogOpen(false);
-      setDraft(emptyDraft);
-      setError("");
-      setSnackbar({
-        open: true,
-        message: payload.id ? "Diet updated." : "Diet added.",
-      });
+      dispatch(setDietManagerDraft({
+        dialogOpen: false,
+        draft: emptyDraft,
+        error: "",
+        snackbar: { open: true, message: payload.id ? "Diet updated." : "Diet added." },
+      }));
     },
     onError: (err: any) => {
-      setError(err?.message || "Failed to save diet");
+      dispatch(setDietManagerDraft({ error: err?.message || "Failed to save diet" }));
     },
   });
 
@@ -115,30 +114,36 @@ export const DietManager: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["diets"] });
-      setSnackbar({ open: true, message: "Diet deleted." });
+      dispatch(setDietManagerDraft({ snackbar: { open: true, message: "Diet deleted." } }));
     },
   });
 
   const openDialog = (diet?: Diet) => {
-    setError("");
     if (diet) {
-      setDraft({
-        id: diet.id,
-        code: diet.code,
-        name: diet.name,
-        start_date: diet.start_date || "",
-        end_date: diet.end_date || "",
-        restriction_cutoff: diet.restriction_cutoff || "",
-        is_active: diet.is_active,
-      });
+      dispatch(setDietManagerDraft({
+        error: "",
+        dialogOpen: true,
+        draft: {
+          id: diet.id,
+          code: diet.code,
+          name: diet.name,
+          start_date: diet.start_date || "",
+          end_date: diet.end_date || "",
+          restriction_cutoff: diet.restriction_cutoff || "",
+          is_active: diet.is_active,
+        },
+      }));
     } else {
-      setDraft(emptyDraft);
+      dispatch(setDietManagerDraft({
+        error: "",
+        draft: emptyDraft,
+        dialogOpen: true,
+      }));
     }
-    setDialogOpen(true);
   };
 
   const confirmDelete = (diet: Diet) => {
-    setDietToDelete(diet);
+    dispatch(setDietManagerDraft({ dietToDelete: diet }));
   };
 
   const sortedDiets = useMemo(() => {
@@ -151,14 +156,14 @@ export const DietManager: React.FC = () => {
 
   const handleSave = () => {
     if (!draft.code.trim() || !draft.name.trim()) {
-      setError("Code and name are required.");
+      dispatch(setDietManagerDraft({ error: "Code and name are required." }));
       return;
     }
     if (draft.start_date && draft.end_date) {
       const start = dayjs(draft.start_date);
       const end = dayjs(draft.end_date);
       if (start.isAfter(end)) {
-        setError("Start date must be on or before end date.");
+        dispatch(setDietManagerDraft({ error: "Start date must be on or before end date." }));
         return;
       }
     }
@@ -238,10 +243,19 @@ export const DietManager: React.FC = () => {
         ))}
       </Grid>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={dialogOpen}
+        onClose={() => dispatch(setDietManagerDraft({ dialogOpen: false }))}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           {draft.id ? "Edit diet" : "Add diet"}
-          <IconButton onClick={() => setDialogOpen(false)} size="small" aria-label="Close">
+          <IconButton
+            onClick={() => dispatch(setDietManagerDraft({ dialogOpen: false }))}
+            size="small"
+            aria-label="Close"
+          >
             <Close fontSize="small" />
           </IconButton>
         </DialogTitle>
@@ -251,7 +265,7 @@ export const DietManager: React.FC = () => {
             <TextField
               label="Code"
               value={draft.code}
-              onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value }))}
+              onChange={(e) => dispatch(setDietManagerDraft({ draft: { ...draft, code: e.target.value } }))}
               fullWidth
               required
               helperText="Stable identifier, e.g. DEC_2026"
@@ -260,7 +274,7 @@ export const DietManager: React.FC = () => {
             <TextField
               label="Name"
               value={draft.name}
-              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+              onChange={(e) => dispatch(setDietManagerDraft({ draft: { ...draft, name: e.target.value } }))}
               fullWidth
               required
               helperText="Display label, e.g. December 2025"
@@ -271,7 +285,7 @@ export const DietManager: React.FC = () => {
                 label="Start date"
                 type="date"
                 value={draft.start_date || ""}
-                onChange={(e) => setDraft((d) => ({ ...d, start_date: e.target.value }))}
+                onChange={(e) => dispatch(setDietManagerDraft({ draft: { ...draft, start_date: e.target.value } }))}
                 InputLabelProps={{ shrink: true }}
                 fullWidth
                 sx={sharedInputSx}
@@ -281,7 +295,7 @@ export const DietManager: React.FC = () => {
                 label="End date"
                 type="date"
                 value={draft.end_date || ""}
-                onChange={(e) => setDraft((d) => ({ ...d, end_date: e.target.value }))}
+                onChange={(e) => dispatch(setDietManagerDraft({ draft: { ...draft, end_date: e.target.value } }))}
                 InputLabelProps={{ shrink: true }}
                 fullWidth
                 sx={sharedInputSx}
@@ -292,7 +306,9 @@ export const DietManager: React.FC = () => {
               label="Restriction cutoff"
               type="date"
               value={draft.restriction_cutoff || ""}
-              onChange={(e) => setDraft((d) => ({ ...d, restriction_cutoff: e.target.value }))}
+              onChange={(e) =>
+                dispatch(setDietManagerDraft({ draft: { ...draft, restriction_cutoff: e.target.value } }))
+              }
               InputLabelProps={{ shrink: true }}
               helperText="Last date invigilators can submit restrictions for this diet"
               fullWidth
@@ -302,7 +318,9 @@ export const DietManager: React.FC = () => {
               control={
                 <Checkbox
                   checked={draft.is_active}
-                  onChange={(e) => setDraft((d) => ({ ...d, is_active: e.target.checked }))}
+                  onChange={(e) =>
+                    dispatch(setDietManagerDraft({ draft: { ...draft, is_active: e.target.checked } }))
+                  }
                 />
               }
               label="Active"
@@ -330,19 +348,19 @@ export const DietManager: React.FC = () => {
           if (dietToDelete) {
             deleteMutation.mutate(dietToDelete.id);
           }
-          setDietToDelete(null);
+          dispatch(setDietManagerDraft({ dietToDelete: null }));
         }}
-        onClose={() => setDietToDelete(null)}
+        onClose={() => dispatch(setDietManagerDraft({ dietToDelete: null }))}
       />
 
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
-        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        onClose={() => dispatch(setDietManagerDraft({ snackbar: { ...snackbar, open: false } }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          onClose={() => dispatch(setDietManagerDraft({ snackbar: { ...snackbar, open: false } }))}
           severity="success"
           variant="filled"
           sx={{

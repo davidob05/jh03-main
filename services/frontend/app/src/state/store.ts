@@ -70,6 +70,86 @@ type VenueDialogDraft = {
   initialized?: boolean;
 };
 
+type InvigilatorDialogDraft = {
+  activeStep: number;
+  preferredName: string;
+  fullName: string;
+  loginUsername: string;
+  tempPassword: string;
+  showPassword: boolean;
+  mobile: string;
+  mobileTextOnly: string;
+  altPhone: string;
+  universityEmail: string;
+  personalEmail: string;
+  contractedHours: string;
+  notes: string;
+  qualifications: string[];
+  restrictions: string[];
+  resigned: boolean;
+  availabilityDiets: string[];
+  initialized?: boolean;
+};
+
+type AnnouncementDialogDraft = {
+  title: string;
+  body: string;
+  audience: "" | "invigilator" | "all";
+  imageData: string;
+  imageName: string | null;
+  publishedAt: string;
+  expiresAt: string;
+  priority: number | "";
+  isActive: boolean;
+  error: string | null;
+};
+
+type DietManagerDiet = {
+  id: number;
+  code: string;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  restriction_cutoff: string | null;
+  is_active: boolean;
+};
+
+type DietDraft = {
+  id?: number;
+  code: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  restriction_cutoff: string;
+  is_active: boolean;
+};
+
+type DietManagerDraft = {
+  dialogOpen: boolean;
+  draft: DietDraft;
+  error: string;
+  dietToDelete: DietManagerDiet | null;
+  snackbar: { open: boolean; message: string };
+};
+
+type UploadFileDraft = {
+  uploadType: string;
+  uploading: boolean;
+  snackbar: { type: "success" | "error" | null; message: string };
+};
+
+type ExportInvigilatorDialogDraft = {
+  onlyConfirmed: boolean;
+  includeCancelled: boolean;
+  includeProvisions: boolean;
+};
+
+type NotifyDialogDraft = {
+  subject: string;
+  message: string;
+  error: string | null;
+};
+
 type ExamVenueDraft = {
   id: number | string;
   venue_name: string;
@@ -117,6 +197,15 @@ type AdminTableState = {
     add: VenueDialogDraft;
     edit: Record<string, VenueDialogDraft>;
   };
+  invigilatorDialogs: {
+    add: InvigilatorDialogDraft;
+    edit: Record<number, InvigilatorDialogDraft>;
+  };
+  announcementDialog: AnnouncementDialogDraft;
+  dietManager: DietManagerDraft;
+  uploadFile: UploadFileDraft;
+  exportInvigilatorDialog: ExportInvigilatorDialogDraft;
+  notifyDialog: NotifyDialogDraft;
   dashboard: DashboardPrefs;
 };
 
@@ -140,6 +229,48 @@ const emptyVenueDraft: VenueDialogDraft = {
   venueType: "",
   isAccessible: true,
   provisions: [],
+};
+
+const emptyInvigilatorDraft: InvigilatorDialogDraft = {
+  activeStep: 0,
+  preferredName: "",
+  fullName: "",
+  loginUsername: "",
+  tempPassword: "TempPass123!",
+  showPassword: false,
+  mobile: "",
+  mobileTextOnly: "",
+  altPhone: "",
+  universityEmail: "",
+  personalEmail: "",
+  contractedHours: "100",
+  notes: "",
+  qualifications: [],
+  restrictions: [],
+  resigned: false,
+  availabilityDiets: [],
+};
+
+const emptyAnnouncementDraft: AnnouncementDialogDraft = {
+  title: "",
+  body: "",
+  audience: "",
+  imageData: "",
+  imageName: null,
+  publishedAt: "",
+  expiresAt: "",
+  priority: "",
+  isActive: true,
+  error: null,
+};
+
+const emptyDietDraft: DietDraft = {
+  code: "",
+  name: "",
+  start_date: "",
+  end_date: "",
+  restriction_cutoff: "",
+  is_active: true,
 };
 
 const initialState: AdminTableState = {
@@ -191,6 +322,33 @@ const initialState: AdminTableState = {
   venueDialogs: {
     add: { ...emptyVenueDraft },
     edit: {},
+  },
+  invigilatorDialogs: {
+    add: { ...emptyInvigilatorDraft },
+    edit: {},
+  },
+  announcementDialog: { ...emptyAnnouncementDraft },
+  dietManager: {
+    dialogOpen: false,
+    draft: { ...emptyDietDraft },
+    error: "",
+    dietToDelete: null,
+    snackbar: { open: false, message: "" },
+  },
+  uploadFile: {
+    uploadType: "",
+    uploading: false,
+    snackbar: { type: null, message: "" },
+  },
+  exportInvigilatorDialog: {
+    onlyConfirmed: false,
+    includeCancelled: false,
+    includeProvisions: false,
+  },
+  notifyDialog: {
+    subject: "",
+    message: "",
+    error: null,
   },
   dashboard: {
     selectedSchool: "",
@@ -257,6 +415,53 @@ const adminTablesSlice = createSlice({
     resetEditVenueDraft(state, action: PayloadAction<string>) {
       delete state.venueDialogs.edit[action.payload];
     },
+    setAddInvigilatorDraft(state, action: PayloadAction<Partial<InvigilatorDialogDraft>>) {
+      Object.assign(state.invigilatorDialogs.add, action.payload);
+    },
+    resetAddInvigilatorDraft(state) {
+      state.invigilatorDialogs.add = { ...emptyInvigilatorDraft };
+    },
+    setEditInvigilatorDraft(
+      state,
+      action: PayloadAction<{ invigilatorId: number; draft: Partial<InvigilatorDialogDraft> }>
+    ) {
+      const { invigilatorId, draft } = action.payload;
+      state.invigilatorDialogs.edit[invigilatorId] = {
+        ...(state.invigilatorDialogs.edit[invigilatorId] || { ...emptyInvigilatorDraft }),
+        ...draft,
+      };
+    },
+    resetEditInvigilatorDraft(state, action: PayloadAction<number>) {
+      delete state.invigilatorDialogs.edit[action.payload];
+    },
+    setAnnouncementDraft(state, action: PayloadAction<Partial<AnnouncementDialogDraft>>) {
+      Object.assign(state.announcementDialog, action.payload);
+    },
+    resetAnnouncementDraft(state) {
+      state.announcementDialog = { ...emptyAnnouncementDraft };
+    },
+    setDietManagerDraft(state, action: PayloadAction<Partial<DietManagerDraft>>) {
+      Object.assign(state.dietManager, action.payload);
+    },
+    setUploadFileDraft(state, action: PayloadAction<Partial<UploadFileDraft>>) {
+      Object.assign(state.uploadFile, action.payload);
+    },
+    setExportInvigilatorDialogDraft(state, action: PayloadAction<Partial<ExportInvigilatorDialogDraft>>) {
+      Object.assign(state.exportInvigilatorDialog, action.payload);
+    },
+    resetExportInvigilatorDialogDraft(state) {
+      state.exportInvigilatorDialog = {
+        onlyConfirmed: false,
+        includeCancelled: false,
+        includeProvisions: false,
+      };
+    },
+    setNotifyDialogDraft(state, action: PayloadAction<Partial<NotifyDialogDraft>>) {
+      Object.assign(state.notifyDialog, action.payload);
+    },
+    resetNotifyDialogDraft(state) {
+      state.notifyDialog = { subject: "", message: "", error: null };
+    },
     setAddExamDraft(state, action: PayloadAction<Partial<ExamDialogDraft>>) {
       Object.assign(state.examDialogs.add, action.payload);
     },
@@ -297,6 +502,18 @@ export const {
   resetAddVenueDraft,
   setEditVenueDraft,
   resetEditVenueDraft,
+  setAddInvigilatorDraft,
+  resetAddInvigilatorDraft,
+  setEditInvigilatorDraft,
+  resetEditInvigilatorDraft,
+  setAnnouncementDraft,
+  resetAnnouncementDraft,
+  setDietManagerDraft,
+  setUploadFileDraft,
+  setExportInvigilatorDialogDraft,
+  resetExportInvigilatorDialogDraft,
+  setNotifyDialogDraft,
+  resetNotifyDialogDraft,
   setAddExamDraft,
   resetAddExamDraft,
   setEditExamDraft,

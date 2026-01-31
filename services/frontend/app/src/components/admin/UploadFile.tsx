@@ -16,15 +16,12 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { Panel } from "../Panel";
 import { sharedInputSx } from "../sharedInputSx";
+import { setUploadFileDraft, useAppDispatch, useAppSelector } from "../../state/store";
 
 export const UploadFile: React.FC = () => {
-  const [uploadType, setUploadType] = useState(""); // exam, provisions, venues
+  const dispatch = useAppDispatch();
+  const { uploadType, uploading, snackbar } = useAppSelector((state) => state.adminTables.uploadFile);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [snackbar, setSnackbar] = useState<{
-    type: "success" | "error" | null;
-    message: string;
-  }>({ type: null, message: "" });
 
   const apiMap: Record<string, string> = {
     exam: "/exams-upload",
@@ -42,22 +39,21 @@ export const UploadFile: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      setSnackbar({ type: null, message: "" });
+      dispatch(setUploadFileDraft({ snackbar: { type: null, message: "" } }));
     }
   };
 
   const handleUpload = async () => {
     if (!uploadType) {
-      setSnackbar({ type: "error", message: "Please select a file type." });
+      dispatch(setUploadFileDraft({ snackbar: { type: "error", message: "Please select a file type." } }));
       return;
     }
     if (!selectedFile) {
-      setSnackbar({ type: "error", message: "Please select a file first." });
+      dispatch(setUploadFileDraft({ snackbar: { type: "error", message: "Please select a file first." } }));
       return;
     }
 
-    setUploading(true);
-    setSnackbar({ type: null, message: "" });
+    dispatch(setUploadFileDraft({ uploading: true, snackbar: { type: null, message: "" } }));
 
     try {
       const formData = new FormData();
@@ -87,21 +83,25 @@ export const UploadFile: React.FC = () => {
           ? "Student provisions"
           : "Venue data";
 
-      setSnackbar({
-        type: "success",
-        message: `Upload complete: ${typeLabel} (${selectedFile.name}). ${parts.join(", ")}.`,
-      });
+      dispatch(setUploadFileDraft({
+        snackbar: {
+          type: "success",
+          message: `Upload complete: ${typeLabel} (${selectedFile.name}). ${parts.join(", ")}.`,
+        },
+      }));
 
       setSelectedFile(null);
       const fileInput = document.getElementById("file-upload") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
     } catch (err) {
-      setSnackbar({
-        type: "error",
-        message: err instanceof Error ? err.message : "Failed to upload file",
-      });
+      dispatch(setUploadFileDraft({
+        snackbar: {
+          type: "error",
+          message: err instanceof Error ? err.message : "Failed to upload file",
+        },
+      }));
     } finally {
-      setUploading(false);
+      dispatch(setUploadFileDraft({ uploading: false }));
     }
   };
 
@@ -119,7 +119,7 @@ export const UploadFile: React.FC = () => {
         <FormControl fullWidth size="small" variant="standard">
           <Select
             value={uploadType}
-            onChange={(e) => setUploadType(e.target.value)}
+            onChange={(e) => dispatch(setUploadFileDraft({ uploadType: e.target.value }))}
             displayEmpty
             renderValue={(selected) => {
               if (!selected) {
@@ -192,11 +192,11 @@ export const UploadFile: React.FC = () => {
       <Snackbar
         open={Boolean(snackbar.type)}
         autoHideDuration={6000}
-        onClose={() => setSnackbar({ type: null, message: "" })}
+        onClose={() => dispatch(setUploadFileDraft({ snackbar: { type: null, message: "" } }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setSnackbar({ type: null, message: "" })}
+          onClose={() => dispatch(setUploadFileDraft({ snackbar: { type: null, message: "" } }))}
           severity={snackbar.type || undefined}
           variant="filled"
           sx={

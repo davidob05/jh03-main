@@ -1,12 +1,19 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { Provider } from "react-redux";
 
 import { ExportInvigilatorTimetablesDialog } from "@/components/admin/ExportInvigilatorTimetablesDialog";
+import { createStoreInstance } from "@/state/store";
 
 describe("ExportInvigilatorTimetablesDialog", () => {
+  const renderWithStore = (ui: React.ReactElement) => {
+    const store = createStoreInstance();
+    return render(<Provider store={store}>{ui}</Provider>);
+  };
+
   it("disables export when no invigilators are selected", () => {
-    render(
+    renderWithStore(
       <ExportInvigilatorTimetablesDialog
         open
         invigilators={[]}
@@ -20,7 +27,7 @@ describe("ExportInvigilatorTimetablesDialog", () => {
 
   it("sends selected options to onExport", () => {
     const onExport = vi.fn();
-    render(
+    renderWithStore(
       <ExportInvigilatorTimetablesDialog
         open
         invigilators={[{ id: 1, name: "Alice Example" }]}

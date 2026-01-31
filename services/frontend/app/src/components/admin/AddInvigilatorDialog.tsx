@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -26,6 +26,12 @@ import { BooleanCheckboxRow } from "../../components/BooleanCheckboxRow";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { sharedInputSx } from "../sharedInputSx";
+import {
+  resetAddInvigilatorDraft,
+  setAddInvigilatorDraft,
+  useAppDispatch,
+  useAppSelector,
+} from "../../state/store";
 
 const STEPS = ["Personal Details", "Login Details", "Qualifications", "Restrictions", "Availability"];
 
@@ -74,28 +80,31 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
 }) => {
   const DEFAULT_TEMP_PASSWORD = "TempPass123!";
   const queryClient = useQueryClient();
-  const [activeStep, setActiveStep] = useState(0);
+  const dispatch = useAppDispatch();
+  const {
+    activeStep,
+    preferredName,
+    fullName,
+    loginUsername,
+    tempPassword,
+    showPassword,
+    mobile,
+    mobileTextOnly,
+    altPhone,
+    universityEmail,
+    personalEmail,
+    contractedHours,
+    notes,
+    qualifications,
+    restrictions,
+    resigned,
+    availabilityDiets,
+  } = useAppSelector((state) => state.adminTables.invigilatorDialogs.add);
 
   // Personal details
-  const [preferredName, setPreferredName] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [loginUsername, setLoginUsername] = useState("");
-  const [tempPassword, setTempPassword] = useState(DEFAULT_TEMP_PASSWORD);
-  const [showPassword, setShowPassword] = useState(false);
-  const [mobile, setMobile] = useState("");
-  const [mobileTextOnly, setMobileTextOnly] = useState("");
-  const [altPhone, setAltPhone] = useState("");
-  const [universityEmail, setUniversityEmail] = useState("");
-  const [personalEmail, setPersonalEmail] = useState("");
-  const [contractedHours, setContractedHours] = useState("100");
-  const [notes, setNotes] = useState("");
   const lastDerivedUsername = useRef("");
 
   // Multi-step selections
-  const [qualifications, setQualifications] = useState<string[]>([]);
-  const [restrictions, setRestrictions] = useState<string[]>([]);
-  const [resigned, setResigned] = useState(false);
-  const [availabilityDiets, setAvailabilityDiets] = useState<string[]>([]);
   const dietsQuery = useQuery<Diet[]>({
     queryKey: ["diets"],
     queryFn: async () => {
@@ -109,31 +118,11 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
     [dietsQuery.data]
   );
 
-  const toggleArrayValue = (
-    value: string,
-    setter: React.Dispatch<React.SetStateAction<string[]>>
-  ) => {
-    setter(prev =>
-      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
-    );
-  };
+  const toggleArrayValue = (current: string[], value: string) =>
+    current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
 
   const handleClose = () => {
-    setActiveStep(0);
-    setPreferredName("");
-    setFullName("");
-    setLoginUsername("");
-    setTempPassword(DEFAULT_TEMP_PASSWORD);
-    setMobile("");
-    setMobileTextOnly("");
-    setAltPhone("");
-    setUniversityEmail("");
-    setPersonalEmail("");
-    setContractedHours("100");
-    setNotes("");
-    setQualifications([]);
-    setRestrictions([]);
-    setAvailabilityDiets([]);
+    dispatch(resetAddInvigilatorDraft());
     onClose();
   };
 
@@ -205,6 +194,15 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
   });
 
   useEffect(() => {
+    dispatch(setAddInvigilatorDraft({ tempPassword: DEFAULT_TEMP_PASSWORD, contractedHours: "100" }));
+  }, [DEFAULT_TEMP_PASSWORD, dispatch]);
+
+  useEffect(() => {
+    if (!open) return;
+    dispatch(resetAddInvigilatorDraft());
+  }, [dispatch, open]);
+
+  useEffect(() => {
     // Autofill username from university email until the admin overrides it.
     const trimmed = (universityEmail || "").trim();
     if (!trimmed) {
@@ -216,28 +214,82 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
     const lastDerived = lastDerivedUsername.current;
     const shouldSync = !loginUsername || loginUsername === lastDerived;
     if (shouldSync && loginUsername !== derived) {
-      setLoginUsername(derived);
+      dispatch(setAddInvigilatorDraft({ loginUsername: derived }));
     }
     lastDerivedUsername.current = derived;
-  }, [loginUsername, universityEmail]);
+  }, [dispatch, loginUsername, universityEmail]);
 
   const renderStepContent = () => {
     switch (activeStep) {
       case 0:
         return (
           <Stack spacing={2.5}>
-            <TextField label="Preferred Name" value={preferredName} onChange={e => setPreferredName(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Mobile" value={mobile} onChange={e => setMobile(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Mobile Text Only" value={mobileTextOnly} onChange={e => setMobileTextOnly(e.target.value)} fullWidth sx={sharedInputSx} />
-            <TextField label="Alternative Phone" value={altPhone} onChange={e => setAltPhone(e.target.value)} fullWidth sx={sharedInputSx} />
-            <TextField label="University Email" value={universityEmail} onChange={e => setUniversityEmail(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Personal Email" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} fullWidth required sx={sharedInputSx} />
-            <TextField label="Contracted Hours" type="number" value={contractedHours} onChange={e => setContractedHours(e.target.value)} fullWidth sx={sharedInputSx} />
+            <TextField
+              label="Preferred Name"
+              value={preferredName}
+              onChange={e => dispatch(setAddInvigilatorDraft({ preferredName: e.target.value }))}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Full Name"
+              value={fullName}
+              onChange={e => dispatch(setAddInvigilatorDraft({ fullName: e.target.value }))}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Mobile"
+              value={mobile}
+              onChange={e => dispatch(setAddInvigilatorDraft({ mobile: e.target.value }))}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Mobile Text Only"
+              value={mobileTextOnly}
+              onChange={e => dispatch(setAddInvigilatorDraft({ mobileTextOnly: e.target.value }))}
+              fullWidth
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Alternative Phone"
+              value={altPhone}
+              onChange={e => dispatch(setAddInvigilatorDraft({ altPhone: e.target.value }))}
+              fullWidth
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="University Email"
+              value={universityEmail}
+              onChange={e => dispatch(setAddInvigilatorDraft({ universityEmail: e.target.value }))}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Personal Email"
+              value={personalEmail}
+              onChange={e => dispatch(setAddInvigilatorDraft({ personalEmail: e.target.value }))}
+              fullWidth
+              required
+              sx={sharedInputSx}
+            />
+            <TextField
+              label="Contracted Hours"
+              type="number"
+              value={contractedHours}
+              onChange={e => dispatch(setAddInvigilatorDraft({ contractedHours: e.target.value }))}
+              fullWidth
+              sx={sharedInputSx}
+            />
             <TextField
               label="Notes"
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={e => dispatch(setAddInvigilatorDraft({ notes: e.target.value }))}
               fullWidth
               multiline
               rows={3}
@@ -246,7 +298,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
             <BooleanCheckboxRow
               label="Resigned"
               value={resigned}
-              onChange={setResigned}
+              onChange={(value) => dispatch(setAddInvigilatorDraft({ resigned: value }))}
               yesLabel="Has resigned"
               noLabel="Active invigilator"
             />
@@ -259,7 +311,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
             <TextField
               label="Username"
               value={loginUsername}
-              onChange={e => setLoginUsername(e.target.value)}
+              onChange={e => dispatch(setAddInvigilatorDraft({ loginUsername: e.target.value }))}
               fullWidth
               required
               helperText="Auto-filled from University Email if left blank."
@@ -268,7 +320,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
             <TextField
               label="Temporary Password"
               value={tempPassword}
-              onChange={e => setTempPassword(e.target.value)}
+              onChange={e => dispatch(setAddInvigilatorDraft({ tempPassword: e.target.value }))}
               fullWidth
               required
               helperText="Starter password which the invigilator can change after first login."
@@ -279,7 +331,7 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
                   <InputAdornment position="end">
                     <IconButton
                       aria-label={showPassword ? "Hide password" : "Show password"}
-                      onClick={() => setShowPassword((s) => !s)}
+                      onClick={() => dispatch(setAddInvigilatorDraft({ showPassword: !showPassword }))}
                       edge="end"
                     >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
@@ -300,7 +352,11 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
                   <BooleanCheckboxRow
                     label={q.label}
                     value={qualifications.includes(q.value)}
-                    onChange={() => toggleArrayValue(q.value, setQualifications)}
+                    onChange={() =>
+                      dispatch(setAddInvigilatorDraft({
+                        qualifications: toggleArrayValue(qualifications, q.value),
+                      }))
+                    }
                   />
                 </Box>
               </Tooltip>
@@ -322,7 +378,11 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
                       <BooleanCheckboxRow
                         label={choice.label}
                         value={restrictions.includes(choice.value)}
-                        onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                        onChange={() =>
+                          dispatch(setAddInvigilatorDraft({
+                            restrictions: toggleArrayValue(restrictions, choice.value),
+                          }))
+                        }
                         yesLabel={choice.yes}
                         noLabel={choice.no}
                       />
@@ -343,7 +403,11 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
                       <BooleanCheckboxRow
                         label={choice.label}
                         value={restrictions.includes(choice.value)}
-                        onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                        onChange={() =>
+                          dispatch(setAddInvigilatorDraft({
+                            restrictions: toggleArrayValue(restrictions, choice.value),
+                          }))
+                        }
                         yesLabel={choice.yes}
                         noLabel={choice.no}
                       />
@@ -364,7 +428,11 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
                       <BooleanCheckboxRow
                         label={choice.label}
                         value={restrictions.includes(choice.value)}
-                        onChange={() => toggleArrayValue(choice.value, setRestrictions)}
+                        onChange={() =>
+                          dispatch(setAddInvigilatorDraft({
+                            restrictions: toggleArrayValue(restrictions, choice.value),
+                          }))
+                        }
                         yesLabel={choice.yes}
                         noLabel={choice.no}
                       />
@@ -390,11 +458,9 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
                     color={selected ? "primary" : "default"}
                     variant={selected ? "filled" : "outlined"}
                     onClick={() =>
-                      setAvailabilityDiets(prev =>
-                        prev.includes(diet.code)
-                          ? prev.filter(d => d !== diet.code)
-                          : [...prev, diet.code]
-                      )
+                      dispatch(setAddInvigilatorDraft({
+                        availabilityDiets: toggleArrayValue(availabilityDiets, diet.code),
+                      }))
                     }
                   />
                 </Tooltip>
@@ -445,14 +511,14 @@ export const AddInvigilatorDialog: React.FC<AddInvigilatorDialogProps> = ({
 
       <DialogActions>
         {activeStep > 0 && (
-          <PillButton onClick={() => setActiveStep(s => s - 1)}>
+          <PillButton onClick={() => dispatch(setAddInvigilatorDraft({ activeStep: activeStep - 1 }))}>
             Back
           </PillButton>
         )}
         {activeStep < STEPS.length - 1 ? (
           <PillButton
             variant="contained"
-            onClick={() => setActiveStep(s => s + 1)}
+            onClick={() => dispatch(setAddInvigilatorDraft({ activeStep: activeStep + 1 }))}
             disabled={activeStep === 0 && !mandatoryFieldsFilled}
           >
             Next

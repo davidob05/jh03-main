@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   Alert,
   Box,
@@ -18,6 +18,12 @@ import { PillButton } from "../PillButton";
 import { Close } from "@mui/icons-material";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { sharedInputSx } from "../sharedInputSx";
+import {
+  resetNotifyDialogDraft,
+  setNotifyDialogDraft,
+  useAppDispatch,
+  useAppSelector,
+} from "../../state/store";
 
 type Recipient = {
   id: number;
@@ -38,9 +44,8 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
   onClose,
   onSent,
 }) => {
-  const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const { subject, message, error } = useAppSelector((state) => state.adminTables.notifyDialog);
 
   const recipientIds = useMemo(() => recipients.map((r) => r.id), [recipients]);
   const recipientEmails = useMemo(
@@ -56,16 +61,14 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
   );
 
   const resetForm = React.useCallback(() => {
-    setSubject("");
-    setMessage("");
-    setError(null);
-  }, []);
+    dispatch(resetNotifyDialogDraft());
+  }, [dispatch]);
 
   useEffect(() => {
     if (!open) {
       resetForm();
     }
-  }, [open]);
+  }, [open, resetForm]);
   const sending = false;
 
   return (
@@ -127,7 +130,7 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
           value={subject}
           fullWidth
           margin="dense"
-          onChange={(e) => setSubject(e.target.value)}
+          onChange={(e) => dispatch(setNotifyDialogDraft({ subject: e.target.value }))}
           sx={sharedInputSx}
         />
         <TextField
@@ -138,7 +141,7 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
           multiline
           minRows={4}
           margin="dense"
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => dispatch(setNotifyDialogDraft({ message: e.target.value }))}
           sx={[sharedInputSx, { height: "auto", "& .MuiInputBase-root": { minHeight: 128 }, "& .MuiInputBase-input": { py: 1 } }]}
         />
 
@@ -165,11 +168,11 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
           variant="contained"
           onClick={async () => {
             if (!recipientEmails.length) {
-              setError("No email addresses found for selected invigilators.");
+              dispatch(setNotifyDialogDraft({ error: "No email addresses found for selected invigilators." }));
               return;
             }
             if (!message.trim()) {
-              setError("Message is required.");
+              dispatch(setNotifyDialogDraft({ error: "Message is required." }));
               return;
             }
             const mailSubject = subject.trim() || "Message from administrator";
@@ -190,7 +193,7 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
                 }),
               });
             } catch (err: any) {
-              setError(err?.message || "Failed to record mail merge.");
+              dispatch(setNotifyDialogDraft({ error: err?.message || "Failed to record mail merge." }));
               // Still proceed to open the mail client
             }
 
@@ -199,6 +202,7 @@ export const NotifyDialog: React.FC<NotifyDialogProps> = ({
             )}&subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(mailBody)}`;
             window.location.href = mailto;
             onSent?.(recipientIds.length);
+            dispatch(resetNotifyDialogDraft());
           }}
           disabled={!recipients.length}
         >

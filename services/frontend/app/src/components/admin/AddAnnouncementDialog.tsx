@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import {
   Box,
   Dialog,
@@ -18,6 +18,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../PillButton";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { sharedInputSx } from "../sharedInputSx";
+import { resetAnnouncementDraft, setAnnouncementDraft, useAppDispatch, useAppSelector } from "../../state/store";
 
 type Audience = "invigilator" | "all";
 
@@ -41,16 +42,19 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
   onCreated,
 }) => {
   const queryClient = useQueryClient();
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [audience, setAudience] = useState<Audience | "">("");
-  const [imageData, setImageData] = useState("");
-  const [imageName, setImageName] = useState<string | null>(null);
-  const [publishedAt, setPublishedAt] = useState(formatDateTimeInput(new Date()));
-  const [expiresAt, setExpiresAt] = useState("");
-  const [priority, setPriority] = useState<number | "">("");
-  const [isActive, setIsActive] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const {
+    title,
+    body,
+    audience,
+    imageData,
+    imageName,
+    publishedAt,
+    expiresAt,
+    priority,
+    isActive,
+    error,
+  } = useAppSelector((state) => state.adminTables.announcementDialog);
 
   const isValidDateInput = (value: string) => {
     if (!value) return true;
@@ -58,22 +62,15 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
     return !Number.isNaN(d.getTime());
   };
 
-  const resetForm = () => {
-    setTitle("");
-    setBody("");
-    setAudience("");
-    setImageData("");
-    setImageName(null);
-    setPublishedAt(formatDateTimeInput(new Date()));
-    setExpiresAt("");
-    setPriority("");
-    setIsActive(true);
-    setError(null);
-  };
+  useEffect(() => {
+    if (!open) return;
+    dispatch(resetAnnouncementDraft());
+    dispatch(setAnnouncementDraft({ publishedAt: formatDateTimeInput(new Date()), isActive: true }));
+  }, [dispatch, open]);
 
   const handleClose = () => {
     if (mutation.isPending) return;
-    resetForm();
+    dispatch(resetAnnouncementDraft());
     onClose();
   };
 
@@ -112,7 +109,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
       handleClose();
     },
     onError: (err: any) => {
-      setError(err?.message || "Failed to create announcement");
+      dispatch(setAnnouncementDraft({ error: err?.message || "Failed to create announcement" }));
     },
   });
 
@@ -138,7 +135,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
           <TextField
             label="Title"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => dispatch(setAnnouncementDraft({ title: e.target.value }))}
             fullWidth
             required
             sx={sharedInputSx}
@@ -146,7 +143,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
           <TextField
             label="Body"
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => dispatch(setAnnouncementDraft({ body: e.target.value }))}
             fullWidth
             required
             multiline
@@ -159,7 +156,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               label="Audience"
               select
               value={audience}
-              onChange={(e) => setAudience(e.target.value as Audience | "")}
+              onChange={(e) => dispatch(setAnnouncementDraft({ audience: e.target.value as Audience | "" }))}
               fullWidth
               sx={sharedInputSx}
             >
@@ -173,7 +170,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               label="Priority"
               select
               value={priority === "" ? "" : String(priority)}
-              onChange={(e) => setPriority(Number(e.target.value))}
+              onChange={(e) => dispatch(setAnnouncementDraft({ priority: Number(e.target.value) }))}
               fullWidth
               sx={sharedInputSx}
             >
@@ -188,7 +185,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               control={
                 <Switch
                   checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
+                  onChange={(e) => dispatch(setAnnouncementDraft({ isActive: e.target.checked }))}
                   color="primary"
                 />
               }
@@ -202,7 +199,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               label="Publish at"
               type="datetime-local"
               value={publishedAt}
-              onChange={(e) => setPublishedAt(e.target.value)}
+              onChange={(e) => dispatch(setAnnouncementDraft({ publishedAt: e.target.value }))}
               fullWidth
               InputLabelProps={{ shrink: true }}
               sx={sharedInputSx}
@@ -211,7 +208,7 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
               label="Expires at (optional)"
               type="datetime-local"
               value={expiresAt}
-              onChange={(e) => setExpiresAt(e.target.value)}
+              onChange={(e) => dispatch(setAnnouncementDraft({ expiresAt: e.target.value }))}
               fullWidth
               InputLabelProps={{ shrink: true }}
               sx={sharedInputSx}
@@ -249,17 +246,19 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
                     const file = e.target.files?.[0];
                     if (!file) return;
                     if (!file.type.startsWith("image/")) {
-                      setError("Please select an image file.");
+                      dispatch(setAnnouncementDraft({ error: "Please select an image file." }));
                       return;
                     }
                     const reader = new FileReader();
                     reader.onload = () => {
-                      setImageData(reader.result as string);
-                      setImageName(file.name);
-                      setError(null);
+                      dispatch(setAnnouncementDraft({
+                        imageData: reader.result as string,
+                        imageName: file.name,
+                        error: null,
+                      }));
                     };
                     reader.onerror = () => {
-                      setError("Failed to read image file.");
+                      dispatch(setAnnouncementDraft({ error: "Failed to read image file." }));
                     };
                     reader.readAsDataURL(file);
                   }}
@@ -299,26 +298,26 @@ export const AddAnnouncementDialog: React.FC<AddAnnouncementDialogProps> = ({
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
-        <PillButton
-          variant="contained"
-          onClick={() => {
-            if (!title.trim() || !body.trim()) {
-              setError("Title and body are required.");
+          <PillButton
+            variant="contained"
+            onClick={() => {
+              if (!title.trim() || !body.trim()) {
+              dispatch(setAnnouncementDraft({ error: "Title and body are required." }));
               return;
             }
             if (!imageData) {
-              setError("Image is required.");
+              dispatch(setAnnouncementDraft({ error: "Image is required." }));
               return;
             }
             if (publishedAt && Number.isNaN(new Date(publishedAt).getTime())) {
-              setError("Publish date is invalid.");
+              dispatch(setAnnouncementDraft({ error: "Publish date is invalid." }));
               return;
             }
             if (expiresAt && Number.isNaN(new Date(expiresAt).getTime())) {
-              setError("Expiry date is invalid.");
+              dispatch(setAnnouncementDraft({ error: "Expiry date is invalid." }));
               return;
             }
-            setError(null);
+            dispatch(setAnnouncementDraft({ error: null }));
             mutation.mutate();
           }}
           disabled={mutation.isPending || isSaveDisabled}

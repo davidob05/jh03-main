@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   Box,
   Chip,
@@ -15,6 +15,12 @@ import {
 import { Close, FileDownloadOutlined } from "@mui/icons-material";
 import { Panel } from "../Panel";
 import { PillButton } from "../PillButton";
+import {
+  resetExportInvigilatorDialogDraft,
+  setExportInvigilatorDialogDraft,
+  useAppDispatch,
+  useAppSelector,
+} from "../../state/store";
 
 export type InvigilatorExportRecipient = {
   id: number;
@@ -43,17 +49,16 @@ export const ExportInvigilatorTimetablesDialog: React.FC<ExportInvigilatorTimeta
   onClose,
   onExport,
 }) => {
-  const [onlyConfirmed, setOnlyConfirmed] = useState(false);
-  const [includeCancelled, setIncludeCancelled] = useState(false);
-  const [includeProvisions, setIncludeProvisions] = useState(false);
+  const dispatch = useAppDispatch();
+  const { onlyConfirmed, includeCancelled, includeProvisions } = useAppSelector(
+    (state) => state.adminTables.exportInvigilatorDialog
+  );
 
   useEffect(() => {
     if (!open) {
-      setOnlyConfirmed(false);
-      setIncludeCancelled(false);
-      setIncludeProvisions(false);
+      dispatch(resetExportInvigilatorDialogDraft());
     }
-  }, [open]);
+  }, [dispatch, open]);
 
   const recipientCount = invigilators.length;
   const exportType = recipientCount > 1 ? "ZIP" : "CSV";
@@ -128,7 +133,7 @@ export const ExportInvigilatorTimetablesDialog: React.FC<ExportInvigilatorTimeta
                   control={
                     <Switch
                       checked={onlyConfirmed}
-                      onChange={(e) => setOnlyConfirmed(e.target.checked)}
+                      onChange={(e) => dispatch(setExportInvigilatorDialogDraft({ onlyConfirmed: e.target.checked }))}
                       color="primary"
                     />
                   }
@@ -143,7 +148,7 @@ export const ExportInvigilatorTimetablesDialog: React.FC<ExportInvigilatorTimeta
                   control={
                     <Switch
                       checked={includeCancelled}
-                      onChange={(e) => setIncludeCancelled(e.target.checked)}
+                      onChange={(e) => dispatch(setExportInvigilatorDialogDraft({ includeCancelled: e.target.checked }))}
                       color="primary"
                     />
                   }
@@ -158,7 +163,7 @@ export const ExportInvigilatorTimetablesDialog: React.FC<ExportInvigilatorTimeta
                   control={
                     <Switch
                       checked={includeProvisions}
-                      onChange={(e) => setIncludeProvisions(e.target.checked)}
+                      onChange={(e) => dispatch(setExportInvigilatorDialogDraft({ includeProvisions: e.target.checked }))}
                       color="primary"
                     />
                   }

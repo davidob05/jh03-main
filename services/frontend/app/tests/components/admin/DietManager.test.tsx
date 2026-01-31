@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DietManager } from "@/components/admin/DietManager";
+import { Provider } from "react-redux";
+import { createStoreInstance } from "@/state/store";
 
 const apiFetchMock = vi.fn();
 
@@ -24,7 +26,12 @@ const diets = [
 
 const renderWithClient = (ui: React.ReactElement) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  const store = createStoreInstance();
+  return render(
+    <Provider store={store}>
+      <QueryClientProvider client={client}>{ui}</QueryClientProvider>
+    </Provider>
+  );
 };
 
 describe("DietManager", () => {
