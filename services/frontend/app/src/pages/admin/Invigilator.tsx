@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -35,6 +35,7 @@ import { EditInvigilatorDialog } from "../../components/admin/EditInvigilatorDia
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
+import { resetInvigilatorProfileUi, setInvigilatorProfileUi, useAppDispatch, useAppSelector } from "../../state/store";
 
 const formatDietLabel = (diet: Diet | { code: string; label?: string }) => {
   return (
@@ -113,26 +114,41 @@ const slotLabelMap: Record<string, string> = {
 const allowedSlots = new Set(Object.keys(slotLabelMap));
 
 export const AdminInvigilatorProfile: React.FC = () => {
-  const [availabilityView, setAvailabilityView] = useState<"list" | "calendar">("list");
-  const [availabilityLimit, setAvailabilityLimit] = useState(4);
-  const [selectedAvailabilityDate, setSelectedAvailabilityDate] = useState<Dayjs | null>(dayjs());
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [promoteOpen, setPromoteOpen] = useState(false);
-  const [promoteMode, setPromoteMode] = useState<"admin" | "senior">("admin");
-  const [promoting, setPromoting] = useState(false);
-  const [promoteError, setPromoteError] = useState<string | null>(null);
-  const [demoteOpen, setDemoteOpen] = useState(false);
-  const [demoting, setDemoting] = useState(false);
-  const [demoteError, setDemoteError] = useState<string | null>(null);
-  const [seniorDemoteOpen, setSeniorDemoteOpen] = useState(false);
-  const [seniorDemoting, setSeniorDemoting] = useState(false);
-  const [seniorDemoteError, setSeniorDemoteError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const invigilatorProfileUi = useAppSelector((state) => state.adminTables.invigilatorProfileUi);
+  const {
+    availabilityView,
+    availabilityLimit,
+    selectedAvailabilityDate,
+    editDialogOpen,
+    deleteOpen,
+    deleting,
+    successMessage,
+    successOpen,
+    promoteOpen,
+    promoteMode,
+    promoting,
+    promoteError,
+    demoteOpen,
+    demoting,
+    demoteError,
+    seniorDemoteOpen,
+    seniorDemoting,
+    seniorDemoteError,
+  } = invigilatorProfileUi;
   const { id } = useParams();
   const navigate = useNavigate();
+  const selectedAvailabilityDay = useMemo(
+    () => (selectedAvailabilityDate ? dayjs(selectedAvailabilityDate) : dayjs()),
+    [selectedAvailabilityDate]
+  );
+
+  useEffect(() => {
+    dispatch(resetInvigilatorProfileUi());
+    return () => {
+      dispatch(resetInvigilatorProfileUi());
+    };
+  }, [dispatch, id]);
 
   const { data: currentUser, isSuccess: currentUserLoaded } = useQuery({
     queryKey: ["me"],
@@ -255,104 +271,131 @@ export const AdminInvigilatorProfile: React.FC = () => {
   const handleDelete = async () => {
     if (!id) return;
     try {
-      setDeleting(true);
+      dispatch(setInvigilatorProfileUi({ deleting: true }));
       const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/`, { method: "DELETE" });
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || "Failed to delete invigilator");
       }
-      setSuccessMessage("Invigilator deleted successfully!");
-      setSuccessOpen(true);
+      dispatch(
+        setInvigilatorProfileUi({
+          successMessage: "Invigilator deleted successfully!",
+          successOpen: true,
+        })
+      );
       setTimeout(() => navigate("/admin/invigilators"), 400);
     } catch (err: any) {
       alert(err?.message || "Delete failed");
     } finally {
-      setDeleting(false);
-      setDeleteOpen(false);
+      dispatch(setInvigilatorProfileUi({ deleting: false, deleteOpen: false }));
     }
   };
 
   const handlePromote = async () => {
     if (!id) return;
     try {
-      setPromoting(true);
-      setPromoteError(null);
+      dispatch(setInvigilatorProfileUi({ promoting: true, promoteError: null }));
       const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/make-admin/`, { method: "POST" });
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || "Failed to promote invigilator to administrator.");
       }
-      setSuccessMessage("Invigilator promoted to administrator.");
-      setSuccessOpen(true);
+      dispatch(
+        setInvigilatorProfileUi({
+          successMessage: "Invigilator promoted to administrator.",
+          successOpen: true,
+        })
+      );
       await refetch();
     } catch (err: any) {
-      setPromoteError(err?.message || "Failed to promote invigilator to administrator.");
+      dispatch(
+        setInvigilatorProfileUi({
+          promoteError: err?.message || "Failed to promote invigilator to administrator.",
+        })
+      );
     } finally {
-      setPromoting(false);
-      setPromoteOpen(false);
+      dispatch(setInvigilatorProfileUi({ promoting: false, promoteOpen: false }));
     }
   };
 
   const handleDemote = async () => {
     if (!id) return;
     try {
-      setDemoting(true);
-      setDemoteError(null);
+      dispatch(setInvigilatorProfileUi({ demoting: true, demoteError: null }));
       const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/remove-admin/`, { method: "POST" });
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || "Failed to remove administrator privileges");
       }
-      setSuccessMessage("Administrator privileges removed.");
-      setSuccessOpen(true);
+      dispatch(
+        setInvigilatorProfileUi({
+          successMessage: "Administrator privileges removed.",
+          successOpen: true,
+        })
+      );
       await refetch();
     } catch (err: any) {
-      setDemoteError(err?.message || "Failed to remove administrator privileges.");
+      dispatch(
+        setInvigilatorProfileUi({
+          demoteError: err?.message || "Failed to remove administrator privileges.",
+        })
+      );
     } finally {
-      setDemoting(false);
-      setDemoteOpen(false);
+      dispatch(setInvigilatorProfileUi({ demoting: false, demoteOpen: false }));
     }
   };
 
   const handleSeniorPromote = async () => {
     if (!id) return;
     try {
-      setPromoting(true);
-      setPromoteError(null);
+      dispatch(setInvigilatorProfileUi({ promoting: true, promoteError: null }));
       const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/make-senior-admin/`, { method: "POST" });
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || "Failed to promote administrator to senior administrator.");
       }
-      setSuccessMessage("Administrator promoted to senior administrator.");
-      setSuccessOpen(true);
+      dispatch(
+        setInvigilatorProfileUi({
+          successMessage: "Administrator promoted to senior administrator.",
+          successOpen: true,
+        })
+      );
       await refetch();
     } catch (err: any) {
-      setPromoteError(err?.message || "Failed to promote administrator to senior administrator.");
+      dispatch(
+        setInvigilatorProfileUi({
+          promoteError: err?.message || "Failed to promote administrator to senior administrator.",
+        })
+      );
     } finally {
-      setPromoting(false);
-      setPromoteOpen(false);
+      dispatch(setInvigilatorProfileUi({ promoting: false, promoteOpen: false }));
     }
   };
 
   const handleSeniorDemote = async () => {
     if (!id) return;
     try {
-      setSeniorDemoting(true);
-      setSeniorDemoteError(null);
+      dispatch(setInvigilatorProfileUi({ seniorDemoting: true, seniorDemoteError: null }));
       const response = await apiFetch(`${apiBaseUrl}/invigilators/${id}/remove-senior-admin/`, { method: "POST" });
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || "Failed to remove senior administrator privileges.");
       }
-      setSuccessMessage("Senior administrator privileges removed.");
-      setSuccessOpen(true);
+      dispatch(
+        setInvigilatorProfileUi({
+          successMessage: "Senior administrator privileges removed.",
+          successOpen: true,
+        })
+      );
       await refetch();
     } catch (err: any) {
-      setSeniorDemoteError(err?.message || "Failed to remove senior administrator privileges.");
+      dispatch(
+        setInvigilatorProfileUi({
+          seniorDemoteError: err?.message || "Failed to remove senior administrator privileges.",
+        })
+      );
     } finally {
-      setSeniorDemoting(false);
-      setSeniorDemoteOpen(false);
+      dispatch(setInvigilatorProfileUi({ seniorDemoting: false, seniorDemoteOpen: false }));
     }
   };
 
@@ -407,12 +450,11 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 onClick={() => {
                   if (data.user_is_superuser) {
                     if (!canDemote) return;
-                    setDemoteOpen(true);
+                    dispatch(setInvigilatorProfileUi({ demoteOpen: true }));
                     return;
                   }
                   if (!canPromote) return;
-                  setPromoteMode("admin");
-                  setPromoteOpen(true);
+                  dispatch(setInvigilatorProfileUi({ promoteMode: "admin", promoteOpen: true }));
                 }}
                 disabled={promoting || demoting || data.user_is_senior_admin}
                 aria-disabled={data.user_is_superuser ? !canDemote || data.user_is_senior_admin : !canPromote}
@@ -442,12 +484,11 @@ export const AdminInvigilatorProfile: React.FC = () => {
                       onChange={(_, checked) => {
                         if (checked) {
                           if (!canSeniorPromote || promoting) return;
-                          setPromoteMode("senior");
-                          setPromoteOpen(true);
+                          dispatch(setInvigilatorProfileUi({ promoteMode: "senior", promoteOpen: true }));
                           return;
                         }
                         if (!canSeniorDemote || seniorDemoting) return;
-                        setSeniorDemoteOpen(true);
+                        dispatch(setInvigilatorProfileUi({ seniorDemoteOpen: true }));
                       }}
                       disabled={data.user_is_senior_admin ? seniorDemoting : (!canSeniorPromote || promoting)}
                       color="primary"
@@ -461,7 +502,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
             value={availabilityView}
             exclusive
             color="primary"
-            onChange={(_, v) => v && setAvailabilityView(v)}
+            onChange={(_, v) => v && dispatch(setInvigilatorProfileUi({ availabilityView: v }))}
           >
             <ToggleButton value="list">
               <GridView />
@@ -872,14 +913,20 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 <Box sx={{ mt: 2, display: "flex", gap: 1.5, justifyContent: "flex-end" }}>
                   <PillButton
                     variant="outlined"
-                    onClick={() => setAvailabilityLimit(4)}
+                    onClick={() => dispatch(setInvigilatorProfileUi({ availabilityLimit: 4 }))}
                     disabled={availabilityLimit <= 4}
                   >
                     Show less
                   </PillButton>
                   <PillButton
                     variant="contained"
-                    onClick={() => setAvailabilityLimit((prev) => Math.min(prev + 4, sortedAvailabilityEntries.length))}
+                    onClick={() =>
+                      dispatch(
+                        setInvigilatorProfileUi({
+                          availabilityLimit: Math.min(availabilityLimit + 4, sortedAvailabilityEntries.length),
+                        })
+                      )
+                    }
                     disabled={availabilityLimit >= sortedAvailabilityEntries.length}
                   >
                     {`Show ${Math.min(4, sortedAvailabilityEntries.length - availabilityLimit)} more`}
@@ -895,8 +942,14 @@ export const AdminInvigilatorProfile: React.FC = () => {
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <StaticDatePicker
                   displayStaticWrapperAs="desktop"
-                  value={selectedAvailabilityDate}
-                  onChange={(newValue) => setSelectedAvailabilityDate(newValue)}
+                  value={selectedAvailabilityDay}
+                  onChange={(newValue) =>
+                    dispatch(
+                      setInvigilatorProfileUi({
+                        selectedAvailabilityDate: (newValue ?? dayjs()).toISOString(),
+                      })
+                    )
+                  }
                   slots={{
                     toolbar: () => null,
                   }}
@@ -948,13 +1001,13 @@ export const AdminInvigilatorProfile: React.FC = () => {
                 />
               </LocalizationProvider>
 
-              {selectedAvailabilityDate && (
+              {selectedAvailabilityDay && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle1" fontWeight={600} mb={1}>
-                    {formatDateWithWeekday(selectedAvailabilityDate)}
+                    {formatDateWithWeekday(selectedAvailabilityDay)}
                   </Typography>
                   <Stack direction="row" spacing={1.5} flexWrap="wrap">
-                    {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).map((slot, i) => (
+                    {(availabilityByDate[selectedAvailabilityDay.format("YYYY-MM-DD")] || []).map((slot, i) => (
                       <Chip
                         key={i}
                         label={slotLabelMap[slot.slot] || slot.slot}
@@ -971,7 +1024,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
                         }}
                       />
                     ))}
-                    {(availabilityByDate[selectedAvailabilityDate.format("YYYY-MM-DD")] || []).length === 0 && (
+                    {(availabilityByDate[selectedAvailabilityDay.format("YYYY-MM-DD")] || []).length === 0 && (
                       <Typography variant="body2" color="text.secondary">
                         No availability recorded for this date.
                       </Typography>
@@ -1007,12 +1060,20 @@ export const AdminInvigilatorProfile: React.FC = () => {
         }}
       >
         <Tooltip title="Edit invigilator">
-          <Fab color="primary" aria-label="edit invigilator" onClick={() => setEditDialogOpen(true)}>
+          <Fab
+            color="primary"
+            aria-label="edit invigilator"
+            onClick={() => dispatch(setInvigilatorProfileUi({ editDialogOpen: true }))}
+          >
             <Edit />
           </Fab>
         </Tooltip>
         <Tooltip title="Delete invigilator">
-          <Fab color="error" aria-label="delete invigilator" onClick={() => setDeleteOpen(true)}>
+          <Fab
+            color="error"
+            aria-label="delete invigilator"
+            onClick={() => dispatch(setInvigilatorProfileUi({ deleteOpen: true }))}
+          >
             <DeleteIcon />
           </Fab>
         </Tooltip>
@@ -1021,12 +1082,16 @@ export const AdminInvigilatorProfile: React.FC = () => {
       <EditInvigilatorDialog
         open={editDialogOpen}
         invigilatorId={data.id}
-        onClose={() => setEditDialogOpen(false)}
+        onClose={() => dispatch(setInvigilatorProfileUi({ editDialogOpen: false }))}
         onSuccess={(name) => {
-          setSuccessMessage(`${name} updated successfully!`);
-          setSuccessOpen(true);
+          dispatch(
+            setInvigilatorProfileUi({
+              successMessage: `${name} updated successfully!`,
+              successOpen: true,
+              editDialogOpen: false,
+            })
+          );
           refetch();
-          setEditDialogOpen(false);
         }}
       />
       <DeleteConfirmationDialog
@@ -1036,7 +1101,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
         confirmText="Delete"
         loading={deleting}
         onClose={() => {
-          if (!deleting) setDeleteOpen(false);
+          if (!deleting) dispatch(setInvigilatorProfileUi({ deleteOpen: false }));
         }}
         onConfirm={handleDelete}
       />
@@ -1052,7 +1117,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
         destructive={false}
         loading={promoting}
         onClose={() => {
-          if (!promoting) setPromoteOpen(false);
+          if (!promoting) dispatch(setInvigilatorProfileUi({ promoteOpen: false }));
         }}
         onConfirm={promoteMode === "senior" ? handleSeniorPromote : handlePromote}
       />
@@ -1063,7 +1128,7 @@ export const AdminInvigilatorProfile: React.FC = () => {
         confirmText="Demote"
         loading={demoting}
         onClose={() => {
-          if (!demoting) setDemoteOpen(false);
+          if (!demoting) dispatch(setInvigilatorProfileUi({ demoteOpen: false }));
         }}
         onConfirm={handleDemote}
       />
@@ -1074,18 +1139,18 @@ export const AdminInvigilatorProfile: React.FC = () => {
         confirmText="Demote"
         loading={seniorDemoting}
         onClose={() => {
-          if (!seniorDemoting) setSeniorDemoteOpen(false);
+          if (!seniorDemoting) dispatch(setInvigilatorProfileUi({ seniorDemoteOpen: false }));
         }}
         onConfirm={handleSeniorDemote}
       />
       <Snackbar
         open={successOpen}
         autoHideDuration={3000}
-        onClose={() => setSuccessOpen(false)}
+        onClose={() => dispatch(setInvigilatorProfileUi({ successOpen: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setSuccessOpen(false)}
+          onClose={() => dispatch(setInvigilatorProfileUi({ successOpen: false }))}
           severity="success"
           variant="filled"
           sx={{

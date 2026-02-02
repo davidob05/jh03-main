@@ -245,6 +245,40 @@ type CalendarUi = {
   } | null;
 };
 
+type InvigilatorProfileUi = {
+  availabilityView: "list" | "calendar";
+  availabilityLimit: number;
+  selectedAvailabilityDate: string;
+  editDialogOpen: boolean;
+  deleteOpen: boolean;
+  deleting: boolean;
+  successMessage: string;
+  successOpen: boolean;
+  promoteOpen: boolean;
+  promoteMode: "admin" | "senior";
+  promoting: boolean;
+  promoteError: string | null;
+  demoteOpen: boolean;
+  demoting: boolean;
+  demoteError: string | null;
+  seniorDemoteOpen: boolean;
+  seniorDemoting: boolean;
+  seniorDemoteError: string | null;
+};
+
+type InvigilatorsPageUi = {
+  addOpen: boolean;
+  successOpen: boolean;
+  successMessage: string;
+  deleteOpen: boolean;
+  calendarModalOpen: boolean;
+  currentMonthIndex: number;
+  bulkAction: string;
+  exporting: boolean;
+  notifyOpen: boolean;
+  exportDialogOpen: boolean;
+};
+
 type ExamVenueDraft = {
   id: number | string;
   venue_name: string;
@@ -308,6 +342,8 @@ type AdminTableState = {
   venuePage: VenuePageUi;
   studentsPage: StudentsPageUi;
   calendarUi: CalendarUi;
+  invigilatorProfileUi: InvigilatorProfileUi;
+  invigilatorsPageUi: InvigilatorsPageUi;
   dashboard: DashboardPrefs;
 };
 
@@ -507,6 +543,38 @@ const initialState: AdminTableState = {
     popupOpen: false,
     selectedExam: null,
   },
+  invigilatorProfileUi: {
+    availabilityView: "list",
+    availabilityLimit: 4,
+    selectedAvailabilityDate: new Date().toISOString(),
+    editDialogOpen: false,
+    deleteOpen: false,
+    deleting: false,
+    successMessage: "",
+    successOpen: false,
+    promoteOpen: false,
+    promoteMode: "admin",
+    promoting: false,
+    promoteError: null,
+    demoteOpen: false,
+    demoting: false,
+    demoteError: null,
+    seniorDemoteOpen: false,
+    seniorDemoting: false,
+    seniorDemoteError: null,
+  },
+  invigilatorsPageUi: {
+    addOpen: false,
+    successOpen: false,
+    successMessage: "",
+    deleteOpen: false,
+    calendarModalOpen: false,
+    currentMonthIndex: 0,
+    bulkAction: "",
+    exporting: false,
+    notifyOpen: false,
+    exportDialogOpen: false,
+  },
   dashboard: {
     selectedSchool: "",
     notificationQuery: "",
@@ -701,6 +769,48 @@ const adminTablesSlice = createSlice({
     resetCalendarUi(state) {
       state.calendarUi = { popupOpen: false, selectedExam: null };
     },
+    setInvigilatorProfileUi(state, action: PayloadAction<Partial<InvigilatorProfileUi>>) {
+      Object.assign(state.invigilatorProfileUi, action.payload);
+    },
+    resetInvigilatorProfileUi(state) {
+      state.invigilatorProfileUi = {
+        availabilityView: "list",
+        availabilityLimit: 4,
+        selectedAvailabilityDate: new Date().toISOString(),
+        editDialogOpen: false,
+        deleteOpen: false,
+        deleting: false,
+        successMessage: "",
+        successOpen: false,
+        promoteOpen: false,
+        promoteMode: "admin",
+        promoting: false,
+        promoteError: null,
+        demoteOpen: false,
+        demoting: false,
+        demoteError: null,
+        seniorDemoteOpen: false,
+        seniorDemoting: false,
+        seniorDemoteError: null,
+      };
+    },
+    setInvigilatorsPageUi(state, action: PayloadAction<Partial<InvigilatorsPageUi>>) {
+      Object.assign(state.invigilatorsPageUi, action.payload);
+    },
+    resetInvigilatorsPageUi(state) {
+      state.invigilatorsPageUi = {
+        addOpen: false,
+        successOpen: false,
+        successMessage: "",
+        deleteOpen: false,
+        calendarModalOpen: false,
+        currentMonthIndex: 0,
+        bulkAction: "",
+        exporting: false,
+        notifyOpen: false,
+        exportDialogOpen: false,
+      };
+    },
     setAddExamDraft(state, action: PayloadAction<Partial<ExamDialogDraft>>) {
       Object.assign(state.examDialogs.add, action.payload);
     },
@@ -766,6 +876,10 @@ export const {
   resetStudentsPageUi,
   setCalendarUi,
   resetCalendarUi,
+  setInvigilatorProfileUi,
+  resetInvigilatorProfileUi,
+  setInvigilatorsPageUi,
+  resetInvigilatorsPageUi,
   setAddExamDraft,
   resetAddExamDraft,
   setEditExamDraft,

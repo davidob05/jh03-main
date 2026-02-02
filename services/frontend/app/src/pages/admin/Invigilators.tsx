@@ -68,7 +68,13 @@ import { formatMonthYear } from '../../utils/dates';
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { sharedInputSx } from "../../components/sharedInputSx";
-import { setInvigilatorsPrefs, useAppDispatch, useAppSelector } from "../../state/store";
+import {
+  resetInvigilatorsPageUi,
+  setInvigilatorsPageUi,
+  setInvigilatorsPrefs,
+  useAppDispatch,
+  useAppSelector,
+} from "../../state/store";
 
 interface Invigilator {
   id: number;
@@ -120,13 +126,18 @@ export const AdminInvigilators: React.FC = () => {
   const [invigilators, setInvigilators] = useState<Invigilator[]>([]);
   const [filtered, setFiltered] = useState<Invigilator[]>([]);
 
-  // Add Invigilator Dialog state
-  const [addOpen, setAddOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-
-  // Delete Invigilator Dialog state
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const {
+    addOpen,
+    successOpen,
+    successMessage,
+    deleteOpen,
+    calendarModalOpen,
+    currentMonthIndex,
+    bulkAction,
+    exporting,
+    notifyOpen,
+    exportDialogOpen,
+  } = useAppSelector((state) => state.adminTables.invigilatorsPageUi);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   
   const [searchParams, setSearchParams] = useSearchParams();
@@ -147,21 +158,18 @@ export const AdminInvigilators: React.FC = () => {
 
   // Calendar state
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
-  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
-
-  // Month index for calendar view
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
 
   // Selection state
   const [selected, setSelected] = useState<number[]>([]);
 
   const searchDraftInitialized = useRef(false);
 
-  // Bulk action state
-  const [bulkAction, setBulkAction] = useState("");
-  const [exporting, setExporting] = useState(false);
-  const [notifyOpen, setNotifyOpen] = useState(false);
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  useEffect(() => {
+    dispatch(resetInvigilatorsPageUi());
+    return () => {
+      dispatch(resetInvigilatorsPageUi());
+    };
+  }, [dispatch]);
 
   // Sync fetched data to state
   useEffect(() => {
@@ -285,15 +293,18 @@ export const AdminInvigilators: React.FC = () => {
     },
     onSuccess: async (_data, ids) => {
       const count = ids?.length ?? 0;
-      setSuccessMessage(
-        count === 1
-          ? "Invigilator account deleted!"
-          : `${count} invigilator accounts deleted!`
+      dispatch(
+        setInvigilatorsPageUi({
+          successMessage:
+            count === 1
+              ? "Invigilator account deleted!"
+              : `${count} invigilator accounts deleted!`,
+          successOpen: true,
+          deleteOpen: false,
+          bulkAction: "",
+        })
       );
-      setSuccessOpen(true);
       setSelected([]);
-      setBulkAction("");
-      setDeleteOpen(false);
       setDeleteError(null);
       await queryClient.invalidateQueries({ queryKey: ["invigilators"] });
     },
@@ -381,7 +392,7 @@ export const AdminInvigilators: React.FC = () => {
     includeProvisions: boolean;
   }) => {
     if (!selected.length || exporting) return;
-    setExporting(true);
+    dispatch(setInvigilatorsPageUi({ exporting: true }));
     try {
       const response = await apiFetch(`${apiBaseUrl}/invigilators/timetables/export/`, {
         method: "POST",
@@ -404,16 +415,19 @@ export const AdminInvigilators: React.FC = () => {
       const filename = extractFilename(response.headers.get("Content-Disposition"), fallbackName);
       downloadBlob(blob, filename);
 
-      setSuccessMessage(
-        selected.length === 1 ? "Timetable export downloaded." : "Timetables export downloaded."
+      dispatch(
+        setInvigilatorsPageUi({
+          successMessage:
+            selected.length === 1 ? "Timetable export downloaded." : "Timetables export downloaded.",
+          successOpen: true,
+          bulkAction: "",
+          exportDialogOpen: false,
+        })
       );
-      setSuccessOpen(true);
-      setBulkAction("");
-      setExportDialogOpen(false);
     } catch (err: any) {
       alert(err?.message || "Failed to export timetables");
     } finally {
-      setExporting(false);
+      dispatch(setInvigilatorsPageUi({ exporting: false }));
     }
   };
 
@@ -621,7 +635,7 @@ export const AdminInvigilators: React.FC = () => {
                       referenceDate={monthDate}
                       onChange={(newValue) => {
                         setSelectedDate(newValue);
-                        setCalendarModalOpen(true);
+                        dispatch(setInvigilatorsPageUi({ calendarModalOpen: true }));
                       }}
                       slots={{
                         toolbar: () => null,
@@ -674,7 +688,7 @@ export const AdminInvigilators: React.FC = () => {
               <PillButton
                 variant="contained"
                 startIcon={<ArrowBack />}
-                onClick={() => setCurrentMonthIndex(prev => prev - 1)}
+                onClick={() => dispatch(setInvigilatorsPageUi({ currentMonthIndex: currentMonthIndex - 1 }))}
                 size="large"
               >
                 Previous
@@ -682,7 +696,7 @@ export const AdminInvigilators: React.FC = () => {
               <PillButton
                 variant="contained"
                 endIcon={<ArrowForward />}
-                onClick={() => setCurrentMonthIndex(prev => prev + 1)}
+                onClick={() => dispatch(setInvigilatorsPageUi({ currentMonthIndex: currentMonthIndex + 1 }))}
                 size="large"
               >
                 Next
@@ -839,7 +853,7 @@ export const AdminInvigilators: React.FC = () => {
         {/* Calendar Modal */}
         <InvigilatorAvailabilityModal
           open={calendarModalOpen}
-          onClose={() => setCalendarModalOpen(false)}
+          onClose={() => dispatch(setInvigilatorsPageUi({ calendarModalOpen: false }))}
           date={selectedDate}
           invigilators={invigilators}
         />
@@ -862,7 +876,7 @@ export const AdminInvigilators: React.FC = () => {
                 label="With all selected users..."
                 value={bulkAction}
                 disabled={selected.length === 0}
-                onChange={(e) => setBulkAction(e.target.value)}
+                onChange={(e) => dispatch(setInvigilatorsPageUi({ bulkAction: e.target.value }))}
                 disableUnderline
               >
                 <MenuItem value="">
@@ -917,17 +931,17 @@ export const AdminInvigilators: React.FC = () => {
                   onClick={() => {
                     if (bulkAction === "delete") {
                       setDeleteError?.(null);
-                      setDeleteOpen(true);
+                      dispatch(setInvigilatorsPageUi({ deleteOpen: true }));
                       return;
                     }
 
                     if (bulkAction === "export") {
-                      setExportDialogOpen(true);
+                      dispatch(setInvigilatorsPageUi({ exportDialogOpen: true }));
                       return;
                     }
 
                     if (bulkAction === "notify") {
-                      setNotifyOpen(true);
+                      dispatch(setInvigilatorsPageUi({ notifyOpen: true }));
                       return;
                     }
                   }}
@@ -978,7 +992,7 @@ export const AdminInvigilators: React.FC = () => {
           <Fab
             color="primary"
             size="large"
-            onClick={() => setAddOpen(true)}
+            onClick={() => dispatch(setInvigilatorsPageUi({ addOpen: true }))}
             sx={{
               position: 'fixed',
               bottom: 32,
@@ -993,10 +1007,14 @@ export const AdminInvigilators: React.FC = () => {
         {/* Add Invigilator Dialog */}
         <AddInvigilatorDialog
           open={addOpen}
-          onClose={() => setAddOpen(false)}
+          onClose={() => dispatch(setInvigilatorsPageUi({ addOpen: false }))}
           onSuccess={(name) => {
-            setSuccessMessage(`${name} added successfully!`);
-            setSuccessOpen(true);
+            dispatch(
+              setInvigilatorsPageUi({
+                successMessage: `${name} added successfully!`,
+                successOpen: true,
+              })
+            );
           }}
         />
 
@@ -1004,18 +1022,20 @@ export const AdminInvigilators: React.FC = () => {
           open={notifyOpen}
           recipients={selectedRecipients}
           onClose={() => {
-            setNotifyOpen(false);
-            setBulkAction("");
+            dispatch(setInvigilatorsPageUi({ notifyOpen: false, bulkAction: "" }));
           }}
           onSent={(count) => {
-            setSuccessMessage(
-              count === 1
-                ? "Mail merge ready for 1 invigilator."
-                : `Mail merge ready for ${count} invigilators.`
+            dispatch(
+              setInvigilatorsPageUi({
+                successMessage:
+                  count === 1
+                    ? "Mail merge ready for 1 invigilator."
+                    : `Mail merge ready for ${count} invigilators.`,
+                successOpen: true,
+                notifyOpen: false,
+                bulkAction: "",
+              })
             );
-            setSuccessOpen(true);
-            setNotifyOpen(false);
-            setBulkAction("");
           }}
         />
 
@@ -1030,8 +1050,7 @@ export const AdminInvigilators: React.FC = () => {
           loading={exporting}
           onClose={() => {
             if (!exporting) {
-              setExportDialogOpen(false);
-              setBulkAction("");
+              dispatch(setInvigilatorsPageUi({ exportDialogOpen: false, bulkAction: "" }));
             }
           }}
           onExport={exportSelected}
@@ -1056,7 +1075,7 @@ export const AdminInvigilators: React.FC = () => {
           loading={bulkDeleteMutation.isPending}
           onClose={() => {
             if (!bulkDeleteMutation.isPending) {
-              setDeleteOpen(false);
+              dispatch(setInvigilatorsPageUi({ deleteOpen: false }));
               setDeleteError(null);
             }
           }}
@@ -1066,11 +1085,11 @@ export const AdminInvigilators: React.FC = () => {
         <Snackbar
           open={successOpen}
           autoHideDuration={3000}
-          onClose={() => setSuccessOpen(false)}
+          onClose={() => dispatch(setInvigilatorsPageUi({ successOpen: false }))}
           anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         >
           <Alert
-            onClose={() => setSuccessOpen(false)}
+            onClose={() => dispatch(setInvigilatorsPageUi({ successOpen: false }))}
             severity="success"
             variant="filled"
             sx={{
