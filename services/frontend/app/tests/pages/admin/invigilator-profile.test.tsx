@@ -27,7 +27,7 @@ const apiFetchMock = vi.fn();
 let currentUserIsSenior = false;
 let invigilatorIsSuperuser = false;
 
-vi.mock("@/utils/api", () => ({
+vi.mock("../../../src/utils/api", () => ({
   apiFetch: (...args: any[]) => apiFetchMock(...args),
   apiBaseUrl: "http://api.test",
 }));

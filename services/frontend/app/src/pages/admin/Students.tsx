@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import React, { useMemo, useEffect, useCallback, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -36,7 +36,7 @@ import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
-import { useAppDispatch, useAppSelector, setStudentsPrefs } from "../../state/store";
+import { useAppDispatch, useAppSelector, setStudentsPrefs, setStudentsPageUi } from "../../state/store";
 
 type StudentProvisionRow = {
   student_id: string;
@@ -185,9 +185,9 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
   studentName,
   examName,
 }) => {
+  const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
-  const [selectedVenueId, setSelectedVenueId] = useState<number | null>(currentExamVenueId ?? null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const { selectedVenueId, saveError } = useAppSelector((s) => s.adminTables.studentsPage);
 
   const { data, isLoading, isError, error } = useQuery<ExamDetailResponse, Error>({
     queryKey: ["exam-venues", examId],
@@ -198,9 +198,8 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
   useEffect(() => {
     if (!open) return;
     const defaultVenue = currentExamVenueId ?? data?.exam_venues?.[0]?.examvenue_id ?? null;
-    setSelectedVenueId(defaultVenue);
-    setSaveError(null);
-  }, [open, currentExamVenueId, data]);
+    dispatch(setStudentsPageUi({ selectedVenueId: defaultVenue, saveError: null }));
+  }, [dispatch, open, currentExamVenueId, data]);
 
   const mutation = useMutation<StudentProvisionRow, Error, number | null>({
     mutationFn: (venueId: number | null) => updateStudentExamVenue(studentExamId, venueId),
@@ -217,7 +216,7 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
       updateCache(["student-provisions", "unallocated"], true);
       onClose();
     },
-    onError: (err: any) => setSaveError(err?.message || "Failed to update venue"),
+    onError: (err: any) => dispatch(setStudentsPageUi({ saveError: err?.message || "Failed to update venue" })),
   });
 
   const venues = data?.exam_venues || [];
@@ -225,7 +224,7 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
   const capabilityLabels = (caps: string[] = []) => Array.from(new Set(caps.map(formatLabel)));
 
   const handleSave = () => {
-    setSaveError(null);
+    dispatch(setStudentsPageUi({ saveError: null }));
     mutation.mutate(selectedVenueId);
   };
 
@@ -271,12 +270,12 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
                   }}
                 >
                   <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                    <Radio
-                      checked={selected}
-                      onChange={() => setSelectedVenueId(v.examvenue_id)}
-                      value={v.examvenue_id}
-                      inputProps={{ "aria-label": v.venue_name || "Unassigned venue" }}
-                    />
+                      <Radio
+                        checked={selected}
+                        onChange={() => dispatch(setStudentsPageUi({ selectedVenueId: v.examvenue_id }))}
+                        value={v.examvenue_id}
+                        inputProps={{ "aria-label": v.venue_name || "Unassigned venue" }}
+                      />
                     <Box sx={{ flex: 1 }}>
                       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={0.5}>
                         <Typography variant="subtitle1" fontWeight={700}>
@@ -330,16 +329,11 @@ const StudentTableSection: React.FC<SectionProps> = ({
   searchDraft,
   onSearchDraftChange,
 }) => {
+  const dispatch = useAppDispatch();
   const rows = query.data || [];
   const rowKey = useCallback((row: StudentProvisionRow) => `${row.student_id}::${row.exam_id}`, []);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
-  const [venueDialog, setVenueDialog] = useState<VenueDialogState | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTargets, setDeleteTargets] = useState<StudentProvisionRow[]>([]);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const { selected, openRows, venueDialog, deleteOpen, deleteTargets, deleteError, page, rowsPerPage } =
+    useAppSelector((s) => s.adminTables.studentsPage);
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation<void, Error, StudentProvisionRow[]>({
@@ -350,13 +344,15 @@ const StudentTableSection: React.FC<SectionProps> = ({
     },
     onSuccess: (_data, targets) => {
       const deletedKeys = new Set(targets.map(rowKey));
-      setSelected((prev) => prev.filter((key) => !deletedKeys.has(key)));
-      setDeleteOpen(false);
-      setDeleteTargets([]);
-      setDeleteError(null);
+      dispatch(setStudentsPageUi({
+        selected: selected.filter((key) => !deletedKeys.has(key)),
+        deleteOpen: false,
+        deleteTargets: [],
+        deleteError: null,
+      }));
       queryClient.invalidateQueries({ queryKey: ["student-provisions"] });
     },
-    onError: (err: any) => setDeleteError(err?.message || "Delete failed"),
+    onError: (err: any) => dispatch(setStudentsPageUi({ deleteError: err?.message || "Delete failed" })),
   });
   const handleRequestSort = (_: React.MouseEvent<unknown>, property: keyof StudentProvisionRow) => {
     const isAsc = orderBy === property && order === "asc";
@@ -417,39 +413,53 @@ const StudentTableSection: React.FC<SectionProps> = ({
 
   useEffect(() => {
     const maxPage = Math.max(0, Math.ceil(sorted.length / rowsPerPage) - 1);
-    if (page > maxPage) setPage(maxPage);
-  }, [sorted.length, rowsPerPage, page]);
+    if (page > maxPage) dispatch(setStudentsPageUi({ page: maxPage }));
+  }, [dispatch, sorted.length, rowsPerPage, page]);
 
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSelected(event.target.checked ? allKeys : []);
+    dispatch(setStudentsPageUi({ selected: event.target.checked ? allKeys : [] }));
   };
 
   const handleRowSelect = (key: string) => {
-    setSelected((prev) => (prev.includes(key) ? prev.filter((value) => value !== key) : [...prev, key]));
+    dispatch(setStudentsPageUi({
+      selected: selected.includes(key)
+        ? selected.filter((value) => value !== key)
+        : [...selected, key],
+    }));
   };
 
   const openVenueDialogForRow = (row: StudentProvisionRow) => {
     if (!row.student_exam_id) return;
-    setVenueDialog({
-      studentExamId: row.student_exam_id,
-      examId: row.exam_id,
-      currentExamVenueId: row.exam_venue_id,
-      studentName: row.student_name,
-      examName: `${row.course_code} • ${row.exam_name}`,
-    });
+    dispatch(setStudentsPageUi({
+      venueDialog: {
+        studentExamId: row.student_exam_id,
+        examId: row.exam_id,
+        currentExamVenueId: row.exam_venue_id,
+        studentName: row.student_name,
+        examName: `${row.course_code} • ${row.exam_name}`,
+      },
+      selectedVenueId: row.exam_venue_id,
+      saveError: null,
+    }));
   };
 
   const openDeleteDialogForSelection = () => {
     const targets = selected.map((key) => rowMap.get(key)).filter(Boolean) as StudentProvisionRow[];
     if (!targets.length) return;
-    setDeleteTargets(targets);
-    setDeleteError(null);
-    setDeleteOpen(true);
+    dispatch(setStudentsPageUi({
+      deleteTargets: targets.map((row) => rowKey(row)),
+      deleteError: null,
+      deleteOpen: true,
+    }));
   };
 
-  const deleteCount = deleteTargets.length;
-  const deleteTarget = deleteTargets[0];
+  const deleteRows = useMemo(
+    () => deleteTargets.map((key) => rowMap.get(key)).filter(Boolean) as StudentProvisionRow[],
+    [deleteTargets, rowMap]
+  );
+  const deleteCount = deleteRows.length;
+  const deleteTarget = deleteRows[0];
 
   return (
     <Panel disableDivider sx={{ p: 0, overflow: "hidden" }}>
@@ -626,7 +636,14 @@ const StudentTableSection: React.FC<SectionProps> = ({
                       <TableCell align="center">
                         <IconButton
                           aria-label={isOpen ? "Collapse details" : "Expand details"}
-                          onClick={() => setOpenRows((prev) => ({ ...prev, [key]: !isOpen }))}
+                          onClick={() =>
+                            dispatch(setStudentsPageUi({
+                              openRows: {
+                                ...openRows,
+                                [key]: !isOpen,
+                              },
+                            }))
+                          }
                         >
                           <ExpandMoreIcon sx={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
                         </IconButton>
@@ -711,10 +728,12 @@ const StudentTableSection: React.FC<SectionProps> = ({
           count={sorted.length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={(_e, newPage) => setPage(newPage)}
+          onPageChange={(_e, newPage) => dispatch(setStudentsPageUi({ page: newPage }))}
           onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
+            dispatch(setStudentsPageUi({
+              rowsPerPage: parseInt(e.target.value, 10),
+              page: 0,
+            }));
           }}
         />
         </>
@@ -722,7 +741,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
       {venueDialog ? (
         <ChangeVenueDialog
           open
-          onClose={() => setVenueDialog(null)}
+          onClose={() => dispatch(setStudentsPageUi({ venueDialog: null, selectedVenueId: null, saveError: null }))}
           {...venueDialog}
         />
       ) : null}
@@ -755,13 +774,11 @@ const StudentTableSection: React.FC<SectionProps> = ({
         loading={deleteMutation.isPending}
         onClose={() => {
           if (!deleteMutation.isPending) {
-            setDeleteOpen(false);
-            setDeleteTargets([]);
-            setDeleteError(null);
+            dispatch(setStudentsPageUi({ deleteOpen: false, deleteTargets: [], deleteError: null }));
           }
         }}
         onConfirm={() => {
-          if (deleteTargets.length) deleteMutation.mutate(deleteTargets);
+          if (deleteRows.length) deleteMutation.mutate(deleteRows);
         }}
       />
     </Panel>

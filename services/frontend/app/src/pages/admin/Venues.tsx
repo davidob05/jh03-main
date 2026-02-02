@@ -39,7 +39,7 @@ import { DeleteConfirmationDialog } from '../../components/admin/DeleteConfirmat
 import { PillButton } from '../../components/PillButton';
 import { Panel } from '../../components/Panel';
 import { VENUE_TYPES } from '../../components/admin/venueTypes';
-import { useAppDispatch, useAppSelector, setVenuesPrefs } from '../../state/store';
+import { useAppDispatch, useAppSelector, setVenuesPrefs, setVenuesPageUi } from '../../state/store';
 import { sharedInputSx } from "../../components/sharedInputSx";
 
 interface ExamVenueData {
@@ -300,6 +300,17 @@ export const AdminVenues: React.FC = () => {
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
   const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery, searchDraft } = useAppSelector((s) => s.adminTables.venues);
+  const {
+    addOpen,
+    deleteOpen,
+    deleteTargets,
+    deleteError,
+    successOpen,
+    successMessage,
+    errorMessage,
+    venueTypeOverrides,
+    updatingVenueIds,
+  } = useAppSelector((s) => s.adminTables.venuesPage);
   const allowedSortKeys = ['name', 'capacity', 'type', 'accessibility', 'provisionCapabilities'] as const;
   type VenueSortKey = typeof allowedSortKeys[number];
   const orderBy: VenueSortKey = allowedSortKeys.includes(rawOrderBy as VenueSortKey)
@@ -307,15 +318,6 @@ export const AdminVenues: React.FC = () => {
     : 'name';
   const [selected, setSelected] = React.useState<readonly string[]>([]);
   const [openRows, setOpenRows] = React.useState<Record<string, boolean>>({});
-  const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [deleteTargets, setDeleteTargets] = React.useState<string[]>([]);
-  const [deleteError, setDeleteError] = React.useState<string | null>(null);
-  const [addOpen, setAddOpen] = React.useState(false);
-  const [successOpen, setSuccessOpen] = React.useState(false);
-  const [successMessage, setSuccessMessage] = React.useState('');
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const [venueTypeOverrides, setVenueTypeOverrides] = React.useState<Record<string, string>>({});
-  const [updatingVenueIds, setUpdatingVenueIds] = React.useState<Record<string, boolean>>({});
   const searchDraftInitialized = React.useRef(false);
   React.useEffect(() => {
     if (searchDraftInitialized.current) return;
@@ -370,35 +372,43 @@ export const AdminVenues: React.FC = () => {
       return res.json();
     },
     onMutate: (payload) => {
-      setUpdatingVenueIds((prev) => ({ ...prev, [payload.venueName]: true }));
+      dispatch(setVenuesPageUi({
+        updatingVenueIds: {
+          ...updatingVenueIds,
+          [payload.venueName]: true,
+        },
+      }));
     },
     onSuccess: (_data, payload) => {
-      setSuccessMessage(`Updated venue type for ${payload.venueName}.`);
-      setSuccessOpen(true);
+      dispatch(setVenuesPageUi({
+        successMessage: `Updated venue type for ${payload.venueName}.`,
+        successOpen: true,
+      }));
       queryClient.invalidateQueries({ queryKey: ['venues'] });
       queryClient.invalidateQueries({ queryKey: ['venue', payload.venueName] });
     },
     onError: (err: any, payload) => {
       if (payload?.venueName) {
         if (payload.previousType) {
-          setVenueTypeOverrides((prev) => ({ ...prev, [payload.venueName]: payload.previousType }));
+          dispatch(setVenuesPageUi({
+            venueTypeOverrides: {
+              ...venueTypeOverrides,
+              [payload.venueName]: payload.previousType,
+            },
+          }));
         } else {
-          setVenueTypeOverrides((prev) => {
-            const next = { ...prev };
-            delete next[payload.venueName];
-            return next;
-          });
+          const next = { ...venueTypeOverrides };
+          delete next[payload.venueName];
+          dispatch(setVenuesPageUi({ venueTypeOverrides: next }));
         }
       }
-      setErrorMessage(err?.message || "Failed to update venue type.");
+      dispatch(setVenuesPageUi({ errorMessage: err?.message || "Failed to update venue type." }));
     },
     onSettled: (_data, _error, payload) => {
       if (payload?.venueName) {
-        setUpdatingVenueIds((prev) => {
-          const next = { ...prev };
-          delete next[payload.venueName];
-          return next;
-        });
+        const next = { ...updatingVenueIds };
+        delete next[payload.venueName];
+        dispatch(setVenuesPageUi({ updatingVenueIds: next }));
       }
     },
   });
@@ -418,15 +428,17 @@ export const AdminVenues: React.FC = () => {
     },
     onSuccess: async (_data, ids) => {
       setSelected([]);
-      setDeleteOpen(false);
-      setDeleteTargets([]);
-      setDeleteError(null);
-      setSuccessMessage(`Deleted ${ids.length} venue${ids.length === 1 ? "" : "s"}.`);
-      setSuccessOpen(true);
+      dispatch(setVenuesPageUi({
+        deleteOpen: false,
+        deleteTargets: [],
+        deleteError: null,
+        successMessage: `Deleted ${ids.length} venue${ids.length === 1 ? "" : "s"}.`,
+        successOpen: true,
+      }));
       await queryClient.invalidateQueries({ queryKey: ['venues'] });
     },
     onError: (err: any) => {
-      setDeleteError(err?.message || "Failed to delete venues.");
+      dispatch(setVenuesPageUi({ deleteError: err?.message || "Failed to delete venues." }));
     },
   });
 
@@ -470,7 +482,12 @@ export const AdminVenues: React.FC = () => {
 
   const handleVenueTypeChange = (venueName: string, nextType: string, currentType: string) => {
     if (!nextType || nextType === currentType) return;
-    setVenueTypeOverrides((prev) => ({ ...prev, [venueName]: nextType }));
+    dispatch(setVenuesPageUi({
+      venueTypeOverrides: {
+        ...venueTypeOverrides,
+        [venueName]: nextType,
+      },
+    }));
     updateVenueTypeMutation.mutate({
       venueName,
       venueType: nextType,
@@ -480,9 +497,11 @@ export const AdminVenues: React.FC = () => {
 
   const openDeleteDialogForSelection = () => {
     if (!selected.length) return;
-    setDeleteTargets([...selected]);
-    setDeleteError(null);
-    setDeleteOpen(true);
+    dispatch(setVenuesPageUi({
+      deleteTargets: [...selected],
+      deleteError: null,
+      deleteOpen: true,
+    }));
   };
 
   const deleteCount = deleteTargets.length;
@@ -590,7 +609,7 @@ export const AdminVenues: React.FC = () => {
             const trimmed = searchDraft.trim();
             dispatch(setVenuesPrefs({ searchQuery: trimmed, searchDraft: trimmed, page: 0 }));
           }}
-          onAddVenue={() => setAddOpen(true)}
+          onAddVenue={() => dispatch(setVenuesPageUi({ addOpen: true }))}
           onDeleteSelected={openDeleteDialogForSelection}
           deleteLoading={bulkDeleteMutation.isPending}
         />
@@ -749,12 +768,14 @@ export const AdminVenues: React.FC = () => {
       </Panel>
       <AddVenueDialog
         open={addOpen}
-        onClose={() => setAddOpen(false)}
+        onClose={() => dispatch(setVenuesPageUi({ addOpen: false }))}
         onSuccess={(name) => {
-          setSuccessMessage(`${name} added successfully!`);
-          setSuccessOpen(true);
+          dispatch(setVenuesPageUi({
+            successMessage: `${name} added successfully!`,
+            successOpen: true,
+            addOpen: false,
+          }));
           queryClient.invalidateQueries({ queryKey: ['venues'] });
-          setAddOpen(false);
         }}
       />
       <DeleteConfirmationDialog
@@ -783,9 +804,7 @@ export const AdminVenues: React.FC = () => {
         loading={bulkDeleteMutation.isPending}
         onClose={() => {
           if (!bulkDeleteMutation.isPending) {
-            setDeleteOpen(false);
-            setDeleteTargets([]);
-            setDeleteError(null);
+            dispatch(setVenuesPageUi({ deleteOpen: false, deleteTargets: [], deleteError: null }));
           }
         }}
         onConfirm={() => {
@@ -795,11 +814,11 @@ export const AdminVenues: React.FC = () => {
       <Snackbar
         open={successOpen}
         autoHideDuration={3000}
-        onClose={() => setSuccessOpen(false)}
+        onClose={() => dispatch(setVenuesPageUi({ successOpen: false }))}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
         <Alert
-          onClose={() => setSuccessOpen(false)}
+          onClose={() => dispatch(setVenuesPageUi({ successOpen: false }))}
           severity="success"
           variant="filled"
           sx={{
@@ -816,16 +835,20 @@ export const AdminVenues: React.FC = () => {
       <Snackbar
         open={Boolean(errorMessage)}
         autoHideDuration={4000}
-        onClose={() => setErrorMessage(null)}
+        onClose={() => dispatch(setVenuesPageUi({ errorMessage: null }))}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert severity="error" onClose={() => setErrorMessage(null)} variant="filled">
+        <Alert
+          severity="error"
+          onClose={() => dispatch(setVenuesPageUi({ errorMessage: null }))}
+          variant="filled"
+        >
           {errorMessage}
         </Alert>
       </Snackbar>
       <Fab
         color="primary"
-        onClick={() => setAddOpen(true)}
+        onClick={() => dispatch(setVenuesPageUi({ addOpen: true }))}
         sx={{
           position: 'fixed',
           bottom: 32,

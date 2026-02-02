@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useContext, useRef } from "react";
+import React, { useMemo, useEffect, useContext, useRef } from "react";
 import {
   Box,
   Typography,
@@ -29,7 +29,7 @@ import { ExamDetailsPopup } from "../../components/admin/ExamDetailsPopup";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
-import { useAppDispatch, useAppSelector, setCalendarPrefs, store, createStoreInstance } from "../../state/store";
+import { useAppDispatch, useAppSelector, setCalendarPrefs, setCalendarUi, createStoreInstance } from "../../state/store";
 import { sharedInputSx } from "../../components/sharedInputSx";
 import { Provider, ReactReduxContext } from "react-redux";
 
@@ -150,12 +150,11 @@ const minutesSinceMidnight = (dateTime: string) => {
 const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchEnabled }) => {
   const dispatch = useAppDispatch();
   const { viewMode, currentDate: currentDateIso, searchQuery, searchDraft, page } = useAppSelector((s) => s.adminTables.calendar);
+  const { popupOpen, selectedExam } = useAppSelector((s) => s.adminTables.calendarUi);
   const currentDate = useMemo(() => {
     const d = new Date(currentDateIso);
     return Number.isNaN(d.getTime()) ? new Date() : d;
   }, [currentDateIso]);
-  const [popupOpen, setPopupOpen] = useState(false);
-  const [selectedExam, setSelectedExam] = useState<ExamDetails | null>(null);
   const itemsPerPage = 6;
 
   const fallbackExams = initialExams ?? examData;
@@ -208,8 +207,7 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
   const totalPages = Math.ceil(examsToday.length / itemsPerPage);
 
   const handleExamClick = (exam: ExamDetails) => {
-    setSelectedExam(exam);
-    setPopupOpen(true);
+    dispatch(setCalendarUi({ selectedExam: exam, popupOpen: true }));
   };
 
   // Group exams by main venue for timeline
@@ -634,7 +632,7 @@ const AdminCalendarInner: React.FC<AdminCalendarProps> = ({ initialExams, fetchE
 
       <ExamDetailsPopup
         open={popupOpen}
-        onClose={() => setPopupOpen(false)}
+        onClose={() => dispatch(setCalendarUi({ popupOpen: false }))}
         exam={selectedExam}
         departmentColors={departmentColors}
       />

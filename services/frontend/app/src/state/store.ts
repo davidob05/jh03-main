@@ -171,6 +171,80 @@ type AddExamUi = {
   snackbarOpen: boolean;
 };
 
+type VenuesPageUi = {
+  addOpen: boolean;
+  deleteOpen: boolean;
+  deleteTargets: string[];
+  deleteError: string | null;
+  successOpen: boolean;
+  successMessage: string;
+  errorMessage: string | null;
+  venueTypeOverrides: Record<string, string>;
+  updatingVenueIds: Record<string, boolean>;
+};
+
+type VenuePageExam = {
+  code: string;
+  subject: string;
+  department?: string;
+  mainVenue: string;
+  mainStartTime: string;
+  mainEndTime: string;
+  venues: {
+    venue: string;
+    startTime: string;
+    endTime: string;
+    students?: number;
+    invigilators?: number;
+  }[];
+};
+
+type VenuePageUi = {
+  editOpen: boolean;
+  popupOpen: boolean;
+  selectedExam: VenuePageExam | null;
+  visibleCount: number;
+  successOpen: boolean;
+  successMessage: string;
+  deleteOpen: boolean;
+  deleting: boolean;
+};
+
+type StudentsVenueDialogState = {
+  studentExamId: number;
+  examId: number;
+  currentExamVenueId: number | null;
+  studentName: string;
+  examName: string;
+};
+
+type StudentsPageUi = {
+  selected: string[];
+  openRows: Record<string, boolean>;
+  venueDialog: StudentsVenueDialogState | null;
+  deleteOpen: boolean;
+  deleteTargets: string[];
+  deleteError: string | null;
+  page: number;
+  rowsPerPage: number;
+  selectedVenueId: number | null;
+  saveError: string | null;
+};
+
+type CalendarUi = {
+  popupOpen: boolean;
+  selectedExam: {
+    id: number;
+    code: string;
+    subject: string;
+    department: string;
+    mainVenue: string;
+    mainStartTime: string;
+    mainEndTime: string;
+    venues: { venue: string; startTime: string; endTime: string; students?: number; invigilators?: number }[];
+  } | null;
+};
+
 type ExamVenueDraft = {
   id: number | string;
   venue_name: string;
@@ -230,6 +304,10 @@ type AdminTableState = {
   examsPage: ExamsPageUi;
   examPage: ExamPageUi;
   addExamUi: AddExamUi;
+  venuesPage: VenuesPageUi;
+  venuePage: VenuePageUi;
+  studentsPage: StudentsPageUi;
+  calendarUi: CalendarUi;
   dashboard: DashboardPrefs;
 };
 
@@ -392,6 +470,43 @@ const initialState: AdminTableState = {
   addExamUi: {
     snackbarOpen: false,
   },
+  venuesPage: {
+    addOpen: false,
+    deleteOpen: false,
+    deleteTargets: [],
+    deleteError: null,
+    successOpen: false,
+    successMessage: "",
+    errorMessage: null,
+    venueTypeOverrides: {},
+    updatingVenueIds: {},
+  },
+  venuePage: {
+    editOpen: false,
+    popupOpen: false,
+    selectedExam: null,
+    visibleCount: 4,
+    successOpen: false,
+    successMessage: "",
+    deleteOpen: false,
+    deleting: false,
+  },
+  studentsPage: {
+    selected: [],
+    openRows: {},
+    venueDialog: null,
+    deleteOpen: false,
+    deleteTargets: [],
+    deleteError: null,
+    page: 0,
+    rowsPerPage: 10,
+    selectedVenueId: null,
+    saveError: null,
+  },
+  calendarUi: {
+    popupOpen: false,
+    selectedExam: null,
+  },
   dashboard: {
     selectedSchool: "",
     notificationQuery: "",
@@ -532,6 +647,60 @@ const adminTablesSlice = createSlice({
     setAddExamUi(state, action: PayloadAction<Partial<AddExamUi>>) {
       Object.assign(state.addExamUi, action.payload);
     },
+    setVenuesPageUi(state, action: PayloadAction<Partial<VenuesPageUi>>) {
+      Object.assign(state.venuesPage, action.payload);
+    },
+    resetVenuesPageUi(state) {
+      state.venuesPage = {
+        addOpen: false,
+        deleteOpen: false,
+        deleteTargets: [],
+        deleteError: null,
+        successOpen: false,
+        successMessage: "",
+        errorMessage: null,
+        venueTypeOverrides: {},
+        updatingVenueIds: {},
+      };
+    },
+    setVenuePageUi(state, action: PayloadAction<Partial<VenuePageUi>>) {
+      Object.assign(state.venuePage, action.payload);
+    },
+    resetVenuePageUi(state) {
+      state.venuePage = {
+        editOpen: false,
+        popupOpen: false,
+        selectedExam: null,
+        visibleCount: 4,
+        successOpen: false,
+        successMessage: "",
+        deleteOpen: false,
+        deleting: false,
+      };
+    },
+    setStudentsPageUi(state, action: PayloadAction<Partial<StudentsPageUi>>) {
+      Object.assign(state.studentsPage, action.payload);
+    },
+    resetStudentsPageUi(state) {
+      state.studentsPage = {
+        selected: [],
+        openRows: {},
+        venueDialog: null,
+        deleteOpen: false,
+        deleteTargets: [],
+        deleteError: null,
+        page: 0,
+        rowsPerPage: 10,
+        selectedVenueId: null,
+        saveError: null,
+      };
+    },
+    setCalendarUi(state, action: PayloadAction<Partial<CalendarUi>>) {
+      Object.assign(state.calendarUi, action.payload);
+    },
+    resetCalendarUi(state) {
+      state.calendarUi = { popupOpen: false, selectedExam: null };
+    },
     setAddExamDraft(state, action: PayloadAction<Partial<ExamDialogDraft>>) {
       Object.assign(state.examDialogs.add, action.payload);
     },
@@ -589,6 +758,14 @@ export const {
   setExamPageUi,
   resetExamPageUi,
   setAddExamUi,
+  setVenuesPageUi,
+  resetVenuesPageUi,
+  setVenuePageUi,
+  resetVenuePageUi,
+  setStudentsPageUi,
+  resetStudentsPageUi,
+  setCalendarUi,
+  resetCalendarUi,
   setAddExamDraft,
   resetAddExamDraft,
   setEditExamDraft,

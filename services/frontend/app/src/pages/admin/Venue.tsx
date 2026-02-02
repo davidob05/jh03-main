@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import {
   Box,
   Paper,
@@ -24,6 +24,7 @@ import { ExamDetailsPopup, ExamDetails as PopupExamDetails, ExamVenueInfo as Pop
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
+import { resetVenuePageUi, setVenuePageUi, useAppDispatch, useAppSelector } from "../../state/store";
 
 interface ExamVenueData {
   exam_name: string;
@@ -78,14 +79,24 @@ export const AdminVenuePage: React.FC = () => {
   const { venueId } = useParams();
   const venueKey = venueId ? decodeURIComponent(venueId) : "";
   const navigate = useNavigate();
-  const [editOpen, setEditOpen] = useState(false);
-  const [popupOpen, setPopupOpen] = useState(false);
-  const [selectedExam, setSelectedExam] = useState<PopupExamDetails | null>(null);
-  const [visibleCount, setVisibleCount] = useState(4);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const dispatch = useAppDispatch();
+  const {
+    editOpen,
+    popupOpen,
+    selectedExam,
+    visibleCount,
+    successOpen,
+    successMessage,
+    deleteOpen,
+    deleting,
+  } = useAppSelector((state) => state.adminTables.venuePage);
+
+  useEffect(() => {
+    dispatch(resetVenuePageUi());
+    return () => {
+      dispatch(resetVenuePageUi());
+    };
+  }, [dispatch, venueKey]);
 
   const { data, isLoading, isError, error, refetch } = useQuery<VenueData>({
     queryKey: ["venue", venueKey],
@@ -123,27 +134,28 @@ export const AdminVenuePage: React.FC = () => {
       venues: [venueInfo],
     };
 
-    setSelectedExam(popupExam);
-    setPopupOpen(true);
+    dispatch(setVenuePageUi({ selectedExam: popupExam, popupOpen: true }));
   };
 
   const handleDelete = async () => {
     if (!venueKey) return;
     try {
-      setDeleting(true);
+      dispatch(setVenuePageUi({ deleting: true }));
       const res = await apiFetch(`${apiBaseUrl}/venues/${encodeURIComponent(venueKey)}/`, { method: "DELETE" });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || "Delete failed");
       }
-      setSuccessMessage(`${venueKey} deleted successfully!`);
-      setSuccessOpen(true);
-      setDeleteOpen(false);
+      dispatch(setVenuePageUi({
+        successMessage: `${venueKey} deleted successfully!`,
+        successOpen: true,
+        deleteOpen: false,
+      }));
       setTimeout(() => navigate("/admin/venues"), 400);
     } catch (err: any) {
       alert(err?.message || "Delete failed");
     } finally {
-      setDeleting(false);
+      dispatch(setVenuePageUi({ deleting: false }));
     }
   };
 
@@ -275,14 +287,16 @@ export const AdminVenuePage: React.FC = () => {
             <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, mt: 3 }}>
               <PillButton
                 variant="outlined"
-                onClick={() => setVisibleCount(4)}
+                onClick={() => dispatch(setVenuePageUi({ visibleCount: 4 }))}
                 disabled={visibleCount <= 4}
               >
                 Show less
               </PillButton>
               <PillButton
                 variant="contained"
-                onClick={() => setVisibleCount((prev) => Math.min(prev + 4, examCount))}
+                onClick={() =>
+                  dispatch(setVenuePageUi({ visibleCount: Math.min(visibleCount + 4, examCount) }))
+                }
                 disabled={visibleCount >= examCount}
               >
                 {examCount - visibleCount <= 0 ? "No more exams to show" : `Show ${Math.min(4, examCount - visibleCount)} more`}
@@ -304,12 +318,12 @@ export const AdminVenuePage: React.FC = () => {
         }}
       >
         <Tooltip title="Edit venue">
-          <Fab color="primary" onClick={() => setEditOpen(true)}>
+          <Fab color="primary" onClick={() => dispatch(setVenuePageUi({ editOpen: true }))}>
             <Edit />
           </Fab>
         </Tooltip>
         <Tooltip title="Delete venue">
-          <Fab color="error" onClick={() => setDeleteOpen(true)}>
+          <Fab color="error" onClick={() => dispatch(setVenuePageUi({ deleteOpen: true }))}>
             <Delete />
           </Fab>
         </Tooltip>
@@ -318,18 +332,20 @@ export const AdminVenuePage: React.FC = () => {
       <EditVenueDialog
         open={editOpen}
         venueId={venueKey || null}
-        onClose={() => setEditOpen(false)}
+        onClose={() => dispatch(setVenuePageUi({ editOpen: false }))}
         onSuccess={(name?: string) => {
-          setSuccessMessage(`${name || venueKey} updated successfully!`);
-          setSuccessOpen(true);
-          setEditOpen(false);
+          dispatch(setVenuePageUi({
+            successMessage: `${name || venueKey} updated successfully!`,
+            successOpen: true,
+            editOpen: false,
+          }));
           refetch();
         }}
       />
 
       <ExamDetailsPopup
         open={popupOpen}
-        onClose={() => setPopupOpen(false)}
+        onClose={() => dispatch(setVenuePageUi({ popupOpen: false }))}
         exam={selectedExam}
       />
 
@@ -340,7 +356,7 @@ export const AdminVenuePage: React.FC = () => {
         confirmText="Delete"
         loading={deleting}
         onClose={() => {
-          if (!deleting) setDeleteOpen(false);
+          if (!deleting) dispatch(setVenuePageUi({ deleteOpen: false }));
         }}
         onConfirm={handleDelete}
       />
@@ -348,11 +364,11 @@ export const AdminVenuePage: React.FC = () => {
       <Snackbar
         open={successOpen}
         autoHideDuration={3000}
-        onClose={() => setSuccessOpen(false)}
+        onClose={() => dispatch(setVenuePageUi({ successOpen: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setSuccessOpen(false)}
+          onClose={() => dispatch(setVenuePageUi({ successOpen: false }))}
           severity="success"
           variant="filled"
           sx={{
