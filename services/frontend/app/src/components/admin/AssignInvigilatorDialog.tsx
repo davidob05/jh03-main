@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -170,8 +170,8 @@ const AssignInvigilatorDialogBody: React.FC<{
   const onlyAvailable = draft?.onlyAvailable ?? true;
   const expandedIds = useMemo(() => new Set(draft?.expandedIds ?? []), [draft?.expandedIds]);
   const assignmentInputs = draft?.assignmentInputs ?? {};
-  const [error, setError] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const error = draft?.error ?? null;
+  const snackbar = draft?.snackbar ?? { open: false, message: "" };
   const queryClient = useQueryClient();
 
   const assignedAssignments = useMemo(() => {
@@ -210,6 +210,8 @@ const AssignInvigilatorDialogBody: React.FC<{
     onlyAvailable: boolean;
     expandedIds: number[];
     assignmentInputs: Record<number, { start: string; end: string; role: string }>;
+    error: string | null;
+    snackbar: { open: boolean; message: string };
     initialized?: boolean;
   }>) => {
     if (!examVenue) return;
@@ -250,7 +252,7 @@ const AssignInvigilatorDialogBody: React.FC<{
       })(),
       initialized: true,
     });
-    setError(null);
+    updateDraft({ error: null });
   }, [assignedAssignments, draft?.initialized, examVenue, examWindow, invigilators, open]);
 
   useEffect(() => {
@@ -442,7 +444,9 @@ const AssignInvigilatorDialogBody: React.FC<{
       onClose();
     },
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to update invigilator assignments.");
+      updateDraft({
+        error: err instanceof Error ? err.message : "Failed to update invigilator assignments.",
+      });
     },
   });
 
@@ -474,13 +478,17 @@ const AssignInvigilatorDialogBody: React.FC<{
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
       onAssigned?.();
-      setSnackbar({
-        open: true,
-        message: vars.action === "approve" ? "Cancellation approved." : "Cancellation rejected.",
+      updateDraft({
+        snackbar: {
+          open: true,
+          message: vars.action === "approve" ? "Cancellation approved." : "Cancellation rejected.",
+        },
       });
     },
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to update cancellation status.");
+      updateDraft({
+        error: err instanceof Error ? err.message : "Failed to update cancellation status.",
+      });
     },
   });
 
@@ -500,10 +508,12 @@ const AssignInvigilatorDialogBody: React.FC<{
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invigilator-assignments"] });
       onAssigned?.();
-      setSnackbar({ open: true, message: "Shift confirmed." });
+      updateDraft({ snackbar: { open: true, message: "Shift confirmed." } });
     },
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to confirm assignment.");
+      updateDraft({
+        error: err instanceof Error ? err.message : "Failed to confirm assignment.",
+      });
     },
   });
 
@@ -1002,11 +1012,11 @@ const AssignInvigilatorDialogBody: React.FC<{
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
-        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        onClose={() => updateDraft({ snackbar: { ...snackbar, open: false } })}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          onClose={() => updateDraft({ snackbar: { ...snackbar, open: false } })}
           severity="success"
           variant="filled"
           sx={{

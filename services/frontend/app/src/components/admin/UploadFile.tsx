@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef } from "react";
 import {
   Box,
   CircularProgress,
@@ -20,8 +20,8 @@ import { setUploadFileDraft, useAppDispatch, useAppSelector } from "../../state/
 
 export const UploadFile: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { uploadType, uploading, snackbar } = useAppSelector((state) => state.adminTables.uploadFile);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const { uploadType, selectedFileName, uploading, snackbar } = useAppSelector((state) => state.adminTables.uploadFile);
+  const selectedFileRef = useRef<File | null>(null);
 
   const apiMap: Record<string, string> = {
     exam: "/exams-upload",
@@ -38,8 +38,8 @@ export const UploadFile: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      dispatch(setUploadFileDraft({ snackbar: { type: null, message: "" } }));
+      selectedFileRef.current = file;
+      dispatch(setUploadFileDraft({ selectedFileName: file.name, snackbar: { type: null, message: "" } }));
     }
   };
 
@@ -48,7 +48,7 @@ export const UploadFile: React.FC = () => {
       dispatch(setUploadFileDraft({ snackbar: { type: "error", message: "Please select a file type." } }));
       return;
     }
-    if (!selectedFile) {
+    if (!selectedFileRef.current) {
       dispatch(setUploadFileDraft({ snackbar: { type: "error", message: "Please select a file first." } }));
       return;
     }
@@ -57,7 +57,7 @@ export const UploadFile: React.FC = () => {
 
     try {
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("file", selectedFileRef.current);
 
       const response = await apiFetch(apiBaseUrl + apiMap[uploadType], {
         method: "POST",
@@ -86,11 +86,12 @@ export const UploadFile: React.FC = () => {
       dispatch(setUploadFileDraft({
         snackbar: {
           type: "success",
-          message: `Upload complete: ${typeLabel} (${selectedFile.name}). ${parts.join(", ")}.`,
+          message: `Upload complete: ${typeLabel} (${selectedFileRef.current?.name || "file"}). ${parts.join(", ")}.`,
         },
       }));
 
-      setSelectedFile(null);
+      selectedFileRef.current = null;
+      dispatch(setUploadFileDraft({ selectedFileName: "" }));
       const fileInput = document.getElementById("file-upload") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
     } catch (err) {
@@ -168,10 +169,10 @@ export const UploadFile: React.FC = () => {
               onChange={handleFileChange}
             />
           </PillButton>
-          {selectedFile && (
+          {selectedFileName && (
             <Chip
               icon={<InsertDriveFile fontSize="small" />}
-              label={selectedFile.name}
+              label={selectedFileName}
               sx={{ maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" } }}
             />
           )}
@@ -181,7 +182,7 @@ export const UploadFile: React.FC = () => {
           variant="contained"
           color="primary"
           onClick={handleUpload}
-          disabled={!uploadType || !selectedFile || uploading}
+          disabled={!uploadType || !selectedFileName || uploading}
           startIcon={uploading ? <CircularProgress size={20} /> : <UploadIcon />}
           sx={{ width: "100%", minHeight: 46 }}
         >

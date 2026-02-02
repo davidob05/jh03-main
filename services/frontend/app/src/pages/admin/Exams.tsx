@@ -248,14 +248,13 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onSear
 export const AdminExams: React.FC = () => {
   const dispatch = useAppDispatch();
   const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery, searchDraft } = useAppSelector((s) => s.adminTables.exams);
-  const { addOpen, deleteOpen, deleteTargetIds, deleteError } = useAppSelector((s) => s.adminTables.examsPage);
+  const { addOpen, deleteOpen, deleteTargetIds, deleteError, selectedIds, openRows } = useAppSelector((s) => s.adminTables.examsPage);
   const allowedSortKeys = ['code', 'subject', 'coreVenue', 'startTime', 'endTime'] as const;
   type ExamSortKey = typeof allowedSortKeys[number];
   const orderBy: ExamSortKey = allowedSortKeys.includes(rawOrderBy as ExamSortKey)
     ? (rawOrderBy as ExamSortKey)
     : 'code';
-  const [selected, setSelected] = React.useState<readonly number[]>([]);
-  const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
+  const selected = selectedIds;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const searchDraftInitialized = React.useRef(false);
@@ -313,7 +312,7 @@ export const AdminExams: React.FC = () => {
       }
     },
     onSuccess: async (_data, ids) => {
-      setSelected((prev) => prev.filter((id) => !ids.includes(id)));
+      dispatch(setExamsPageUi({ selectedIds: selected.filter((id) => !ids.includes(id)) }));
       dispatch(setExamsPageUi({ deleteOpen: false, deleteTargetIds: [], deleteError: null }));
       await Promise.all([
         refetch(),
@@ -337,7 +336,7 @@ export const AdminExams: React.FC = () => {
   }, [examsData]);
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSelected(event.target.checked ? rows.map((n) => n.id) : []);
+    dispatch(setExamsPageUi({ selectedIds: event.target.checked ? rows.map((n) => n.id) : [] }));
   };
 
   const handleRequestSort = (event: React.MouseEvent<unknown>, property: keyof RowData) => {
@@ -352,7 +351,7 @@ export const AdminExams: React.FC = () => {
     else if (selectedIndex === 0) newSelected = newSelected.concat(selected.slice(1));
     else if (selectedIndex === selected.length - 1) newSelected = newSelected.concat(selected.slice(0, -1));
     else if (selectedIndex > 0) newSelected = newSelected.concat(selected.slice(0, selectedIndex), selected.slice(selectedIndex + 1));
-    setSelected(newSelected);
+    dispatch(setExamsPageUi({ selectedIds: [...newSelected] }));
   };
 
   const handleChangePage = (_event: unknown, newPage: number) => dispatch(setExamsPrefs({ page: newPage }));
@@ -501,7 +500,19 @@ export const AdminExams: React.FC = () => {
                         <TableCell>{formatDateTime(row.endTime)}</TableCell>
                         <TableCell>{row.duration}</TableCell>
                         <TableCell align="center">
-                          <IconButton aria-label={isOpen ? 'Collapse exam venues' : 'Expand exam venues'} onClick={() => setOpenRows((prev) => ({ ...prev, [row.id]: !prev[row.id] }))}>
+                          <IconButton
+                            aria-label={isOpen ? 'Collapse exam venues' : 'Expand exam venues'}
+                            onClick={() =>
+                              dispatch(
+                                setExamsPageUi({
+                                  openRows: {
+                                    ...openRows,
+                                    [row.id]: !openRows[row.id],
+                                  },
+                                })
+                              )
+                            }
+                          >
                             <ExpandMoreIcon sx={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
                           </IconButton>
                         </TableCell>

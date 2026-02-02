@@ -58,6 +58,8 @@ type AssignInvigilatorDraft = {
   onlyAvailable: boolean;
   expandedIds: number[];
   assignmentInputs: Record<number, AssignInvigilatorInputs>;
+  error: string | null;
+  snackbar: { open: boolean; message: string };
   initialized?: boolean;
 };
 
@@ -134,6 +136,7 @@ type DietManagerDraft = {
 
 type UploadFileDraft = {
   uploadType: string;
+  selectedFileName: string;
   uploading: boolean;
   snackbar: { type: "success" | "error" | null; message: string };
 };
@@ -155,6 +158,8 @@ type ExamsPageUi = {
   deleteOpen: boolean;
   deleteTargetIds: number[];
   deleteError: string | null;
+  selectedIds: number[];
+  openRows: Record<number, boolean>;
 };
 
 type ExamPageUi = {
@@ -181,6 +186,8 @@ type VenuesPageUi = {
   errorMessage: string | null;
   venueTypeOverrides: Record<string, string>;
   updatingVenueIds: Record<string, boolean>;
+  selectedIds: string[];
+  openRows: Record<string, boolean>;
 };
 
 type VenuePageExam = {
@@ -271,12 +278,15 @@ type InvigilatorsPageUi = {
   successOpen: boolean;
   successMessage: string;
   deleteOpen: boolean;
+  deleteError: string | null;
   calendarModalOpen: boolean;
   currentMonthIndex: number;
   bulkAction: string;
   exporting: boolean;
   notifyOpen: boolean;
   exportDialogOpen: boolean;
+  selectedIds: number[];
+  selectedDate: string | null;
 };
 
 type ExamVenueDraft = {
@@ -510,6 +520,7 @@ const initialState: AdminTableState = {
   },
   uploadFile: {
     uploadType: "",
+    selectedFileName: "",
     uploading: false,
     snackbar: { type: null, message: "" },
   },
@@ -528,6 +539,8 @@ const initialState: AdminTableState = {
     deleteOpen: false,
     deleteTargetIds: [],
     deleteError: null,
+    selectedIds: [],
+    openRows: {},
   },
   examPage: {
     editOpen: false,
@@ -551,6 +564,8 @@ const initialState: AdminTableState = {
     errorMessage: null,
     venueTypeOverrides: {},
     updatingVenueIds: {},
+    selectedIds: [],
+    openRows: {},
   },
   venuePage: {
     editOpen: false,
@@ -603,12 +618,15 @@ const initialState: AdminTableState = {
     successOpen: false,
     successMessage: "",
     deleteOpen: false,
+    deleteError: null,
     calendarModalOpen: false,
     currentMonthIndex: 0,
     bulkAction: "",
     exporting: false,
     notifyOpen: false,
     exportDialogOpen: false,
+    selectedIds: [],
+    selectedDate: null,
   },
   dashboard: {
     selectedSchool: "",
@@ -680,6 +698,8 @@ const adminTablesSlice = createSlice({
           onlyAvailable: true,
           expandedIds: [],
           assignmentInputs: {},
+          error: null,
+          snackbar: { open: false, message: "" },
         }),
         ...draft,
       };
@@ -762,6 +782,8 @@ const adminTablesSlice = createSlice({
         deleteOpen: false,
         deleteTargetIds: [],
         deleteError: null,
+        selectedIds: [],
+        openRows: {},
       };
     },
     setExamPageUi(state, action: PayloadAction<Partial<ExamPageUi>>) {
@@ -795,6 +817,8 @@ const adminTablesSlice = createSlice({
         errorMessage: null,
         venueTypeOverrides: {},
         updatingVenueIds: {},
+        selectedIds: [],
+        openRows: {},
       };
     },
     setVenuePageUi(state, action: PayloadAction<Partial<VenuePageUi>>) {
@@ -869,12 +893,15 @@ const adminTablesSlice = createSlice({
         successOpen: false,
         successMessage: "",
         deleteOpen: false,
+        deleteError: null,
         calendarModalOpen: false,
         currentMonthIndex: 0,
         bulkAction: "",
         exporting: false,
         notifyOpen: false,
         exportDialogOpen: false,
+        selectedIds: [],
+        selectedDate: null,
       };
     },
     setAddExamDraft(state, action: PayloadAction<Partial<ExamDialogDraft>>) {

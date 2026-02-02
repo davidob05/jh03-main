@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -157,7 +157,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
   const mainLength = draft?.mainLength ?? "";
   const mainProvisions = draft?.mainProvisions ?? [];
   const extraVenues = draft?.extraVenues ?? [];
-  const [initialExtraIds, setInitialExtraIds] = useState<Set<number>>(new Set());
+  const initialExtraIdsRef = useRef<Set<number>>(new Set());
 
   const updateDraft = (updates: Partial<{
     name: string;
@@ -267,7 +267,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
     });
 
     const extras = (exam.exam_venues || []).filter((ev) => !coreVenue || ev.examvenue_id !== coreVenue.examvenue_id);
-    setInitialExtraIds(new Set(extras.map((ev) => ev.examvenue_id)));
+    initialExtraIdsRef.current = new Set(extras.map((ev) => ev.examvenue_id));
     updateDraft({
       extraVenues:
       extras.map((ev) => ({
@@ -283,7 +283,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
   useEffect(() => {
     if (!open || !isCreate) return;
     dispatch(resetAddExamDraft());
-    setInitialExtraIds(new Set());
+    initialExtraIdsRef.current = new Set();
   }, [dispatch, isCreate, open]);
 
   useEffect(() => {
@@ -436,7 +436,7 @@ export const EditExamDialog: React.FC<Props> = ({ open, examId, onClose, onSucce
 
       // Extras: create/update/delete non-core venues
       const currentIds = new Set(extraVenues.filter((v) => typeof v.id === "number").map((v) => v.id as number));
-      const toDelete = Array.from(initialExtraIds).filter((id) => !currentIds.has(id));
+      const toDelete = Array.from(initialExtraIdsRef.current).filter((id) => !currentIds.has(id));
 
       for (const id of toDelete) {
         const delRes = await apiFetch(`${apiBaseUrl}/exam-venues/${id}/`, { method: "DELETE" });

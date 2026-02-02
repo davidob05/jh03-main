@@ -310,14 +310,15 @@ export const AdminVenues: React.FC = () => {
     errorMessage,
     venueTypeOverrides,
     updatingVenueIds,
+    selectedIds,
+    openRows,
   } = useAppSelector((s) => s.adminTables.venuesPage);
   const allowedSortKeys = ['name', 'capacity', 'type', 'accessibility', 'provisionCapabilities'] as const;
   type VenueSortKey = typeof allowedSortKeys[number];
   const orderBy: VenueSortKey = allowedSortKeys.includes(rawOrderBy as VenueSortKey)
     ? (rawOrderBy as VenueSortKey)
     : 'name';
-  const [selected, setSelected] = React.useState<readonly string[]>([]);
-  const [openRows, setOpenRows] = React.useState<Record<string, boolean>>({});
+  const selected = selectedIds;
   const searchDraftInitialized = React.useRef(false);
   React.useEffect(() => {
     if (searchDraftInitialized.current) return;
@@ -427,7 +428,7 @@ export const AdminVenues: React.FC = () => {
       return true;
     },
     onSuccess: async (_data, ids) => {
-      setSelected([]);
+      dispatch(setVenuesPageUi({ selectedIds: [] }));
       dispatch(setVenuesPageUi({
         deleteOpen: false,
         deleteTargets: [],
@@ -444,10 +445,10 @@ export const AdminVenues: React.FC = () => {
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      setSelected(rows.map((n) => n.id));
+      dispatch(setVenuesPageUi({ selectedIds: rows.map((n) => n.id) }));
       return;
     }
-    setSelected([]);
+    dispatch(setVenuesPageUi({ selectedIds: [] }));
   };
 
   const handleRequestSort = (_event: React.MouseEvent<unknown>, property: keyof RowData) => {
@@ -469,7 +470,7 @@ export const AdminVenues: React.FC = () => {
         selected.slice(selectedIndex + 1),
       );
 
-    setSelected(newSelected);
+    dispatch(setVenuesPageUi({ selectedIds: [...newSelected] }));
   };
 
   const handleSearchChange = (q: string) => {
@@ -679,10 +680,14 @@ export const AdminVenues: React.FC = () => {
                       <TableCell align="center">
                         <IconButton
                           onClick={() =>
-                            setOpenRows((prev) => ({
-                              ...prev,
-                              [row.id]: !prev[row.id],
-                            }))
+                            dispatch(
+                              setVenuesPageUi({
+                                openRows: {
+                                  ...openRows,
+                                  [row.id]: !openRows[row.id],
+                                },
+                              })
+                            )
                           }
                         >
                           <ExpandMoreIcon

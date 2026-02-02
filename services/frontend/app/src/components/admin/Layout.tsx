@@ -1,5 +1,5 @@
 import { AppBar, Toolbar, Box, Button, Avatar, IconButton, Tooltip, Menu, MenuItem, Divider, Typography } from "@mui/material";
-import React from "react";
+import React, { useRef } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { apiBaseUrl, apiFetch, clearAuthSession, getStoredUser } from "../../utils/api";
 import { setAdminLayoutUi, useAppDispatch, useAppSelector } from "../../state/store";
@@ -9,7 +9,7 @@ export const AdminLayout: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { accountMenuOpen } = useAppSelector((state) => state.adminTables.adminLayoutUi);
-  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const menuAnchorRef = useRef<HTMLElement | null>(null);
 
   const menuItems = [
     { text: "Home", path: "/admin" },
@@ -32,11 +32,11 @@ export const AdminLayout: React.FC = () => {
   };
 
   const openMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setMenuAnchor(event.currentTarget);
+    menuAnchorRef.current = event.currentTarget;
     dispatch(setAdminLayoutUi({ accountMenuOpen: true }));
   };
   const closeMenu = () => {
-    setMenuAnchor(null);
+    menuAnchorRef.current = null;
     dispatch(setAdminLayoutUi({ accountMenuOpen: false }));
   };
 
@@ -92,8 +92,8 @@ export const AdminLayout: React.FC = () => {
                 </IconButton>
               </Tooltip>
               <Menu
-                anchorEl={menuAnchor}
-                open={accountMenuOpen}
+                anchorEl={menuAnchorRef.current}
+                open={accountMenuOpen && Boolean(menuAnchorRef.current)}
                 onClose={closeMenu}
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "top", horizontal: "right" }}

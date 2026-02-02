@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -132,8 +132,6 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
   const restrictions = draft?.restrictions ?? [];
   const resigned = draft?.resigned ?? false;
   const availabilityDiets = draft?.availabilityDiets ?? [];
-  const [dietOptions, setDietOptions] = useState<{ code: string; label: string; is_active?: boolean }[]>([]);
-
   const toggleArrayValue = (current: string[], value: string) =>
     current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
 
@@ -156,7 +154,7 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
     },
   });
 
-  useEffect(() => {
+  const dietOptions = useMemo(() => {
     const base = (diets || []).map((d) => ({
       code: d.code,
       label: formatDietLabel(d),
@@ -166,8 +164,8 @@ export const EditInvigilatorDialog: React.FC<EditInvigilatorDialogProps> = ({
       data?.restrictions
         ?.map((r) => ({ code: r.diet, label: r.diet.replace(/_/g, " "), is_active: true }))
         .filter((r) => !base.some((b) => b.code === r.code)) || [];
-    setDietOptions([...base, ...extras]);
-  }, [diets, data?.restrictions]);
+    return [...base, ...extras];
+  }, [data?.restrictions, diets]);
 
   useEffect(() => {
     if (!data) return;

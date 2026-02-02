@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from "react-router-dom";
 import { Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -123,22 +123,23 @@ type NotifyMethod = 'email' | 'sms' | 'call';
 export const AdminInvigilators: React.FC = () => {
   const dispatch = useAppDispatch();
   const { data: invigilatorsData = [], isLoading, isError, error } = useQuery<Invigilator[], Error>({ queryKey: ['invigilators'], queryFn: fetchInvigilators });
-  const [invigilators, setInvigilators] = useState<Invigilator[]>([]);
-  const [filtered, setFiltered] = useState<Invigilator[]>([]);
+  const invigilators = useMemo(() => invigilatorsData, [invigilatorsData]);
 
   const {
     addOpen,
     successOpen,
     successMessage,
     deleteOpen,
+    deleteError,
     calendarModalOpen,
     currentMonthIndex,
     bulkAction,
     exporting,
     notifyOpen,
     exportDialogOpen,
+    selectedIds,
+    selectedDate,
   } = useAppSelector((state) => state.adminTables.invigilatorsPageUi);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   const [searchParams, setSearchParams] = useSearchParams();
   const viewParam = searchParams.get("view") as ViewMode | null;
@@ -156,11 +157,10 @@ export const AdminInvigilators: React.FC = () => {
 
   const itemsPerPage = viewMode === 'grid' ? 12 : 10;
 
-  // Calendar state
-  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+  const selectedDateValue = selectedDate ? dayjs(selectedDate) : null;
 
   // Selection state
-  const [selected, setSelected] = useState<number[]>([]);
+  const selected = selectedIds;
 
   const searchDraftInitialized = useRef(false);
 
@@ -170,12 +170,6 @@ export const AdminInvigilators: React.FC = () => {
       dispatch(resetInvigilatorsPageUi());
     };
   }, [dispatch]);
-
-  // Sync fetched data to state
-  useEffect(() => {
-    setInvigilators(invigilatorsData);
-    setFiltered(invigilatorsData);
-  }, [invigilatorsData]);
 
   useEffect(() => {
     if (viewParam && viewParam !== viewMode) {
@@ -222,7 +216,7 @@ export const AdminInvigilators: React.FC = () => {
   };
 
   // Filtering logic
-  useEffect(() => {
+  const filtered = useMemo(() => {
     let result = invigilators;
 
     if (firstLetter !== 'All') {
@@ -254,9 +248,12 @@ export const AdminInvigilators: React.FC = () => {
     // Sort after filtering
     result = sortInvigilators(result);
 
-    setFiltered(result);
+    return result;
+  }, [firstLetter, lastLetter, invigilators, sortField, sortOrder, searchQuery]);
+
+  useEffect(() => {
     dispatch(setInvigilatorsPrefs({ page: 1 }));
-  }, [dispatch, firstLetter, lastLetter, invigilators, sortField, sortOrder, searchQuery]);
+  }, [dispatch, firstLetter, lastLetter, sortField, sortOrder, searchQuery, invigilatorsData]);
 
   // Sorting function
   const sortInvigilators = (data: Invigilator[]) => {
@@ -304,12 +301,11 @@ export const AdminInvigilators: React.FC = () => {
           bulkAction: "",
         })
       );
-      setSelected([]);
-      setDeleteError(null);
+      dispatch(setInvigilatorsPageUi({ selectedIds: [], deleteError: null }));
       await queryClient.invalidateQueries({ queryKey: ["invigilators"] });
     },
     onError: (err: any) => {
-      setDeleteError(err?.message || "Delete failed");
+      dispatch(setInvigilatorsPageUi({ deleteError: err?.message || "Delete failed" }));
     },
   });
 
@@ -323,16 +319,16 @@ export const AdminInvigilators: React.FC = () => {
 
   // Toggle selection of an invigilator
   const toggleSelect = (id: number) => {
-    setSelected(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    dispatch(setInvigilatorsPageUi({
+      selectedIds: selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id],
+    }));
   };
 
   const toggleSelectAll = () => {
     if (selected.length === filtered.length) {
-      setSelected([]);
+      dispatch(setInvigilatorsPageUi({ selectedIds: [] }));
     } else {
-      setSelected(filtered.map(i => i.id));
+      dispatch(setInvigilatorsPageUi({ selectedIds: filtered.map(i => i.id) }));
     }
   };
 
@@ -634,8 +630,12 @@ export const AdminInvigilators: React.FC = () => {
                       value={null}
                       referenceDate={monthDate}
                       onChange={(newValue) => {
-                        setSelectedDate(newValue);
-                        dispatch(setInvigilatorsPageUi({ calendarModalOpen: true }));
+                        dispatch(
+                          setInvigilatorsPageUi({
+                            selectedDate: newValue ? newValue.toISOString() : null,
+                            calendarModalOpen: true,
+                          })
+                        );
                       }}
                       slots={{
                         toolbar: () => null,
@@ -854,7 +854,7 @@ export const AdminInvigilators: React.FC = () => {
         <InvigilatorAvailabilityModal
           open={calendarModalOpen}
           onClose={() => dispatch(setInvigilatorsPageUi({ calendarModalOpen: false }))}
-          date={selectedDate}
+          date={selectedDateValue}
           invigilators={invigilators}
         />
 
@@ -930,7 +930,7 @@ export const AdminInvigilators: React.FC = () => {
                   disabled={selected.length === 0 || !bulkAction || exporting}
                   onClick={() => {
                     if (bulkAction === "delete") {
-                      setDeleteError?.(null);
+                      dispatch(setInvigilatorsPageUi({ deleteError: null }));
                       dispatch(setInvigilatorsPageUi({ deleteOpen: true }));
                       return;
                     }
@@ -1076,7 +1076,7 @@ export const AdminInvigilators: React.FC = () => {
           onClose={() => {
             if (!bulkDeleteMutation.isPending) {
               dispatch(setInvigilatorsPageUi({ deleteOpen: false }));
-              setDeleteError(null);
+              dispatch(setInvigilatorsPageUi({ deleteError: null }));
             }
           }}
           onConfirm={() => bulkDeleteMutation.mutate(selected)}
