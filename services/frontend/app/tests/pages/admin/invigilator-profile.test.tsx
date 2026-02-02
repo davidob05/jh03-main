@@ -57,7 +57,8 @@ const invigilatorResponse = {
 
 const renderPage = (opts: { isSeniorAdmin?: boolean; seedMeCache?: boolean } = {}) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  if (opts.seedMeCache && opts.isSeniorAdmin) {
+  const shouldSeed = opts.seedMeCache ?? Boolean(opts.isSeniorAdmin);
+  if (shouldSeed && opts.isSeniorAdmin) {
     client.setQueryData(["me"], { is_senior_admin: true });
   }
   currentUserIsSenior = Boolean(opts.isSeniorAdmin);

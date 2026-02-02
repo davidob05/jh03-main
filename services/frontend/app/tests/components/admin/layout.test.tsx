@@ -2,10 +2,21 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "@/components/admin/Layout";
 import { setAuthSession, clearAuthSession } from "@/utils/api";
+import { Provider } from "react-redux";
+import { createStoreInstance } from "@/state/store";
 
 describe("Components - AdminLayout", () => {
-  const renderLayout = (initialPath = "/admin") =>
+  const renderWithStore = (ui: React.ReactElement) => {
+    const store = createStoreInstance();
     render(
+      <Provider store={store}>
+        {ui}
+      </Provider>
+    );
+  };
+
+  const renderLayout = (initialPath = "/admin") =>
+    renderWithStore(
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
           <Route path="/admin/*" element={<AdminLayout />}>
@@ -52,7 +63,7 @@ describe("Components - AdminLayout", () => {
   });
 
   it ("renders children in the outlet", () => {
-    render(
+    renderWithStore(
       <MemoryRouter initialEntries={["/admin"]}>
         <Routes>
           <Route path="/admin" element={<AdminLayout />}>

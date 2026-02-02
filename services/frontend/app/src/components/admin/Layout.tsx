@@ -1,12 +1,15 @@
 import { AppBar, Toolbar, Box, Button, Avatar, IconButton, Tooltip, Menu, MenuItem, Divider, Typography } from "@mui/material";
-import React, { useState } from "react";
+import React from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { apiBaseUrl, apiFetch, clearAuthSession, getStoredUser } from "../../utils/api";
+import { setAdminLayoutUi, useAppDispatch, useAppSelector } from "../../state/store";
 
 export const AdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const dispatch = useAppDispatch();
+  const { accountMenuOpen } = useAppSelector((state) => state.adminTables.adminLayoutUi);
+  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null);
 
   const menuItems = [
     { text: "Home", path: "/admin" },
@@ -28,8 +31,14 @@ export const AdminLayout: React.FC = () => {
     }
   };
 
-  const openMenu = (event: React.MouseEvent<HTMLElement>) => setMenuAnchor(event.currentTarget);
-  const closeMenu = () => setMenuAnchor(null);
+  const openMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setMenuAnchor(event.currentTarget);
+    dispatch(setAdminLayoutUi({ accountMenuOpen: true }));
+  };
+  const closeMenu = () => {
+    setMenuAnchor(null);
+    dispatch(setAdminLayoutUi({ accountMenuOpen: false }));
+  };
 
   const user = getStoredUser();
   const displayName = user?.username || user?.email || "User";
@@ -84,7 +93,7 @@ export const AdminLayout: React.FC = () => {
               </Tooltip>
               <Menu
                 anchorEl={menuAnchor}
-                open={Boolean(menuAnchor)}
+                open={accountMenuOpen}
                 onClose={closeMenu}
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "top", horizontal: "right" }}

@@ -312,6 +312,39 @@ type DashboardPrefs = {
   notificationQuery: string;
   selectedNotificationType: string | null;
   selectedInvigilatorId: number | null;
+  visibleCount: number;
+  announcementDialogOpen: boolean;
+  announcementSnackbar: { open: boolean; message: string };
+  exportSnackbar: { open: boolean; message: string };
+  activeAnnouncementIndex: number;
+  exporting: boolean;
+  bulkExporting: boolean;
+};
+
+type AdminProfileUi = {
+  name: string;
+  email: string;
+  phone: string;
+  photoPreview: string | null;
+  avatarData: string | null;
+  confirmRemoveOpen: boolean;
+  showPhotoSave: boolean;
+  snackbar: { open: boolean; message: string; severity: "success" | "error" };
+  lastUpdated: string;
+  lastLogin: string | null;
+  deleteAccountOpen: boolean;
+  darkMode: boolean;
+  notifications: boolean;
+  notifyEmail: "instant" | "daily" | "off";
+  notifySms: boolean;
+  notifyPush: boolean;
+  passwords: { current: string; next: string; confirm: string };
+  showPasswords: boolean;
+  extraSessionsToShow: number;
+};
+
+type AdminLayoutUi = {
+  accountMenuOpen: boolean;
 };
 
 type AdminTableState = {
@@ -345,6 +378,8 @@ type AdminTableState = {
   invigilatorProfileUi: InvigilatorProfileUi;
   invigilatorsPageUi: InvigilatorsPageUi;
   dashboard: DashboardPrefs;
+  adminProfileUi: AdminProfileUi;
+  adminLayoutUi: AdminLayoutUi;
 };
 
 const emptyExamDraft: ExamDialogDraft = {
@@ -580,6 +615,37 @@ const initialState: AdminTableState = {
     notificationQuery: "",
     selectedNotificationType: null,
     selectedInvigilatorId: null,
+    visibleCount: 4,
+    announcementDialogOpen: false,
+    announcementSnackbar: { open: false, message: "" },
+    exportSnackbar: { open: false, message: "" },
+    activeAnnouncementIndex: 0,
+    exporting: false,
+    bulkExporting: false,
+  },
+  adminProfileUi: {
+    name: "",
+    email: "",
+    phone: "",
+    photoPreview: null,
+    avatarData: null,
+    confirmRemoveOpen: false,
+    showPhotoSave: false,
+    snackbar: { open: false, message: "", severity: "success" },
+    lastUpdated: "Just now",
+    lastLogin: null,
+    deleteAccountOpen: false,
+    darkMode: false,
+    notifications: true,
+    notifyEmail: "instant",
+    notifySms: false,
+    notifyPush: false,
+    passwords: { current: "", next: "", confirm: "" },
+    showPasswords: false,
+    extraSessionsToShow: 0,
+  },
+  adminLayoutUi: {
+    accountMenuOpen: false,
   },
 };
 
@@ -833,6 +899,35 @@ const adminTablesSlice = createSlice({
     setDashboardPrefs(state, action: PayloadAction<Partial<DashboardPrefs>>) {
       Object.assign(state.dashboard, action.payload);
     },
+    setAdminProfileUi(state, action: PayloadAction<Partial<AdminProfileUi>>) {
+      Object.assign(state.adminProfileUi, action.payload);
+    },
+    resetAdminProfileUi(state) {
+      state.adminProfileUi = {
+        name: "",
+        email: "",
+        phone: "",
+        photoPreview: null,
+        avatarData: null,
+        confirmRemoveOpen: false,
+        showPhotoSave: false,
+        snackbar: { open: false, message: "", severity: "success" },
+        lastUpdated: "Just now",
+        lastLogin: null,
+        deleteAccountOpen: false,
+        darkMode: false,
+        notifications: true,
+        notifyEmail: "instant",
+        notifySms: false,
+        notifyPush: false,
+        passwords: { current: "", next: "", confirm: "" },
+        showPasswords: false,
+        extraSessionsToShow: 0,
+      };
+    },
+    setAdminLayoutUi(state, action: PayloadAction<Partial<AdminLayoutUi>>) {
+      Object.assign(state.adminLayoutUi, action.payload);
+    },
     resetAdminPrefs(state) {
       Object.assign(state, initialState);
     },
@@ -885,6 +980,9 @@ export const {
   setEditExamDraft,
   resetEditExamDraft,
   setDashboardPrefs,
+  setAdminProfileUi,
+  resetAdminProfileUi,
+  setAdminLayoutUi,
   resetAdminPrefs,
 } = adminTablesSlice.actions;
 

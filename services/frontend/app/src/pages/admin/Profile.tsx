@@ -20,7 +20,7 @@ import {
   CardContent,
   Chip,
 } from "@mui/material";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PillButton } from "../../components/PillButton";
@@ -30,10 +30,33 @@ import { formatDateTime } from "../../utils/dates";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { Panel } from "../../components/Panel";
 import { sharedInputSx } from "../../components/sharedInputSx";
+import { resetAdminProfileUi, setAdminProfileUi, useAppDispatch, useAppSelector } from "../../state/store";
 
 export const AdminProfile: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
+  const adminProfileUi = useAppSelector((state) => state.adminTables.adminProfileUi);
+  const {
+    name,
+    email,
+    phone,
+    photoPreview,
+    avatarData,
+    confirmRemoveOpen,
+    showPhotoSave,
+    snackbar,
+    lastUpdated,
+    lastLogin,
+    deleteAccountOpen,
+    darkMode,
+    notifyEmail,
+    notifySms,
+    notifyPush,
+    passwords,
+    showPasswords,
+    extraSessionsToShow,
+  } = adminProfileUi;
 
   const { data: userData, isLoading, isError, error } = useQuery({
     queryKey: ["me"],
@@ -49,27 +72,12 @@ export const AdminProfile: React.FC = () => {
     [userData]
   );
 
-  const [name, setName] = useState<string>("");
-  const [email, setEmail] = useState<string>("");
-  const [phone, setPhone] = useState<string>("");
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [avatarData, setAvatarData] = useState<string | null>(null);
-  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
-  const [showPhotoSave, setShowPhotoSave] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
-  const [lastUpdated, setLastUpdated] = useState("Just now");
-  const [lastLogin, setLastLogin] = useState<string | null>(null);
-  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
-
-  const [darkMode, setDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(true);
-  const [notifyEmail, setNotifyEmail] = useState<"instant" | "daily" | "off">("instant");
-  const [notifySms, setNotifySms] = useState(false);
-  const [notifyPush, setNotifyPush] = useState(false);
-
-  const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
-  const [showPasswords, setShowPasswords] = useState(false);
-  const [extraSessionsToShow, setExtraSessionsToShow] = useState(0);
+  useEffect(() => {
+    dispatch(resetAdminProfileUi());
+    return () => {
+      dispatch(resetAdminProfileUi());
+    };
+  }, [dispatch]);
 
   const {
     data: sessions,
@@ -127,17 +135,20 @@ export const AdminProfile: React.FC = () => {
 
   const handlePhotoChange = (file?: File | null) => {
     if (!file) {
-      setPhotoPreview(null);
-      setAvatarData(null);
+      dispatch(setAdminProfileUi({ photoPreview: null, avatarData: null }));
       return;
     }
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = typeof reader.result === "string" ? reader.result : null;
-      setPhotoPreview(result);
-      setAvatarData(result);
-      setSnackbar({ open: true, message: "Photo ready to save.", severity: "success" });
-      setShowPhotoSave(true);
+      dispatch(
+        setAdminProfileUi({
+          photoPreview: result,
+          avatarData: result,
+          snackbar: { open: true, message: "Photo ready to save.", severity: "success" },
+          showPhotoSave: true,
+        })
+      );
     };
     reader.readAsDataURL(file);
   };
@@ -156,7 +167,15 @@ export const AdminProfile: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) {
-        setSnackbar({ open: true, message: data?.detail || "Failed to update profile.", severity: "error" });
+        dispatch(
+          setAdminProfileUi({
+            snackbar: {
+              open: true,
+              message: data?.detail || "Failed to update profile.",
+              severity: "error",
+            },
+          })
+        );
         return;
       }
       // Update local cached user info
@@ -166,28 +185,52 @@ export const AdminProfile: React.FC = () => {
           setAuthSession(token, data);
         }
         // keep in-memory state and react-query cache in sync
-        setName(data.username || name);
-        setEmail(data.email || email);
-        setPhone(data.phone || "");
-        setPhotoPreview(data.avatar || null);
-        setAvatarData(data.avatar || null);
+        dispatch(
+          setAdminProfileUi({
+            name: data.username || name,
+            email: data.email || email,
+            phone: data.phone || "",
+            photoPreview: data.avatar || null,
+            avatarData: data.avatar || null,
+          })
+        );
         queryClient.setQueryData(["me"], data);
       }
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      setSnackbar({ open: true, message: "Profile updated!", severity: "success" });
-      setLastUpdated("Just now");
+      dispatch(
+        setAdminProfileUi({
+          snackbar: { open: true, message: "Profile updated!", severity: "success" },
+          lastUpdated: "Just now",
+        })
+      );
     } catch (err: any) {
-      setSnackbar({ open: true, message: err?.message || "Failed to update profile!", severity: "error" });
+      dispatch(
+        setAdminProfileUi({
+          snackbar: {
+            open: true,
+            message: err?.message || "Failed to update profile!",
+            severity: "error",
+          },
+        })
+      );
     }
   };
 
   const handleSavePassword = () => {
     if (passwords.next !== passwords.confirm) {
-      setSnackbar({ open: true, message: "New passwords do not match", severity: "error" });
+      dispatch(
+        setAdminProfileUi({
+          snackbar: { open: true, message: "New passwords do not match", severity: "error" },
+        })
+      );
       return;
     }
     if (!passwords.current || !passwords.next) {
-      setSnackbar({ open: true, message: "Current and new passwords are required.", severity: "error" });
+      dispatch(
+        setAdminProfileUi({
+          snackbar: { open: true, message: "Current and new passwords are required.", severity: "error" },
+        })
+      );
       return;
     }
     apiFetch(`${apiBaseUrl}/auth/me/`, {
@@ -205,20 +248,40 @@ export const AdminProfile: React.FC = () => {
           const msg = Array.isArray(data?.detail) ? data.detail.join(" ") : data?.detail || "Failed to update password.";
           throw new Error(msg);
         }
-        setSnackbar({ open: true, message: "Password updated successfully!", severity: "success" });
-        setPasswords({ current: "", next: "", confirm: "" });
+        dispatch(
+          setAdminProfileUi({
+            snackbar: { open: true, message: "Password updated successfully!", severity: "success" },
+            passwords: { current: "", next: "", confirm: "" },
+          })
+        );
       })
       .catch((err: any) => {
-        setSnackbar({ open: true, message: err?.message || "Failed to update password.", severity: "error" });
+        dispatch(
+          setAdminProfileUi({
+            snackbar: {
+              open: true,
+              message: err?.message || "Failed to update password.",
+              severity: "error",
+            },
+          })
+        );
       });
   };
 
   const handleTestNotification = () => {
-    setSnackbar({ open: true, message: "Test notification sent", severity: "success" });
+    dispatch(
+      setAdminProfileUi({
+        snackbar: { open: true, message: "Test notification sent", severity: "success" },
+      })
+    );
   };
 
   const handleExportData = () => {
-    setSnackbar({ open: true, message: "Data export started", severity: "success" });
+    dispatch(
+      setAdminProfileUi({
+        snackbar: { open: true, message: "Data export started", severity: "success" },
+      })
+    );
   };
 
   const handleDeleteAccount = async () => {
@@ -231,12 +294,24 @@ export const AdminProfile: React.FC = () => {
       }
       // Clear local auth state and redirect to login
       clearAuthSession();
-      setSnackbar({ open: true, message: "Account deleted.", severity: "success" });
+      dispatch(
+        setAdminProfileUi({
+          snackbar: { open: true, message: "Account deleted.", severity: "success" },
+        })
+      );
       navigate("/login", { replace: true });
     } catch (err: any) {
-      setSnackbar({ open: true, message: err?.message || "Failed to delete account.", severity: "error" });
+      dispatch(
+        setAdminProfileUi({
+          snackbar: {
+            open: true,
+            message: err?.message || "Failed to delete account.",
+            severity: "error",
+          },
+        })
+      );
     } finally {
-      setDeleteAccountOpen(false);
+      dispatch(setAdminProfileUi({ deleteAccountOpen: false }));
     }
   };
 
@@ -245,10 +320,22 @@ export const AdminProfile: React.FC = () => {
       const res = await apiFetch(`${apiBaseUrl}/auth/sessions/revoke-others/`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.detail || "Failed to sign out of other sessions.");
-      setSnackbar({ open: true, message: "Signed out of other sessions.", severity: "success" });
+      dispatch(
+        setAdminProfileUi({
+          snackbar: { open: true, message: "Signed out of other sessions.", severity: "success" },
+        })
+      );
       await refetchSessions();
     } catch (err: any) {
-      setSnackbar({ open: true, message: err?.message || "Failed to sign out of other sessions.", severity: "error" });
+      dispatch(
+        setAdminProfileUi({
+          snackbar: {
+            open: true,
+            message: err?.message || "Failed to sign out of other sessions.",
+            severity: "error",
+          },
+        })
+      );
     }
   };
 
@@ -261,24 +348,40 @@ export const AdminProfile: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.detail || "Failed to sign out of session.");
-      setSnackbar({ open: true, message: "Session signed out.", severity: "success" });
+      dispatch(
+        setAdminProfileUi({
+          snackbar: { open: true, message: "Session signed out.", severity: "success" },
+        })
+      );
       await refetchSessions();
     } catch (err: any) {
-      setSnackbar({ open: true, message: err?.message || "Failed to sign out of session.", severity: "error" });
+      dispatch(
+        setAdminProfileUi({
+          snackbar: {
+            open: true,
+            message: err?.message || "Failed to sign out of session.",
+            severity: "error",
+          },
+        })
+      );
     }
   };
 
   useEffect(() => {
     if (!userData) return;
-    setName(userData.username || userData.email || "");
-    setEmail(userData.email || userData.username || "");
-    setPhone(userData.phone || "");
-    setPhotoPreview(userData.avatar || null);
-    setAvatarData(userData.avatar || null);
-    setShowPhotoSave(false);
-    setLastLogin(userData.last_login ? formatDateTime(userData.last_login) : null);
-    setLastUpdated("Just now");
-  }, [userData]);
+    dispatch(
+      setAdminProfileUi({
+        name: userData.username || userData.email || "",
+        email: userData.email || userData.username || "",
+        phone: userData.phone || "",
+        photoPreview: userData.avatar || null,
+        avatarData: userData.avatar || null,
+        showPhotoSave: false,
+        lastLogin: userData.last_login ? formatDateTime(userData.last_login) : null,
+        lastUpdated: "Just now",
+      })
+    );
+  }, [dispatch, userData]);
 
   if (isLoading) {
     return (
@@ -355,7 +458,11 @@ export const AdminProfile: React.FC = () => {
               </PillButton>
             )}
             {photoPreview && (
-              <PillButton variant="outlined" color="error" onClick={() => setConfirmRemoveOpen(true)}>
+              <PillButton
+                variant="outlined"
+                color="error"
+                onClick={() => dispatch(setAdminProfileUi({ confirmRemoveOpen: true }))}
+              >
                 Remove
               </PillButton>
             )}
@@ -378,7 +485,13 @@ export const AdminProfile: React.FC = () => {
             </Typography>
 
             <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
-              <TextField fullWidth size="small" value={name} onChange={(e) => setName(e.target.value)} sx={sharedInputSx} />
+              <TextField
+                fullWidth
+                size="small"
+                value={name}
+                onChange={(e) => dispatch(setAdminProfileUi({ name: e.target.value }))}
+                sx={sharedInputSx}
+              />
               <PillButton variant="contained" onClick={handleSaveProfile}>Save</PillButton>
             </Stack>
           </Box>
@@ -390,7 +503,14 @@ export const AdminProfile: React.FC = () => {
             </Typography>
 
             <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
-              <TextField fullWidth size="small" value={email} onChange={(e) => setEmail(e.target.value)} type="email" sx={sharedInputSx} />
+              <TextField
+                fullWidth
+                size="small"
+                value={email}
+                onChange={(e) => dispatch(setAdminProfileUi({ email: e.target.value }))}
+                type="email"
+                sx={sharedInputSx}
+              />
               <PillButton variant="contained" onClick={handleSaveProfile}>Save</PillButton>
             </Stack>
           </Box>
@@ -402,7 +522,13 @@ export const AdminProfile: React.FC = () => {
             </Typography>
 
             <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
-              <TextField fullWidth size="small" value={phone} onChange={(e) => setPhone(e.target.value)} sx={sharedInputSx} />
+              <TextField
+                fullWidth
+                size="small"
+                value={phone}
+                onChange={(e) => dispatch(setAdminProfileUi({ phone: e.target.value }))}
+                sx={sharedInputSx}
+              />
               <PillButton variant="contained" onClick={handleSaveProfile}>Save</PillButton>
             </Stack>
           </Box>
@@ -426,11 +552,20 @@ export const AdminProfile: React.FC = () => {
                     : "Confirm new password"
                 }
                 value={(passwords as any)[key]}
-                onChange={(e) => setPasswords((prev) => ({ ...prev, [key]: e.target.value }))}
+                onChange={(e) =>
+                  dispatch(
+                    setAdminProfileUi({
+                      passwords: { ...passwords, [key]: e.target.value },
+                    })
+                  )
+                }
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPasswords((p) => !p)} edge="end">
+                      <IconButton
+                        onClick={() => dispatch(setAdminProfileUi({ showPasswords: !showPasswords }))}
+                        edge="end"
+                      >
                         {showPasswords ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
                     </InputAdornment>
@@ -570,14 +705,20 @@ export const AdminProfile: React.FC = () => {
             <Stack direction="row" spacing={1} justifyContent="flex-start">
               <PillButton
                 variant="contained"
-                onClick={() => setExtraSessionsToShow((prev) => prev + Math.min(MORE_STEP, remainingSessions))}
+                onClick={() =>
+                  dispatch(
+                    setAdminProfileUi({
+                      extraSessionsToShow: extraSessionsToShow + Math.min(MORE_STEP, remainingSessions),
+                    })
+                  )
+                }
                 disabled={remainingSessions === 0}
               >
                 Show {Math.min(MORE_STEP, remainingSessions)} more
               </PillButton>
               <PillButton
                 variant="outlined"
-                onClick={() => setExtraSessionsToShow(0)}
+                onClick={() => dispatch(setAdminProfileUi({ extraSessionsToShow: 0 }))}
                 disabled={extraSessionsToShow === 0}
               >
                 Show less
@@ -598,7 +739,7 @@ export const AdminProfile: React.FC = () => {
             <Typography>Dark Mode</Typography>
             <Switch
               checked={darkMode}
-              onChange={() => setDarkMode(!darkMode)}
+              onChange={() => dispatch(setAdminProfileUi({ darkMode: !darkMode }))}
               disabled
             />
           </Stack>
@@ -610,7 +751,7 @@ export const AdminProfile: React.FC = () => {
               <Select
                 label="Email frequency"
                 value={notifyEmail}
-                onChange={(e) => setNotifyEmail(e.target.value as any)}
+                onChange={(e) => dispatch(setAdminProfileUi({ notifyEmail: e.target.value as any }))}
               >
                 <MenuItem value="instant">Instant</MenuItem>
                 <MenuItem value="daily">Daily summary</MenuItem>
@@ -624,7 +765,7 @@ export const AdminProfile: React.FC = () => {
             <Typography>SMS Notifications</Typography>
             <Switch
               checked={notifySms}
-              onChange={() => setNotifySms(!notifySms)}
+              onChange={() => dispatch(setAdminProfileUi({ notifySms: !notifySms }))}
               disabled
             />
           </Stack>
@@ -633,7 +774,7 @@ export const AdminProfile: React.FC = () => {
             <Typography>Push Notifications</Typography>
             <Switch
               checked={notifyPush}
-              onChange={() => setNotifyPush(!notifyPush)}
+              onChange={() => dispatch(setAdminProfileUi({ notifyPush: !notifyPush }))}
               disabled
             />
           </Stack>
@@ -648,7 +789,11 @@ export const AdminProfile: React.FC = () => {
             <PillButton variant="outlined" onClick={handleExportData} disabled>
               Export my data
             </PillButton>
-            <PillButton variant="outlined" color="error" onClick={() => setDeleteAccountOpen(true)}>
+            <PillButton
+              variant="outlined"
+              color="error"
+              onClick={() => dispatch(setAdminProfileUi({ deleteAccountOpen: true }))}
+            >
               Delete my account
             </PillButton>
           </Stack>
@@ -658,12 +803,12 @@ export const AdminProfile: React.FC = () => {
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
-        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        onClose={() => dispatch(setAdminProfileUi({ snackbar: { ...snackbar, open: false } }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
           severity={snackbar.severity}
-          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          onClose={() => dispatch(setAdminProfileUi({ snackbar: { ...snackbar, open: false } }))}
           variant="filled"
           sx={
             snackbar.severity === "success"
@@ -686,7 +831,7 @@ export const AdminProfile: React.FC = () => {
         title="Remove profile photo?"
         description="This will remove your current profile photo."
         confirmText="Remove"
-        onClose={() => setConfirmRemoveOpen(false)}
+        onClose={() => dispatch(setAdminProfileUi({ confirmRemoveOpen: false }))}
         onConfirm={async () => {
           try {
             const res = await apiFetch(`${apiBaseUrl}/auth/me/`, {
@@ -696,7 +841,15 @@ export const AdminProfile: React.FC = () => {
             });
             const data = await res.json();
             if (!res.ok) {
-              setSnackbar({ open: true, message: data?.detail || "Failed to remove photo.", severity: "error" });
+              dispatch(
+                setAdminProfileUi({
+                  snackbar: {
+                    open: true,
+                    message: data?.detail || "Failed to remove photo.",
+                    severity: "error",
+                  },
+                })
+              );
               return;
             }
             const token = getAuthToken();
@@ -704,13 +857,25 @@ export const AdminProfile: React.FC = () => {
               setAuthSession(token, data);
             }
             queryClient.setQueryData(["me"], data);
-            setPhotoPreview(null);
-            setAvatarData(null);
-            setSnackbar({ open: true, message: "Profile photo removed.", severity: "success" });
+            dispatch(
+              setAdminProfileUi({
+                photoPreview: null,
+                avatarData: null,
+                snackbar: { open: true, message: "Profile photo removed.", severity: "success" },
+              })
+            );
           } catch (err: any) {
-            setSnackbar({ open: true, message: err?.message || "Failed to remove photo.", severity: "error" });
+            dispatch(
+              setAdminProfileUi({
+                snackbar: {
+                  open: true,
+                  message: err?.message || "Failed to remove photo.",
+                  severity: "error",
+                },
+              })
+            );
           } finally {
-            setConfirmRemoveOpen(false);
+            dispatch(setAdminProfileUi({ confirmRemoveOpen: false }));
           }
         }}
       />
@@ -719,7 +884,7 @@ export const AdminProfile: React.FC = () => {
         title="Delete account?"
         description="This will permanently delete your account and sign you out. This cannot be undone."
         confirmText="Delete"
-        onClose={() => setDeleteAccountOpen(false)}
+        onClose={() => dispatch(setAdminProfileUi({ deleteAccountOpen: false }))}
         onConfirm={handleDeleteAccount}
       />
     </Box>

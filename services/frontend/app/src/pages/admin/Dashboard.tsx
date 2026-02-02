@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   Box,
   Chip,
@@ -122,14 +122,15 @@ export const AdminDashboard: React.FC = () => {
     notificationQuery,
     selectedNotificationType,
     selectedInvigilatorId,
+    visibleCount,
+    announcementDialogOpen,
+    announcementSnackbar,
+    exportSnackbar,
+    activeAnnouncementIndex,
+    exporting,
+    bulkExporting,
   } = useAppSelector((s) => s.adminTables.dashboard);
-  const [visibleCount, setVisibleCount] = useState(4);
-  const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
-  const [announcementSnackbar, setAnnouncementSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
-  const [exportSnackbar, setExportSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
-  const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
-  const [exporting, setExporting] = useState(false);
-  const [bulkExporting, setBulkExporting] = useState(false);
+  const announcementIndexRef = useRef(activeAnnouncementIndex);
 
   const { data: exams = [], isLoading: loadingExams } = useQuery<ExamData[]>({
     queryKey: ["dashboard-exams"],
@@ -277,8 +278,8 @@ export const AdminDashboard: React.FC = () => {
   }, [notifications, notificationQuery, selectedInvigilatorId, selectedNotificationType]);
 
   useEffect(() => {
-    setVisibleCount(4);
-  }, [notificationQuery, selectedInvigilatorId, selectedNotificationType]);
+    dispatch(setDashboardPrefs({ visibleCount: 4 }));
+  }, [dispatch, notificationQuery, selectedInvigilatorId, selectedNotificationType]);
 
   const placeholderAnnouncement: Announcement = {
     id: 0,
@@ -326,22 +327,37 @@ export const AdminDashboard: React.FC = () => {
   }, [announcementsError, announcementsFromApi]);
 
   useEffect(() => {
+    announcementIndexRef.current = activeAnnouncementIndex;
+  }, [activeAnnouncementIndex]);
+
+  useEffect(() => {
     const total = announcements.length || 1;
-    setActiveAnnouncementIndex(0);
+    dispatch(setDashboardPrefs({ activeAnnouncementIndex: 0 }));
+    announcementIndexRef.current = 0;
     const timer = window.setInterval(() => {
-      setActiveAnnouncementIndex((prev) => (prev + 1) % total);
+      const next = (announcementIndexRef.current + 1) % total;
+      announcementIndexRef.current = next;
+      dispatch(setDashboardPrefs({ activeAnnouncementIndex: next }));
     }, 7000);
     return () => window.clearInterval(timer);
-  }, [announcements.length]);
+  }, [announcements.length, dispatch]);
 
   const showPrevAnnouncement = () => {
     const total = announcements.length || 1;
-    setActiveAnnouncementIndex((prev) => (prev === 0 ? total - 1 : prev - 1));
+    dispatch(
+      setDashboardPrefs({
+        activeAnnouncementIndex: activeAnnouncementIndex === 0 ? total - 1 : activeAnnouncementIndex - 1,
+      })
+    );
   };
 
   const showNextAnnouncement = () => {
     const total = announcements.length || 1;
-    setActiveAnnouncementIndex((prev) => (prev + 1) % total);
+    dispatch(
+      setDashboardPrefs({
+        activeAnnouncementIndex: (activeAnnouncementIndex + 1) % total,
+      })
+    );
   };
 
   const activeAnnouncement = announcements[activeAnnouncementIndex] ?? placeholderAnnouncement;
@@ -363,19 +379,23 @@ export const AdminDashboard: React.FC = () => {
     }
     const normalizedSchool = selectedSchool === ALL_SCHOOLS_LABEL ? "" : selectedSchool;
     try {
-      setExporting(true);
+      dispatch(setDashboardPrefs({ exporting: true }));
       await downloadProvisionExport(normalizedSchool || undefined);
-      setExportSnackbar({
-        open: true,
-        message: normalizedSchool
-          ? `Provisions exported for ${normalizedSchool}.`
-          : "Provisions exported.",
-      });
+      dispatch(
+        setDashboardPrefs({
+          exportSnackbar: {
+            open: true,
+            message: normalizedSchool
+              ? `Provisions exported for ${normalizedSchool}.`
+              : "Provisions exported.",
+          },
+        })
+      );
     } catch (err) {
       console.error(err);
       alert("Export failed");
     } finally {
-      setExporting(false);
+      dispatch(setDashboardPrefs({ exporting: false }));
     }
   };
 
@@ -384,11 +404,11 @@ export const AdminDashboard: React.FC = () => {
       (s) => s && s !== ALL_SCHOOLS_LABEL && s !== ALL_SCHOOLS_BULK_LABEL
     );
     if (!schools.length) {
-      setExportSnackbar({ open: true, message: "No schools found to export." });
+      dispatch(setDashboardPrefs({ exportSnackbar: { open: true, message: "No schools found to export." } }));
       return;
     }
     try {
-      setBulkExporting(true);
+      dispatch(setDashboardPrefs({ bulkExporting: true }));
       const url = `${apiBaseUrl}/provisions/export/?separate=1`;
       const res = await apiFetch(url);
       if (!res.ok) throw new Error("Failed to export provisions");
@@ -398,12 +418,16 @@ export const AdminDashboard: React.FC = () => {
         "provisions_export_by_school.zip"
       );
       downloadBlob(blob, filename);
-      setExportSnackbar({ open: true, message: "Provisions exported for all schools." });
+      dispatch(
+        setDashboardPrefs({
+          exportSnackbar: { open: true, message: "Provisions exported for all schools." },
+        })
+      );
     } catch (err) {
       console.error(err);
       alert("Export failed");
     } finally {
-      setBulkExporting(false);
+      dispatch(setDashboardPrefs({ bulkExporting: false }));
     }
   };
 
@@ -579,7 +603,7 @@ export const AdminDashboard: React.FC = () => {
                   return (
                     <Box
                       key={a.id}
-                      onClick={() => setActiveAnnouncementIndex(idx)}
+                      onClick={() => dispatch(setDashboardPrefs({ activeAnnouncementIndex: idx }))}
                       role="button"
                       aria-label={`Go to announcement ${idx + 1}`}
                       sx={{
@@ -741,14 +765,20 @@ export const AdminDashboard: React.FC = () => {
         <Box sx={{ textAlign: "center", mt: 3, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
           <PillButton
             variant="outlined"
-            onClick={() => setVisibleCount(4)}
+            onClick={() => dispatch(setDashboardPrefs({ visibleCount: 4 }))}
             disabled={visibleCount <= 4}
           >
             Show less
           </PillButton>
           <PillButton
             variant="contained"
-            onClick={() => setVisibleCount((prev) => Math.min(prev + 4, filteredNotifications.length))}
+            onClick={() =>
+              dispatch(
+                setDashboardPrefs({
+                  visibleCount: Math.min(visibleCount + 4, filteredNotifications.length),
+                })
+              )
+            }
             disabled={visibleCount >= filteredNotifications.length}
           >
             {`Show ${Math.min(4, Math.max(filteredNotifications.length - visibleCount, 0))} more`}
@@ -761,7 +791,7 @@ export const AdminDashboard: React.FC = () => {
         <Fab
           color="primary"
           size="large"
-          onClick={() => setAnnouncementDialogOpen(true)}
+          onClick={() => dispatch(setDashboardPrefs({ announcementDialogOpen: true }))}
           sx={{
             position: "fixed",
             bottom: 32,
@@ -775,21 +805,37 @@ export const AdminDashboard: React.FC = () => {
 
       <AddAnnouncementDialog
         open={announcementDialogOpen}
-        onClose={() => setAnnouncementDialogOpen(false)}
+        onClose={() => dispatch(setDashboardPrefs({ announcementDialogOpen: false }))}
         onCreated={(title) => {
-          setAnnouncementDialogOpen(false);
-          setAnnouncementSnackbar({ open: true, message: `${title} posted.` });
+          dispatch(
+            setDashboardPrefs({
+              announcementDialogOpen: false,
+              announcementSnackbar: { open: true, message: `${title} posted.` },
+            })
+          );
         }}
       />
 
       <Snackbar
         open={announcementSnackbar.open}
         autoHideDuration={3000}
-        onClose={() => setAnnouncementSnackbar((prev) => ({ ...prev, open: false }))}
+        onClose={() =>
+          dispatch(
+            setDashboardPrefs({
+              announcementSnackbar: { ...announcementSnackbar, open: false },
+            })
+          )
+        }
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setAnnouncementSnackbar((prev) => ({ ...prev, open: false }))}
+          onClose={() =>
+            dispatch(
+              setDashboardPrefs({
+                announcementSnackbar: { ...announcementSnackbar, open: false },
+              })
+            )
+          }
           severity="success"
           variant="filled"
           sx={{
@@ -807,11 +853,23 @@ export const AdminDashboard: React.FC = () => {
       <Snackbar
         open={exportSnackbar.open}
         autoHideDuration={3000}
-        onClose={() => setExportSnackbar((prev) => ({ ...prev, open: false }))}
+        onClose={() =>
+          dispatch(
+            setDashboardPrefs({
+              exportSnackbar: { ...exportSnackbar, open: false },
+            })
+          )
+        }
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setExportSnackbar((prev) => ({ ...prev, open: false }))}
+          onClose={() =>
+            dispatch(
+              setDashboardPrefs({
+                exportSnackbar: { ...exportSnackbar, open: false },
+              })
+            )
+          }
           severity="success"
           variant="filled"
           sx={{
