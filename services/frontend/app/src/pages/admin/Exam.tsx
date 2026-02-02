@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
@@ -24,6 +24,7 @@ import { EditExamDialog } from "../../components/admin/EditExamDialog";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
+import { resetExamPageUi, setExamPageUi, useAppDispatch, useAppSelector } from "../../state/store";
 
 type ExamVenue = {
   examvenue_id: number;
@@ -118,13 +119,23 @@ const formatSchool = (text?: string): string => {
 export const AdminExamDetails: React.FC = () => {
   const { examId } = useParams<ExamRouteParams>();
   const navigate = useNavigate();
-  const [editOpen, setEditOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [assignVenue, setAssignVenue] = useState<ExamVenue | null>(null);
+  const dispatch = useAppDispatch();
+  const {
+    editOpen,
+    successOpen,
+    successMessage,
+    deleteOpen,
+    deleting,
+    assignOpen,
+    assignVenueId,
+  } = useAppSelector((state) => state.adminTables.examPage);
+
+  useEffect(() => {
+    dispatch(resetExamPageUi());
+    return () => {
+      dispatch(resetExamPageUi());
+    };
+  }, [dispatch, examId]);
 
   const { data, isLoading, isError, error, refetch } = useQuery<ExamData, Error>({
     queryKey: ["exam", examId],
@@ -184,6 +195,10 @@ export const AdminExamDetails: React.FC = () => {
   });
   const ratioLabel = `1:${studentsPerInvigilator}`;
   const venueStatsById = new Map(venueStats.map((stat) => [stat.venue.examvenue_id, stat]));
+  const assignVenue =
+    assignVenueId != null
+      ? data.exam_venues.find((venue) => venue.examvenue_id === assignVenueId) || null
+      : null;
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 2, md: 4 } }}>
@@ -233,8 +248,7 @@ export const AdminExamDetails: React.FC = () => {
               <PillButton
                 variant="outlined"
                 onClick={() => {
-                  setAssignVenue(coreVenue);
-                  setAssignOpen(true);
+                  dispatch(setExamPageUi({ assignVenueId: coreVenue.examvenue_id, assignOpen: true }));
                 }}
               >
                 Assign invigilator
@@ -334,8 +348,7 @@ export const AdminExamDetails: React.FC = () => {
                       variant="outlined"
                       fullWidth
                       onClick={() => {
-                        setAssignVenue(ev);
-                        setAssignOpen(true);
+                        dispatch(setExamPageUi({ assignVenueId: ev.examvenue_id, assignOpen: true }));
                       }}
                     >
                       Assign invigilator
@@ -360,12 +373,12 @@ export const AdminExamDetails: React.FC = () => {
         }}
       >
         <Tooltip title="Edit exam">
-          <Fab color="primary" onClick={() => setEditOpen(true)}>
+          <Fab color="primary" onClick={() => dispatch(setExamPageUi({ editOpen: true }))}>
             <Edit />
           </Fab>
         </Tooltip>
         <Tooltip title="Delete exam">
-          <Fab color="error" onClick={() => setDeleteOpen(true)}>
+          <Fab color="error" onClick={() => dispatch(setExamPageUi({ deleteOpen: true }))}>
             <Delete />
           </Fab>
         </Tooltip>
@@ -375,11 +388,13 @@ export const AdminExamDetails: React.FC = () => {
         <EditExamDialog
           open={editOpen}
           examId={data?.exam_id ?? null}
-          onClose={() => setEditOpen(false)}
+          onClose={() => dispatch(setExamPageUi({ editOpen: false }))}
           onSuccess={(name) => {
-            setSuccessMessage(`${name || "Exam"} updated successfully!`);
-            setSuccessOpen(true);
-            setEditOpen(false);
+            dispatch(setExamPageUi({
+              successMessage: `${name || "Exam"} updated successfully!`,
+              successOpen: true,
+              editOpen: false,
+            }));
             refetch();
           }}
         />
@@ -392,32 +407,34 @@ export const AdminExamDetails: React.FC = () => {
         confirmText="Delete"
         loading={deleting}
         onClose={() => {
-          if (!deleting) setDeleteOpen(false);
+          if (!deleting) dispatch(setExamPageUi({ deleteOpen: false }));
         }}
         onConfirm={async () => {
           if (!examId) return;
           try {
-            setDeleting(true);
+            dispatch(setExamPageUi({ deleting: true }));
             const res = await apiFetch(`${apiBaseUrl}/exams/${examId}/`, { method: "DELETE" });
             if (!res.ok) {
               const text = await res.text();
               throw new Error(text || "Delete failed");
             }
-            setSuccessMessage("Exam deleted successfully!");
-            setSuccessOpen(true);
-            setDeleteOpen(false);
+            dispatch(setExamPageUi({
+              successMessage: "Exam deleted successfully!",
+              successOpen: true,
+              deleteOpen: false,
+            }));
             setTimeout(() => navigate("/admin/exams"), 400);
           } catch (err: any) {
             alert(err?.message || "Delete failed");
           } finally {
-            setDeleting(false);
+            dispatch(setExamPageUi({ deleting: false }));
           }
         }}
       />
 
       <AssignInvigilatorDialog
         open={assignOpen}
-        onClose={() => setAssignOpen(false)}
+        onClose={() => dispatch(setExamPageUi({ assignOpen: false }))}
         examVenue={assignVenue}
         invigilators={invigilators}
         assignments={assignments}
@@ -426,23 +443,31 @@ export const AdminExamDetails: React.FC = () => {
           if (!summary) return;
           const { assigned, unassigned, updated } = summary;
           if (assigned && unassigned) {
-            setSuccessMessage(`Assigned ${assigned} and unassigned ${unassigned} invigilator${unassigned === 1 ? "" : "s"}.`);
-            setSuccessOpen(true);
+            dispatch(setExamPageUi({
+              successMessage: `Assigned ${assigned} and unassigned ${unassigned} invigilator${unassigned === 1 ? "" : "s"}.`,
+              successOpen: true,
+            }));
             return;
           }
           if (assigned) {
-            setSuccessMessage(`Assigned ${assigned} invigilator${assigned === 1 ? "" : "s"}.`);
-            setSuccessOpen(true);
+            dispatch(setExamPageUi({
+              successMessage: `Assigned ${assigned} invigilator${assigned === 1 ? "" : "s"}.`,
+              successOpen: true,
+            }));
             return;
           }
           if (unassigned) {
-            setSuccessMessage(`Unassigned ${unassigned} invigilator${unassigned === 1 ? "" : "s"}.`);
-            setSuccessOpen(true);
+            dispatch(setExamPageUi({
+              successMessage: `Unassigned ${unassigned} invigilator${unassigned === 1 ? "" : "s"}.`,
+              successOpen: true,
+            }));
             return;
           }
           if (updated) {
-            setSuccessMessage("Assignments updated.");
-            setSuccessOpen(true);
+            dispatch(setExamPageUi({
+              successMessage: "Assignments updated.",
+              successOpen: true,
+            }));
           }
         }}
       />
@@ -450,11 +475,11 @@ export const AdminExamDetails: React.FC = () => {
       <Snackbar
         open={successOpen}
         autoHideDuration={3000}
-        onClose={() => setSuccessOpen(false)}
+        onClose={() => dispatch(setExamPageUi({ successOpen: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setSuccessOpen(false)}
+          onClose={() => dispatch(setExamPageUi({ successOpen: false }))}
           severity="success"
           variant="filled"
           sx={{

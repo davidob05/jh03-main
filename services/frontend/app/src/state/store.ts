@@ -150,6 +150,27 @@ type NotifyDialogDraft = {
   error: string | null;
 };
 
+type ExamsPageUi = {
+  addOpen: boolean;
+  deleteOpen: boolean;
+  deleteTargetIds: number[];
+  deleteError: string | null;
+};
+
+type ExamPageUi = {
+  editOpen: boolean;
+  successOpen: boolean;
+  successMessage: string;
+  deleteOpen: boolean;
+  deleting: boolean;
+  assignOpen: boolean;
+  assignVenueId: number | null;
+};
+
+type AddExamUi = {
+  snackbarOpen: boolean;
+};
+
 type ExamVenueDraft = {
   id: number | string;
   venue_name: string;
@@ -206,6 +227,9 @@ type AdminTableState = {
   uploadFile: UploadFileDraft;
   exportInvigilatorDialog: ExportInvigilatorDialogDraft;
   notifyDialog: NotifyDialogDraft;
+  examsPage: ExamsPageUi;
+  examPage: ExamPageUi;
+  addExamUi: AddExamUi;
   dashboard: DashboardPrefs;
 };
 
@@ -350,6 +374,24 @@ const initialState: AdminTableState = {
     message: "",
     error: null,
   },
+  examsPage: {
+    addOpen: false,
+    deleteOpen: false,
+    deleteTargetIds: [],
+    deleteError: null,
+  },
+  examPage: {
+    editOpen: false,
+    successOpen: false,
+    successMessage: "",
+    deleteOpen: false,
+    deleting: false,
+    assignOpen: false,
+    assignVenueId: null,
+  },
+  addExamUi: {
+    snackbarOpen: false,
+  },
   dashboard: {
     selectedSchool: "",
     notificationQuery: "",
@@ -462,6 +504,34 @@ const adminTablesSlice = createSlice({
     resetNotifyDialogDraft(state) {
       state.notifyDialog = { subject: "", message: "", error: null };
     },
+    setExamsPageUi(state, action: PayloadAction<Partial<ExamsPageUi>>) {
+      Object.assign(state.examsPage, action.payload);
+    },
+    resetExamsPageUi(state) {
+      state.examsPage = {
+        addOpen: false,
+        deleteOpen: false,
+        deleteTargetIds: [],
+        deleteError: null,
+      };
+    },
+    setExamPageUi(state, action: PayloadAction<Partial<ExamPageUi>>) {
+      Object.assign(state.examPage, action.payload);
+    },
+    resetExamPageUi(state) {
+      state.examPage = {
+        editOpen: false,
+        successOpen: false,
+        successMessage: "",
+        deleteOpen: false,
+        deleting: false,
+        assignOpen: false,
+        assignVenueId: null,
+      };
+    },
+    setAddExamUi(state, action: PayloadAction<Partial<AddExamUi>>) {
+      Object.assign(state.addExamUi, action.payload);
+    },
     setAddExamDraft(state, action: PayloadAction<Partial<ExamDialogDraft>>) {
       Object.assign(state.examDialogs.add, action.payload);
     },
@@ -514,6 +584,11 @@ export const {
   resetExportInvigilatorDialogDraft,
   setNotifyDialogDraft,
   resetNotifyDialogDraft,
+  setExamsPageUi,
+  resetExamsPageUi,
+  setExamPageUi,
+  resetExamPageUi,
+  setAddExamUi,
   setAddExamDraft,
   resetAddExamDraft,
   setEditExamDraft,

@@ -37,7 +37,7 @@ import { PillButton } from "../../components/PillButton";
 import { Panel } from "../../components/Panel";
 import { DeleteConfirmationDialog } from "../../components/admin/DeleteConfirmationDialog";
 import { AddExamDialog } from "../../components/admin/AddExamDialog";
-import { useAppDispatch, useAppSelector, setExamsPrefs } from '../../state/store';
+import { useAppDispatch, useAppSelector, setExamsPrefs, setExamsPageUi } from '../../state/store';
 
 interface ExamData {
   exam_id: number;
@@ -248,6 +248,7 @@ function EnhancedTableToolbar({ numSelected, searchQuery, onSearchChange, onSear
 export const AdminExams: React.FC = () => {
   const dispatch = useAppDispatch();
   const { order, orderBy: rawOrderBy, page, rowsPerPage, searchQuery, searchDraft } = useAppSelector((s) => s.adminTables.exams);
+  const { addOpen, deleteOpen, deleteTargetIds, deleteError } = useAppSelector((s) => s.adminTables.examsPage);
   const allowedSortKeys = ['code', 'subject', 'coreVenue', 'startTime', 'endTime'] as const;
   type ExamSortKey = typeof allowedSortKeys[number];
   const orderBy: ExamSortKey = allowedSortKeys.includes(rawOrderBy as ExamSortKey)
@@ -255,10 +256,6 @@ export const AdminExams: React.FC = () => {
     : 'code';
   const [selected, setSelected] = React.useState<readonly number[]>([]);
   const [openRows, setOpenRows] = React.useState<Record<number, boolean>>({});
-  const [addOpen, setAddOpen] = React.useState(false);
-  const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [deleteTargets, setDeleteTargets] = React.useState<RowData[]>([]);
-  const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const searchDraftInitialized = React.useRef(false);
@@ -317,16 +314,14 @@ export const AdminExams: React.FC = () => {
     },
     onSuccess: async (_data, ids) => {
       setSelected((prev) => prev.filter((id) => !ids.includes(id)));
-      setDeleteOpen(false);
-      setDeleteTargets([]);
-      setDeleteError(null);
+      dispatch(setExamsPageUi({ deleteOpen: false, deleteTargetIds: [], deleteError: null }));
       await Promise.all([
         refetch(),
         queryClient.invalidateQueries({ queryKey: ['exams-table'] }),
         queryClient.invalidateQueries({ queryKey: ['exams-calendar'] }),
       ]);
     },
-    onError: (err: any) => setDeleteError(err?.message || "Delete failed"),
+    onError: (err: any) => dispatch(setExamsPageUi({ deleteError: err?.message || "Delete failed" })),
   });
 
   const summary = React.useMemo(() => {
@@ -382,12 +377,18 @@ export const AdminExams: React.FC = () => {
   const openDeleteDialogForSelection = React.useCallback(() => {
     const targets = selected.map((id) => rowMap.get(id)).filter(Boolean) as RowData[];
     if (!targets.length) return;
-    setDeleteTargets(targets);
-    setDeleteError(null);
-    setDeleteOpen(true);
+    dispatch(setExamsPageUi({
+      deleteOpen: true,
+      deleteTargetIds: targets.map((target) => target.id),
+      deleteError: null,
+    }));
   }, [selected, rowMap]);
   const handleDeleteSelected = openDeleteDialogForSelection;
 
+  const deleteTargets = React.useMemo(
+    () => deleteTargetIds.map((id) => rowMap.get(id)).filter(Boolean) as RowData[],
+    [deleteTargetIds, rowMap]
+  );
   const deleteCount = deleteTargets.length;
   const deleteTarget = deleteTargets[0];
 
@@ -580,9 +581,7 @@ export const AdminExams: React.FC = () => {
           loading={deleteMutation.isPending}
           onClose={() => {
             if (!deleteMutation.isPending) {
-              setDeleteOpen(false);
-              setDeleteTargets([]);
-              setDeleteError(null);
+              dispatch(setExamsPageUi({ deleteOpen: false, deleteTargetIds: [], deleteError: null }));
             }
           }}
           onConfirm={() => {
@@ -591,7 +590,7 @@ export const AdminExams: React.FC = () => {
         />
         <AddExamDialog
           open={addOpen}
-          onClose={() => setAddOpen(false)}
+          onClose={() => dispatch(setExamsPageUi({ addOpen: false }))}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["exams-table"] });
           }}
@@ -599,7 +598,7 @@ export const AdminExams: React.FC = () => {
         <Tooltip title="Add a new exam">
           <Fab
             color="primary"
-            onClick={() => setAddOpen(true)}
+            onClick={() => dispatch(setExamsPageUi({ addOpen: true }))}
             sx={{
               position: 'fixed',
               bottom: 32,

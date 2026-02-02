@@ -16,7 +16,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiBaseUrl, apiFetch } from "../../utils/api";
 import { PillButton } from "../PillButton";
 import { sharedInputSx } from "../sharedInputSx";
-import { resetAddExamDraft, setAddExamDraft, useAppDispatch, useAppSelector } from "../../state/store";
+import {
+  resetAddExamDraft,
+  setAddExamDraft,
+  setAddExamUi,
+  useAppDispatch,
+  useAppSelector,
+} from "../../state/store";
 
 type Props = {
   open: boolean;
@@ -27,15 +33,15 @@ type Props = {
 export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
-  const [snackbarOpen, setSnackbarOpen] = React.useState(false);
   const { name, code, examType, students, school, contact } = useAppSelector(
     (state) => state.adminTables.examDialogs.add
   );
+  const { snackbarOpen } = useAppSelector((state) => state.adminTables.addExamUi);
 
   useEffect(() => {
     if (!open) return;
     dispatch(resetAddExamDraft());
-    setSnackbarOpen(false);
+    dispatch(setAddExamUi({ snackbarOpen: false }));
   }, [dispatch, open]);
 
   const mutation = useMutation({
@@ -63,7 +69,7 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
       queryClient.invalidateQueries({ queryKey: ["dashboard-exams"] });
       onSuccess?.(name);
       dispatch(resetAddExamDraft());
-      setSnackbarOpen(true);
+      dispatch(setAddExamUi({ snackbarOpen: true }));
       onClose();
     },
     onError: (err: any) => alert(err?.message || "Failed to create exam"),
@@ -160,11 +166,11 @@ export const AddExamDialog: React.FC<Props> = ({ open, onClose, onSuccess }) => 
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={3000}
-        onClose={() => setSnackbarOpen(false)}
+        onClose={() => dispatch(setAddExamUi({ snackbarOpen: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setSnackbarOpen(false)}
+          onClose={() => dispatch(setAddExamUi({ snackbarOpen: false }))}
           severity="success"
           variant="filled"
           sx={{
