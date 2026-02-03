@@ -309,7 +309,6 @@ const ChangeVenueDialog: React.FC<ChangeVenueDialogProps> = ({
         {saveError ? <Alert severity="error" sx={{ mt: 2 }}>{saveError}</Alert> : null}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
         <PillButton variant="contained" onClick={handleSave} disabled={disableSave}>
           {mutation.isPending ? "Saving..." : "Save"}
         </PillButton>
@@ -512,12 +511,7 @@ const StudentTableSection: React.FC<SectionProps> = ({
         ) : null}
       </Toolbar>
       <Divider />
-      {query.isLoading ? (
-        <Box sx={{ p: 4, textAlign: "center" }}>
-          <CircularProgress size={48} />
-          <Typography sx={{ mt: 2 }}>Loading students…</Typography>
-        </Box>
-      ) : query.isError ? (
+      {query.isError ? (
         <Box sx={{ p: 3 }}>
           <Typography color="error" variant="body1">{query.error?.message || "Failed to load students"}</Typography>
         </Box>
@@ -816,6 +810,27 @@ export const AdminStudents: React.FC = () => {
     queryKey: ["student-provisions", "all"],
     queryFn: () => fetchStudentProvisions(false),
   });
+
+  if (allQuery.isLoading || unallocatedQuery.isLoading) {
+    return (
+      <Box sx={{ p: 6, textAlign: "center" }}>
+        <CircularProgress size={60} />
+        <Typography sx={{ mt: 2 }}>Loading students…</Typography>
+      </Box>
+    );
+  }
+
+  if (allQuery.isError || unallocatedQuery.isError) {
+    return (
+      <Box sx={{ width: "100%", maxWidth: 1050, p: 3, mx: "auto" }}>
+        <Panel>
+          <Typography color="error" variant="h6">
+            {allQuery.error?.message || unallocatedQuery.error?.message || "Failed to load students"}
+          </Typography>
+        </Panel>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ width: "100%", maxWidth: 1200, p: { xs: 2, md: 4 }, mx: "auto" }}>
