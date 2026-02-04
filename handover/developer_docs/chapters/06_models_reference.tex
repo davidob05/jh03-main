@@ -1,0 +1,77 @@
+\section{Domain model reference}
+\label{sec:models}
+
+This section summarizes the core Django models. Each entry is a one-line purpose statement with links to relevant workflows. Detailed field-level notes appear in later sections.
+
+\subsection{Enum and choice types}
+\label{subsec:models:enums}
+
+\begin{longtable}{p{0.30\textwidth}p{0.64\textwidth}}
+\toprule
+\textbf{Type} & \textbf{Purpose} \\
+\midrule
+\texttt{ProvisionType} & Normalized provision labels used by students and matching logic (see Section~\ref{sec:ingestion}). \\
+\texttt{ExamVenueProvisionType} & Provision capabilities used for venue matching and allocations. \\
+\texttt{VenueType} & Categorical labels for venue classification and reporting. \\
+\texttt{ExamTypeChoices} & Exam modality labels (on-campus vs online). \\
+\texttt{DietChoices} & Predefined diet windows for scheduling (expand as new cycles are added). \\
+\texttt{SlotChoices} & Morning vs evening availability slots. \\
+\texttt{InvigilatorQualificationChoices} & Qualification labels for invigilator capability tracking. \\
+\texttt{InvigilatorRestrictionType} & Restriction labels used when scheduling invigilators. \\
+\texttt{AccessibilityFeatures} & Venue accessibility metadata. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Core domain tables}
+\label{subsec:models:core}
+
+\begin{longtable}{p{0.30\textwidth}p{0.64\textwidth}}
+\toprule
+\textbf{Model} & \textbf{Purpose} \\
+\midrule
+\texttt{Diet} & Represents an exam diet window with start/end dates and restriction cutoffs. \\
+\texttt{Exam} & Stores exam metadata such as course code, school, and student counts. \\
+\texttt{Venue} & Represents a physical location with capacity, type, and capabilities. \\
+\texttt{ExamVenue} & Links an exam to a venue and captures timing/provision capability context. \\
+\texttt{Student} & Stores student identifiers and names. \\
+\texttt{StudentExam} & Links students to exams and optionally to matched exam venues. \\
+\texttt{Provisions} & Stores student provisions and extra-time notes per exam. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Notifications and announcements}
+\label{subsec:models:notifications}
+
+\begin{longtable}{p{0.30\textwidth}p{0.64\textwidth}}
+\toprule
+\textbf{Model} & \textbf{Purpose} \\
+\midrule
+\texttt{Notification} & Tracks system-generated events for admin or invigilator attention. \\
+\texttt{Announcement} & Admin-authored messages displayed in the UI. \\
+\texttt{UploadLog} & Records upload history for traceability and reporting. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Invigilator management}
+\label{subsec:models:invigilators}
+
+\begin{longtable}{p{0.30\textwidth}p{0.64\textwidth}}
+\toprule
+\textbf{Model} & \textbf{Purpose} \\
+\midrule
+\texttt{Invigilator} & Profile for invigilators, linked to auth users when present. \\
+\texttt{InvigilatorQualification} & Assigns qualifications to invigilators (unique per invigilator). \\
+\texttt{InvigilatorRestriction} & Records diet-specific restrictions per invigilator. \\
+\texttt{InvigilatorAvailability} & Tracks availability by date/slot. \\
+\texttt{InvigilatorAssignment} & Connects invigilators to exam venues with shift timing and role. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Where to look next}
+\label{subsec:models:next}
+
+\begin{itemize}
+  \item Model behaviors and signals: see Section~\ref{sec:signals} (to be added).
+  \item API serialization of these models: see Section~\ref{sec:api} (to be added).
+  \item Ingestion mapping into these models: see Section~\ref{sec:ingestion}.
+\end{itemize}
