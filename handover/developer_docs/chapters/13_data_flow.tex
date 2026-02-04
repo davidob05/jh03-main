@@ -1,0 +1,60 @@
+\section{End-to-end data flow}
+\label{sec:dataflow}
+
+This section provides a step-by-step view of how data moves through the system, from file upload to allocation and UI display. It is intended as a maintainer guide for debugging ingestion issues.
+
+\subsection{Upload entrypoint}
+\label{subsec:dataflow:entry}
+
+The admin UI uploads Excel files via \texttt{POST /api/exams-upload} (see Section~\ref{subsec:api:ingest}). This endpoint is implemented in \texttt{TimetableUploadView} and calls \texttt{parse\_excel\_file}.
+
+\subsection{File classification and parsing}
+\label{subsec:dataflow:parse}
+
+\begin{itemize}
+  \item \texttt{parse\_excel\_file} uses pandas to load a workbook and normalize headers.
+  \item \texttt{detect\_provision\_file} and \texttt{detect\_exam\_file} inspect canonical columns.
+  \item \texttt{detect\_venue\_file} detects structural venue sheets and falls back to \texttt{parse\_venue\_file}.
+\end{itemize}
+
+Required columns are validated against \texttt{utils/file\_definitions.py} before ingestion proceeds.
+
+\subsection{Ingestion and persistence}
+\label{subsec:dataflow:ingest}
+
+Once parsing succeeds, \texttt{ingest\_upload\_result} dispatches by file type:
+
+\begin{itemize}
+  \item \textbf{Exam}: \texttt{\_import\_exam\_rows} upserts \texttt{Exam} and creates core \texttt{ExamVenue} rows.
+  \item \textbf{Provisions}: \texttt{\_import\_provision\_rows} upserts \texttt{Student}, \texttt{Provisions}, \texttt{StudentExam}, then allocates venues.
+  \item \textbf{Venue}: \texttt{\_import\_venue\_days} captures availability and updates venues.
+\end{itemize}
+
+Every successful ingestion writes an \texttt{UploadLog} row for traceability.
+
+\subsection{Allocation and matching}
+\label{subsec:dataflow:matching}
+
+Provision ingestion is where matching rules apply:
+
+\begin{itemize}
+  \item Required capabilities are derived from provision labels (\texttt{\_required\_capabilities}).
+  \item Candidate venues are filtered by type, accessibility, and availability.
+  \item \texttt{venue\_has\_timing\_conflict} prevents overlaps.
+  \item \texttt{attach\_placeholders\_to\_venue} upgrades placeholder \texttt{ExamVenue} rows when a venue becomes capable.
+\end{itemize}
+
+These rules are validated by upload and matching tests (see Section~\ref{sec:tests}).
+
+\subsection{API serialization to UI}
+\label{subsec:dataflow:api}
+
+Backend model data is serialized via DRF serializers and consumed by the frontend. For example:
+
+\begin{itemize}
+  \item \texttt{ExamSerializer} and \texttt{ExamVenueSerializer} power admin exam screens.
+  \item \texttt{InvigilatorAssignmentSerializer} drives invigilator timetable and shift flows.
+  \item \texttt{NotificationSerializer} fuels admin and invigilator notifications.
+\end{itemize}
+
+See Section~\ref{sec:api} for endpoint coverage and Section~\ref{sec:frontend:components} for UI mappings.
