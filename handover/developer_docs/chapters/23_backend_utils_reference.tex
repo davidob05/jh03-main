@@ -1,0 +1,69 @@
+\section{Backend utilities reference}
+\label{sec:backend:utils}
+
+This section summarizes per-function responsibilities for the key helper modules under \texttt{timetabling\_system/utils} and \texttt{timetabling\_system/services} not covered elsewhere.
+
+\subsection{Venue matching and stats}
+\label{subsec:backend:utils:venue}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Function} & \textbf{Purpose} \\
+\midrule
+\texttt{venue\_supports\_caps} & Validates that a venue has all required provision capabilities. \\
+\texttt{venue\_has\_timing\_conflict} & Detects overlapping \texttt{ExamVenue} slots for a venue. \\
+\texttt{venue\_is\_available} & Checks a venue's availability list for a date. \\
+\texttt{attach\_placeholders\_to\_venue} & Binds placeholder \texttt{ExamVenue} rows to a newly capable venue. \\
+\texttt{examvenue\_student\_counts} & Aggregates student counts per \texttt{ExamVenue}. \\
+\texttt{core\_exam\_size} & Estimates core exam size excluding extra-time allocations. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Excel parsing and classification}
+\label{subsec:backend:utils:excel}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Function} & \textbf{Purpose} \\
+\midrule
+\texttt{parse\_excel\_file} & Main Excel parser; classifies and returns structured rows. \\
+\texttt{prepare\_exam\_provision\_df} & Normalizes and cleans DataFrames for exam/provision parsing. \\
+\texttt{validate\_required\_columns} & Checks column requirements from \texttt{file\_definitions}. \\
+\texttt{detect\_provision\_file} & Detects provision files by column signatures. \\
+\texttt{detect\_exam\_file} & Detects exam files by column signatures. \\
+\texttt{detect\_venue\_file} & Detects structural venue sheets. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Column normalization}
+\label{subsec:backend:utils:columns}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Function} & \textbf{Purpose} \\
+\midrule
+\texttt{normalize} & Normalizes column labels to lowercase, underscore-separated tokens. \\
+\texttt{map\_equivalent\_columns} & Maps messy headers to canonical names. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Venue parsing and ingest}
+\label{subsec:backend:utils:venues}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Function} & \textbf{Purpose} \\
+\midrule
+\texttt{parse\_venue\_file} & Parses venue availability spreadsheets using openpyxl. \\
+\texttt{\_cell\_to\_date\_text} & Converts Excel date cells into ISO strings. \\
+\texttt{upsert\_venues} & Upserts venues from parsed venue files with defaults. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Cross-references}
+\label{subsec:backend:utils:links}
+
+\begin{itemize}
+  \item Ingestion pipeline: Section~\ref{sec:ingestion}.
+  \item Upload processor reference: Section~\ref{sec:uploadprocessor}.
+\end{itemize}
