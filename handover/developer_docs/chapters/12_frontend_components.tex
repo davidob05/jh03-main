@@ -1,0 +1,72 @@
+\section{Frontend component map}
+\label{sec:frontend:components}
+
+This section maps the main frontend pages and shared components. It is intended as a navigation aid for maintainers rather than exhaustive API documentation.
+
+\subsection{Routing layout}
+\label{subsec:frontend:components:routing}
+
+Routing is defined in \texttt{src/Routes.tsx} and uses two layout shells:
+
+\begin{itemize}
+  \item \texttt{AdminLayout}: wraps all \texttt{/admin/*} routes.
+  \item \texttt{InvigilatorLayout}: wraps all \texttt{/invigilator/*} routes.
+\end{itemize}
+
+\subsection{Admin pages}
+\label{subsec:frontend:components:adminpages}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Component} & \textbf{Purpose} \\
+\midrule
+\texttt{pages/admin/Dashboard.tsx} & Admin landing page and high-level metrics. \\
+\texttt{pages/admin/Calendar.tsx} & Calendar view for exam schedules and allocations. \\
+\texttt{pages/admin/Exams.tsx} & Exam list, filters, bulk actions. \\
+\texttt{pages/admin/Exam.tsx} & Exam detail view and allocations. \\
+\texttt{pages/admin/Venues.tsx} & Venue list and management. \\
+\texttt{pages/admin/Venue.tsx} & Venue detail view and availability. \\
+\texttt{pages/admin/Invigilators.tsx} & Invigilator list and assignment tools. \\
+\texttt{pages/admin/Invigilator.tsx} & Invigilator profile and schedule controls. \\
+\texttt{pages/admin/Students.tsx} & Student/provision management and allocation fixes. \\
+\texttt{pages/admin/Profile.tsx} & Admin profile and auth settings. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Invigilator pages}
+\label{subsec:frontend:components:invpages}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Component} & \textbf{Purpose} \\
+\midrule
+\texttt{pages/invigilator/Dashboard.tsx} & Invigilator landing page with summary stats. \\
+\texttt{pages/invigilator/Timetable.tsx} & Upcoming timetable and assignments. \\
+\texttt{pages/invigilator/Shifts.tsx} & Shift pickup and cancellation actions. \\
+\texttt{pages/invigilator/Restrictions.tsx} & Availability and restriction entry. \\
+\texttt{pages/invigilator/Profile.tsx} & Invigilator profile management. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Admin dialogs and shared components}
+\label{subsec:frontend:components:admindialogs}
+
+Admin dialogs live in \texttt{src/components/admin}. Key components:
+
+\begin{itemize}
+  \item \texttt{UploadFile}: Excel ingestion UI.
+  \item \texttt{AssignInvigilatorDialog}, \texttt{EditInvigilatorDialog}, \texttt{InvigilatorAvailabilityModal}: assignment and availability tooling.
+  \item \texttt{DietManager}: diet administration UI.
+  \item \texttt{NotificationsPanel}, \texttt{NotifyDialog}: admin messaging and mail merge.
+  \item \texttt{ExportInvigilatorTimetablesDialog}, \texttt{ExportProgressDialog}: CSV export flows.
+\end{itemize}
+
+Shared cross-role components live in \texttt{src/components} (e.g., \texttt{RequireAuth}, \texttt{RequireRole}, \texttt{Panel}, \texttt{PillButton}).
+
+\subsection{Cross-references}
+\label{subsec:frontend:components:links}
+
+\begin{itemize}
+  \item API endpoints used by these pages: Section~\ref{sec:api}.
+  \item Auth/role logic: Section~\ref{sec:accounts}.
+\end{itemize}
