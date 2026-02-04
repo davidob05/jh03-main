@@ -1,0 +1,42 @@
+\section{Backend overview (Django)}
+\label{sec:backend}
+
+The backend is a Django 5 project located in \texttt{services/django/lithium}. It owns the data model, ingestion logic, API endpoints, and admin flows. Most application logic lives in the \texttt{timetabling\_system} app, with supporting auth in \texttt{accounts} and simple page rendering in \texttt{pages}.
+
+\subsection{Project entry points}
+\label{subsec:backend:entrypoints}
+
+\begin{itemize}
+  \item \texttt{manage.py}: Django management entry point used by scripts and CI.
+  \item \texttt{django\_project/settings.py}: configuration, installed apps, middleware, environment defaults.
+  \item \texttt{django\_project/urls.py}: top-level URL routing (API, auth, pages).
+  \item \texttt{django\_project/asgi.py} and \texttt{django\_project/wsgi.py}: deployment entry points.
+\end{itemize}
+
+\subsection{Apps and responsibilities}
+\label{subsec:backend:apps}
+
+\begin{longtable}{p{0.28\textwidth}p{0.68\textwidth}}
+\toprule
+\textbf{App} & \textbf{Responsibility} \\
+\midrule
+\texttt{timetabling\_system} & Core domain models, ingestion pipeline, matching logic, API endpoints. \\
+\texttt{accounts} & Authentication, user profiles, invigilator metadata, custom adapters. \\
+\texttt{pages} & Simple HTML pages (marketing/static). \\
+\bottomrule
+\end{longtable}
+
+\subsection{Settings and environment}
+\label{subsec:backend:settings}
+
+The backend reads database settings from environment variables and ships defaults for local development. The Docker service spins up PostgreSQL in-container; in CI, the same environment variables are used. See \texttt{README.md} for the current default variable names and test commands.
+
+\subsection{Permissions and roles}
+\label{subsec:backend:roles}
+
+The system distinguishes admin users from invigilators. Admins can manage all data and upload spreadsheets; invigilators are restricted to their own schedules and availability. API endpoints enforce role-based access; frontend routes apply additional UI guards (see Section~\ref{sec:frontend}).
+
+\subsection{Next sections}
+\label{subsec:backend:next}
+
+Detailed model-by-model and function-by-function references are in Section~\ref{sec:models} and Section~\ref{sec:services} (to be added). Ingestion details are in Section~\ref{sec:ingestion}.
