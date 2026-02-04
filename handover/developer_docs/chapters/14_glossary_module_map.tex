@@ -1,0 +1,50 @@
+\section{Glossary and module map}
+\label{sec:glossary}
+
+This section defines key domain terms and maps the most important modules to their responsibilities.
+
+\subsection{Glossary}
+\label{subsec:glossary:terms}
+
+\begin{longtable}{p{0.28\textwidth}p{0.68\textwidth}}
+\toprule
+\textbf{Term} & \textbf{Definition} \\
+\midrule
+\texttt{Diet} & An exam period window (e.g., April/May) with dates and restriction cutoffs. \\
+\texttt{ExamVenue} & Join model connecting an exam to a venue and timing context. \\
+\texttt{Provision} & A student requirement (extra time, separate room, assistive tech). \\
+\texttt{Placeholder ExamVenue} & An \texttt{ExamVenue} with no venue assigned yet. \\
+\texttt{Capability} & A venue feature used to satisfy provisions (e.g., computer, accessible hall). \\
+\texttt{Invigilator} & Staff profile that can be assigned to exam venues and shifts. \\
+\texttt{Assignment} & A scheduled invigilator shift tied to an exam venue. \\
+\texttt{Restriction} & Invigilator availability limitations for a given diet. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Module map}
+\label{subsec:glossary:modules}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Module/Path} & \textbf{Responsibility} \\
+\midrule
+\texttt{timetabling\_system/models.py} & Domain models and constraints (see Section~\ref{sec:models}). \\
+\texttt{timetabling\_system/api/} & REST API endpoints and serializers (see Section~\ref{sec:api}). \\
+\texttt{timetabling\_system/services/} & Ingestion + matching business logic (see Section~\ref{sec:services}). \\
+\texttt{timetabling\_system/utils/} & Excel parsing and header normalization helpers. \\
+\texttt{accounts/} & Custom user model and auth/session endpoints (see Section~\ref{sec:accounts}). \\
+\texttt{services/frontend/app/src} & React frontend and role-gated routes (see Section~\ref{sec:frontend}). \\
+\texttt{ops/compose} & Docker compose definitions (see Section~\ref{sec:ops}). \\
+\bottomrule
+\end{longtable}
+
+\subsection{Known gaps}
+\label{subsec:glossary:gaps}
+
+This documentation focuses on the highest-value maintainer knowledge. Remaining gaps to fill:
+
+\begin{itemize}
+  \item Per-class and per-function reference tables for large files (e.g., \texttt{upload\_processor.py}).
+  \item Detailed permission matrix per endpoint.
+  \item Frontend state/dataflow diagrams for complex admin flows.
+\end{itemize}
