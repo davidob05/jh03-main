@@ -1,0 +1,42 @@
+\section{Ingestion pipeline overview}
+\label{sec:ingestion}
+
+The ingestion pipeline transforms Excel uploads into normalized domain records. It is the highest-impact logic in the system and has strict ordering requirements: venues first, then exams, then provisions. The primary implementation lives in \texttt{timetabling\_system/services} and \texttt{timetabling\_system/utils}.
+
+\subsection{Upload sequence}
+\label{subsec:ingestion:sequence}
+
+\begin{enumerate}
+  \item \textbf{Venue uploads}: create or update \texttt{Venue} rows, including capacity, type, accessibility, and availability.
+  \item \textbf{Exam uploads}: create or update \texttt{Exam} rows and initial \texttt{ExamVenue} links.
+  \item \textbf{Manual capabilities tagging}: admins annotate venues with provision capabilities before provisioning runs.
+  \item \textbf{Provision uploads}: upsert students and their exams, match required capabilities to venues, and attach students to the right \texttt{ExamVenue} rows.
+\end{enumerate}
+
+This mirrors the behavior documented in \texttt{README.md} and should not be reordered without updating tests and UI guidance.
+
+\subsection{Key modules}
+\label{subsec:ingestion:modules}
+
+\begin{longtable}{p{0.36\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Module} & \textbf{Purpose} \\
+\midrule
+\texttt{services/upload\_processor.py} & Orchestrates parsing and record upserts for each upload type. \\
+\texttt{utils/excel\_parser.py} & Reads Excel files and standardizes raw rows. \\
+\texttt{utils/file\_classifier.py} & Determines upload type based on column signatures. \\
+\texttt{utils/column\_mapper.py} & Maps various header names to canonical field names. \\
+\texttt{services/venue\_matching.py} & Matches provision requirements to suitable venues and prevents conflicts. \\
+\texttt{services/venue\_stats.py} & Computes availability/usage statistics for reporting. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Matching logic (high-level)}
+\label{subsec:ingestion:matching}
+
+The matching logic prioritizes reusing existing \texttt{ExamVenue} rows that already satisfy capability requirements. If none exist, it searches for compatible venues based on required provisions, accessibility, availability, and timing. Conflict checks prevent overlapping allocations unless explicitly allowed for the same exam. For detailed behavior and helper routines, see Section~\ref{sec:services} (to be added).
+
+\subsection{Error handling and data hygiene}
+\label{subsec:ingestion:errors}
+
+Ingestion attempts to normalize common variants (e.g., provision phrasing and header names). Unknown or malformed rows are typically skipped with logging; the pipeline favors resilience to messy spreadsheets. Tests in \texttt{services/django/lithium/tests/django} encode the expected behavior for edge cases.
