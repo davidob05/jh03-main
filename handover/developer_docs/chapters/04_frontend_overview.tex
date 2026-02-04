@@ -1,0 +1,38 @@
+\section{Frontend overview (React)}
+\label{sec:frontend}
+
+The frontend lives in \texttt{services/frontend/app}. It is a React 19 + Vite application with role-based routes for admins and invigilators. The UI uses Material UI and talks to the Django API via a small fetch wrapper that injects auth tokens.
+
+\subsection{Entry points and configuration}
+\label{subsec:frontend:entrypoints}
+
+\begin{itemize}
+  \item \texttt{src/main.tsx}: application bootstrap, mounts the React tree.
+  \item \texttt{src/App.tsx}: top-level app wrapper (themes, routing, providers).
+  \item \texttt{src/Routes.tsx}: route definitions and role gating.
+  \item \texttt{src/vite.config.mts}: Vite build configuration.
+\end{itemize}
+
+\subsection{Routes and role gates}
+\label{subsec:frontend:routes}
+
+Routes are defined in \texttt{src/Routes.tsx}. Two guards mediate access:
+
+\begin{itemize}
+  \item \texttt{RequireAuth}: enforces authentication before entering protected routes.
+  \item \texttt{RequireRole}: restricts protected routes to a specific role (admin or invigilator).
+\end{itemize}
+
+Admin routes are under \texttt{/admin/*}, invigilator routes are under \texttt{/invigilator/*}. The login page is public, and unknown routes go to a \texttt{NotFound} page.
+
+\subsection{API access and auth storage}
+\label{subsec:frontend:api}
+
+The fetch helper in \texttt{src/utils/api.ts} builds a base API URL from \texttt{VITE\_API\_URL} or the browser origin and injects the \texttt{Authorization: Token <token>} header. Auth state is stored in \texttt{sessionStorage} when available and can fall back to \texttt{localStorage} for legacy users. The helper also supports a public fetch mode for unauthenticated calls.
+
+\subsection{UI structure}
+\label{subsec:frontend:ui}
+
+The React tree splits into admin and invigilator layouts, each with nested pages and dialogs. The admin area includes exam, venue, invigilator, and student management screens plus uploads and notifications. Invigilator pages cover dashboards, timetables, availability, restrictions, and profile data.
+
+Detailed component references are provided in Section~\ref{sec:frontend:components} (to be added), with links back to relevant backend API endpoints in Section~\ref{sec:api} (to be added).
