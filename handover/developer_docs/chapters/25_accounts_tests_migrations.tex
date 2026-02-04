@@ -1,0 +1,39 @@
+\section{Accounts tests and migrations}
+\label{sec:accounts:tests}
+
+This section describes the accounts-specific tests and migrations that shape authentication behavior.
+
+\subsection{Default admin migration}
+\label{subsec:accounts:tests:migration}
+
+\texttt{accounts/migrations/0002\_create\_default\_admin.py} seeds a default admin user and token for local use. It provides:
+
+\begin{itemize}
+  \item \texttt{create\_default\_admin}: creates or updates the default admin user and token.
+  \item \texttt{remove\_default\_admin}: removes the default admin user on reverse migration.
+\end{itemize}
+
+These behaviors are covered by migration tests in \texttt{accounts/tests\_ext.py}.
+
+\subsection{Core account tests}
+\label{subsec:accounts:tests:core}
+
+\texttt{accounts/tests.py} covers basic user creation, login page rendering, and admin login redirects.
+
+\subsection{Extended auth tests}
+\label{subsec:accounts:tests:ext}
+
+\texttt{accounts/tests\_ext.py} covers:
+
+\begin{itemize}
+  \item Account adapter behavior for resigned invigilators.
+  \item Auth API edge cases (missing credentials, inactive users).
+  \item Current user PATCH flows (username/email/password/avatar/phone).
+  \item Session token regeneration and deletion behavior.
+  \item Migration logic for default admin creation/removal.
+\end{itemize}
+
+\subsection{Password validator tests}
+\label{subsec:accounts:tests:validators}
+
+\texttt{accounts/tests\_validators.py} verifies the complexity validator accepts valid passwords and rejects weak ones.
