@@ -207,6 +207,16 @@ CI mirrors these commands via `.gitlab-ci.yml`.
 3. Commit code, migration files, and relevant docs together.
 4. Open a merge request; CI must be green before merging.
 
+### Developer Documentation (Handover)
+
+- Developer docs live in `handover/developer_docs`.
+- If you change the codebase, update the LaTeX sources in `handover/developer_docs/chapters` and rebuild the PDF.
+- Generate the PDF with:
+
+```
+./generate-docs-pdf.sh
+```
+
 For questions, drop a note in your team channel. Happy hacking!
 
 ---
