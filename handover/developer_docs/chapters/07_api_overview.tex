@@ -1,0 +1,93 @@
+\section{API overview}
+\label{sec:api}
+
+The API is provided by Django REST Framework and is rooted at \texttt{/api/}. URL wiring is in \texttt{django\_project/urls.py} and \texttt{timetabling\_system/api/urls.py}. The frontend calls these endpoints via \texttt{src/utils/api.ts} (see Section~\ref{sec:frontend}).
+
+\subsection{URL routing}
+\label{subsec:api:routing}
+
+Top-level routing:
+
+\begin{itemize}
+  \item \texttt{/api/} is handled by \texttt{timetabling\_system/api/urls.py}.
+  \item \texttt{/admin/} is the Django admin UI.
+  \item \texttt{/accounts/} exposes django-allauth endpoints.
+\end{itemize}
+
+\subsection{Authentication endpoints}
+\label{subsec:api:auth}
+
+The API exposes token-based auth and session management:
+
+\begin{itemize}
+  \item \texttt{POST /api/auth/token/login/}: username/password login, returns token and user info.
+  \item \texttt{GET /api/auth/me/}: current user payload.
+  \item \texttt{GET /api/auth/sessions/}: list active sessions.
+  \item \texttt{POST /api/auth/sessions/revoke/}: revoke a session.
+  \item \texttt{POST /api/auth/sessions/revoke-others/}: revoke all other sessions.
+  \item \texttt{POST /api/auth/logout/}: end the current session.
+\end{itemize}
+
+\subsection{Admin CRUD endpoints}
+\label{subsec:api:crud}
+
+The following viewsets are admin-only and use standard REST semantics (list, retrieve, create, update, delete):
+
+\begin{itemize}
+  \item \texttt{/api/exams/} (ExamViewSet)
+  \item \texttt{/api/venues/} (VenueViewSet)
+  \item \texttt{/api/exam-venues/} (ExamVenueViewSet)
+  \item \texttt{/api/invigilators/} (InvigilatorViewSet)
+  \item \texttt{/api/invigilator-assignments/} (InvigilatorAssignmentViewSet)
+  \item \texttt{/api/announcements/} (AnnouncementViewSet; read allowed for invigilators)
+  \item \texttt{/api/diets/} (DietViewSet)
+\end{itemize}
+
+Bulk delete actions exist on exams, venues, and invigilators via \texttt{POST /api/<resource>/bulk-delete/}.
+
+\subsection{Ingestion and exports}
+\label{subsec:api:ingest}
+
+\begin{itemize}
+  \item \texttt{POST /api/exams-upload}: upload Excel files, routes to ingestion pipeline.
+  \item \texttt{GET /api/provisions/export/}: export provisions CSV (admin-only).
+  \item \texttt{POST /api/invigilators/timetables/export/}: export invigilator timetables CSV.
+\end{itemize}
+
+\subsection{Notifications and messaging}
+\label{subsec:api:notifications}
+
+\begin{itemize}
+  \item \texttt{GET/POST /api/notifications/}: list recent notifications or trigger mail merge (admin).
+  \item \texttt{GET /api/invigilator/notifications/}: invigilator notification feed.
+\end{itemize}
+
+\subsection{Invigilator self-service endpoints}
+\label{subsec:api:invigilator}
+
+\begin{itemize}
+  \item \texttt{GET /api/invigilator/stats/}: invigilator stats summary.
+  \item \texttt{GET/PUT /api/invigilator/availability/}: view/update availability for a diet.
+  \item \texttt{GET /api/invigilator/assignments/}: list invigilator assignments.
+  \item \texttt{POST /api/invigilator-assignments/<id>/pickup/}: pick up a cancelled shift.
+  \item \texttt{POST /api/invigilator-assignments/<id>/request-cancel/}: request cancellation.
+  \item \texttt{POST /api/invigilator-assignments/<id>/undo-cancel/}: undo cancellation.
+\end{itemize}
+
+\subsection{Serializers}
+\label{subsec:api:serializers}
+
+Serializers live in \texttt{timetabling\_system/api/serializers.py}. Highlights:
+
+\begin{itemize}
+  \item \texttt{ExamVenueSerializer} and \texttt{ExamVenueWriteSerializer}: read vs write shapes for exam venues.
+  \item \texttt{ExamSerializer}, \texttt{VenueSerializer}, \texttt{VenueWriteSerializer}: admin CRUD payloads.
+  \item \texttt{InvigilatorAssignmentSerializer}: includes provision details and coverage metadata.
+  \item \texttt{InvigilatorSerializer}: nested create/update for qualifications and restrictions.
+  \item \texttt{NotificationSerializer}, \texttt{AnnouncementSerializer}, \texttt{DietSerializer}.
+\end{itemize}
+
+\subsection{Permissions and throttling}
+\label{subsec:api:permissions}
+
+Most mutation endpoints require admin access. Invigilator-only actions are guarded by \texttt{IsInvigilatorOrAdmin}; senior-admin role gates are enforced for admin promotion actions. Admin-only viewsets often disable throttling to allow bulk operations.
