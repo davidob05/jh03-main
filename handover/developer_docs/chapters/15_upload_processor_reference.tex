@@ -1,0 +1,97 @@
+\section{Upload processor reference}
+\label{sec:uploadprocessor}
+
+This section provides a function-level reference for \texttt{timetabling\_system/services/upload\_processor.py}. The intent is to highlight responsibilities and how helpers compose.
+
+\subsection{Public entrypoint}
+\label{subsec:uploadprocessor:entry}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Function} & \textbf{Purpose} \\
+\midrule
+\texttt{ingest\_upload\_result} & Dispatches parsed results by file type, persists data, writes \texttt{UploadLog}, and returns a summary. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Parsing and normalization helpers}
+\label{subsec:uploadprocessor:normalize}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Function} & \textbf{Purpose} \\
+\midrule
+\texttt{\_base\_summary} & Initializes summary counters for ingestion. \\
+\texttt{\_maybe\_to\_datetime} & Extracts datetime from pandas-like values when present. \\
+\texttt{\_is\_missing} & Normalizes missing/blank detection including NaN. \\
+\texttt{\_clean\_string} & Strips and truncates strings for safe storage. \\
+\texttt{\_coerce\_date} & Coerces values into \texttt{date} objects when possible. \\
+\texttt{\_coerce\_datetime} & Coerces values into \texttt{datetime} objects when possible. \\
+\texttt{\_time\_from\_digits} & Interprets digit-only strings as HHMM time values. \\
+\texttt{\_coerce\_time} & Coerces values into \texttt{time} objects and handles Excel fractions. \\
+\texttt{\_coerce\_int} & Coerces durations and numeric fields into integers. \\
+\texttt{\_ensure\_aware} & Normalizes timezone awareness based on settings. \\
+\texttt{\_combine\_start\_datetime} & Builds a start datetime from date + time inputs. \\
+\texttt{\_duration\_in\_minutes} & Derives durations from explicit length or end time. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Exam ingestion}
+\label{subsec:uploadprocessor:exam}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Function} & \textbf{Purpose} \\
+\midrule
+\texttt{\_core\_exam\_timing} & Finds core start time and duration from \texttt{ExamVenue} rows. \\
+\texttt{\_import\_exam\_rows} & Upserts \texttt{Exam} records and creates core \texttt{ExamVenue} links. \\
+\texttt{\_build\_exam\_payload} & Normalizes a raw row into exam fields and timing. \\
+\texttt{\_create\_exam\_venue\_links} & Ensures venues exist and links them to exams as core venues. \\
+\texttt{\_extract\_venue\_names} & Parses venue names from raw rows, handling online markers. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Provision ingestion}
+\label{subsec:uploadprocessor:provisions}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Function} & \textbf{Purpose} \\
+\midrule
+\texttt{\_normalize\_provisions} & Maps raw provision text into canonical \texttt{ProvisionType} values. \\
+\texttt{\_match\_extra\_time\_token} & Handles extra-time token parsing from messy text. \\
+\texttt{\_import\_provision\_rows} & Upserts students, provisions, and matches/allocates venues. \\
+\texttt{\_required\_capabilities} & Maps provision labels to venue capability requirements. \\
+\texttt{\_needs\_accessible\_venue} & True if provisions require accessibility. \\
+\texttt{\_needs\_separate\_room} & True if provisions require separate rooms. \\
+\texttt{\_needs\_computer} & True if provisions require computer access. \\
+\texttt{\_exam\_requires\_computer} & Infers computer requirement from exam type. \\
+\texttt{\_extra\_time\_minutes} & Calculates extra time needed from provisions. \\
+\texttt{\_apply\_extra\_time} & Adjusts start time/length to accommodate extra time. \\
+\texttt{\_has\_small\_extra\_time} & Heuristic for small extra time allowances. \\
+\texttt{\_allowed\_venue\_types} & Determines compatible venue types for allocations. \\
+\texttt{\_find\_matching\_exam\_venue} & Finds existing \texttt{ExamVenue} matching constraints. \\
+\texttt{\_allocate\_exam\_venue} & Creates or repurposes \texttt{ExamVenue} rows to satisfy needs. \\
+\texttt{\_exam\_venue\_is\_reserved} & Enforces separate-room exclusivity. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Venue availability ingestion}
+\label{subsec:uploadprocessor:venues}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Function} & \textbf{Purpose} \\
+\midrule
+\texttt{\_import\_venue\_days} & Upserts venues and availability dates from venue uploads. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Cross-references}
+\label{subsec:uploadprocessor:links}
+
+\begin{itemize}
+  \item Data-flow overview: Section~\ref{sec:dataflow}.
+  \item Matching logic: Section~\ref{sec:services}.
+  \item Tests covering ingestion: Section~\ref{sec:tests}.
+\end{itemize}
