@@ -1,0 +1,68 @@
+\section{Services and utilities}
+\label{sec:services}
+
+This section summarizes the non-view business logic modules that power ingestion, matching, and parsing. These modules are where most data normalization occurs.
+
+\subsection{Service layer}
+\label{subsec:services:layer}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Module} & \textbf{Purpose} \\
+\midrule
+\texttt{services/upload\_processor.py} & Orchestrates ingestion; routes file types to import routines and records \texttt{UploadLog}. \\
+\texttt{services/venue\_matching.py} & Capability matching and conflict detection for venue assignments. \\
+\texttt{services/venue\_stats.py} & Aggregates student counts per \texttt{ExamVenue} and estimates core exam sizes. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Ingestion helpers (upload\_processor.py)}
+\label{subsec:services:upload}
+
+Core helpers:
+
+\begin{itemize}
+  \item \texttt{ingest\_upload\_result}: main entry point; dispatches by file type and returns summary.
+  \item \texttt{\_import\_exam\_rows}: upserts exams and core exam venues.
+  \item \texttt{\_import\_provision\_rows}: upserts students, provisions, and matching exam venues.
+  \item \texttt{\_import\_venue\_days}: ingests venue availability blocks.
+  \item \texttt{\_required\_capabilities}, \texttt{\_needs\_*}: map provision labels into capability constraints.
+\end{itemize}
+
+These routines are the primary business rules for data consistency. Changes here should be accompanied by Django tests in \texttt{services/django/lithium/tests/django}.
+
+\subsection{Venue matching (venue\_matching.py)}
+\label{subsec:services:matching}
+
+\begin{itemize}
+  \item \texttt{venue\_supports\_caps}: checks venue capability coverage.
+  \item \texttt{venue\_has\_timing\_conflict}: detects schedule overlap, with optional same-exam allowances.
+  \item \texttt{venue\_is\_available}: checks venue availability by date list.
+  \item \texttt{attach\_placeholders\_to\_venue}: upgrades placeholder \texttt{ExamVenue} rows when a venue becomes capable.
+\end{itemize}
+
+\subsection{Utilities}
+\label{subsec:services:utils}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Module} & \textbf{Purpose} \\
+\midrule
+\texttt{utils/excel\_parser.py} & Reads Excel files, normalizes headers, and dispatches parsing by file type. \\
+\texttt{utils/file\_classifier.py} & Detects exam/provision/venue sheets based on column signatures. \\
+\texttt{utils/column\_mapper.py} & Normalizes column names and maps equivalents to canonical names. \\
+\texttt{utils/file\_definitions.py} & Required canonical columns for exam/provision files. \\
+\texttt{utils/equivalents.py} & Canonical header mapping for messy Excel files. \\
+\texttt{utils/venue\_parser.py} & Parses venue availability spreadsheets using openpyxl. \\
+\texttt{utils/venue\_ingest.py} & Upserts venue records from parsed availability data. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Cross-references}
+\label{subsec:services:links}
+
+\begin{itemize}
+  \item Ingestion flow overview: Section~\ref{sec:ingestion}.
+  \item API upload endpoint: Section~\ref{subsec:api:ingest}.
+  \item Model constraints relevant to matching: Section~\ref{sec:models}.
+\end{itemize}
