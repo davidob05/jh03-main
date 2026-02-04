@@ -1,0 +1,47 @@
+\section{Frontend tests and config}
+\label{sec:tests:frontend:index}
+
+This section lists frontend test files and notes test configuration.
+
+\subsection{Vitest configuration}
+\label{subsec:tests:frontend:config}
+
+\begin{itemize}
+  \item Test setup lives in \texttt{app/setupTests.ts}.
+  \item Vite/Vitest config is in \texttt{app/vite.config.mts} and \texttt{app/vitest.config.mts}.
+\end{itemize}
+
+\subsection{Frontend test index}
+\label{subsec:tests:frontend:index}
+
+\begin{longtable}{p{0.52\textwidth}p{0.42\textwidth}}
+\toprule
+\textbf{Test file} & \textbf{Coverage focus} \\
+\midrule
+\texttt{components/RequireRole.test.tsx} & Role gating behavior. \\
+\texttt{components/admin/AddInvigilatorDialog.diets.test.tsx} & Invigilator creation with diets. \\
+\texttt{components/admin/AssignInvigilatorDialog.test.tsx} & Assigning invigilators to shifts. \\
+\texttt{components/admin/ContractedHoursReport.test.tsx} & Contracted hours report rendering. \\
+\texttt{components/admin/DietManager.test.tsx} & Diet CRUD UI logic. \\
+\texttt{components/admin/EditInvigilatorDialog.diets.test.tsx} & Invigilator edit flow with diets. \\
+\texttt{components/admin/ExamDetailsPopup.test.tsx} & Exam details popup behavior. \\
+\texttt{components/admin/ExportInvigilatorTimetablesDialog.test.tsx} & Export dialog behavior. \\
+\texttt{components/admin/InvigilatorAvailabilityModal.test.tsx} & Availability modal behavior. \\
+\texttt{components/admin/UploadFile.test.tsx} & Upload UI and error handling. \\
+\texttt{components/admin/layout.test.tsx} & Admin layout rendering. \\
+\texttt{components/invigilator/layout.test.tsx} & Invigilator layout rendering. \\
+\texttt{components/invigilator/shift-pickup-dialog.test.tsx} & Shift pickup dialog flow. \\
+\texttt{pages/admin/announcements.test.tsx} & Admin announcements page. \\
+\texttt{pages/admin/calendar.test.tsx} & Admin calendar UI. \\
+\texttt{pages/admin/dashboard-export.test.tsx} & Dashboard export workflows. \\
+\texttt{pages/admin/exam-details.test.tsx} & Admin exam detail page. \\
+\texttt{pages/admin/invigilator-profile.test.tsx} & Invigilator profile page. \\
+\texttt{pages/admin/invigilators-export.test.tsx} & Invigilator export workflow. \\
+\texttt{pages/admin/profile.test.tsx} & Admin profile page. \\
+\texttt{pages/admin/statePersistence.test.tsx} & State persistence across sessions. \\
+\texttt{pages/invigilator/announcements.test.tsx} & Invigilator announcements page. \\
+\texttt{pages/invigilator/dashboard.test.tsx} & Invigilator dashboard. \\
+\texttt{pages/invigilator/restrictions.test.tsx} & Restrictions/availability page. \\
+\texttt{pages/invigilator/shifts.test.tsx} & Invigilator shifts page. \\
+\bottomrule
+\end{longtable}
