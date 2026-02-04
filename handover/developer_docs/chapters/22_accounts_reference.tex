@@ -1,0 +1,73 @@
+\section{Accounts app reference}
+\label{sec:accounts:ref}
+
+This section provides a function/class reference for the \texttt{accounts} app.
+
+\subsection{Models}
+\label{subsec:accounts:ref:models}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Model} & \textbf{Purpose} \\
+\midrule
+\texttt{CustomUser} & Extends \texttt{AbstractUser} with phone, avatar, and senior-admin flag. \\
+\texttt{UserSession} & Per-login token model; supports multiple concurrent sessions per user. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Auth API helpers and views}
+\label{subsec:accounts:ref:api}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Helper/View} & \textbf{Purpose} \\
+\midrule
+\texttt{\_safe\_attr} & Safe attribute access to avoid exploding on missing attributes. \\
+\texttt{\_derive\_role} & Derives role label from user flags/profile. \\
+\texttt{\_get\_invigilator\_id} & Pulls invigilator id from the user profile. \\
+\texttt{\_get\_senior\_admin\_flag} & Checks the senior-admin flag. \\
+\texttt{\_get\_client\_ip}, \texttt{\_get\_user\_agent} & Capture request metadata for session tracking. \\
+\texttt{AuthTokenSerializer} & Validates username/password (username or email). \\
+\texttt{ObtainAuthTokenView} & Issues DRF token and logs a \texttt{UserSession}. \\
+\texttt{CurrentUserView} & GET/PATCH/DELETE for profile updates and admin self-delete. \\
+\texttt{SessionListView} & Lists sessions for the current user. \\
+\texttt{SessionRevokeView} & Revokes a specific session. \\
+\texttt{SessionRevokeOthersView} & Revokes all other active sessions. \\
+\texttt{SessionLogoutView} & Revokes the current session. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Authentication backend}
+\label{subsec:accounts:ref:authbackend}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Class} & \textbf{Purpose} \\
+\midrule
+\texttt{UserSessionAuthentication} & DRF auth class that validates \texttt{UserSession} tokens and updates \texttt{last\_seen}. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Adapters and validators}
+\label{subsec:accounts:ref:adapters}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Class} & \textbf{Purpose} \\
+\midrule
+\texttt{AccountAdapter} & Blocks resigned invigilator login when configured. \\
+\texttt{ComplexityPasswordValidator} & Enforces lower/upper/digit/symbol complexity. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Admin integration}
+\label{subsec:accounts:ref:admin}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Class} & \textbf{Purpose} \\
+\midrule
+\texttt{CustomUserAdmin} & Admin UI for custom users with profile fields. \\
+\texttt{UserSessionAdmin} & Admin UI for viewing and revoking sessions. \\
+\bottomrule
+\end{longtable}
