@@ -1,0 +1,24 @@
+\section{Signals and implicit behaviors}
+\label{sec:signals}
+
+Some system behaviors are triggered implicitly via Django signals and model hooks. These are easy to overlook when making changes.
+
+\subsection{Signal registration}
+\label{subsec:signals:registration}
+
+Signals are registered in \texttt{timetabling\_system/apps.py} via the app \texttt{ready()} hook. This ensures the signal handlers in \texttt{timetabling\_system/signals.py} are loaded when Django starts.
+
+\subsection{Venue signals}
+\label{subsec:signals:venue}
+
+\begin{itemize}
+  \item \texttt{pre\_save Venue}: if a venue has \texttt{USE\_COMPUTER} capability and its type is not computer-friendly, it is coerced to \texttt{COMPUTER\_CLUSTER}.
+  \item \texttt{post\_save Venue}: runs \texttt{attach\_placeholders\_to\_venue} to upgrade placeholder \texttt{ExamVenue} rows when a venue becomes capable.
+\end{itemize}
+
+These signal behaviors tie into the ingestion and matching logic (see Section~\ref{sec:services} and Section~\ref{sec:ingestion}).
+
+\subsection{Model-level hooks}
+\label{subsec:signals:modelhooks}
+
+Some models enforce behavior via \texttt{clean()} and \texttt{save()} overrides (for example, \texttt{StudentExam} validates separate-room capacity and calls \texttt{full\_clean()} on save). See Section~\ref{sec:models} for the affected models.
