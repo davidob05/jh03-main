@@ -1,0 +1,50 @@
+\section{Accounts and authentication}
+\label{sec:accounts}
+
+The \texttt{accounts} app provides a custom user model, session tracking, and login APIs that integrate with the rest of the platform. It also enforces optional login restrictions for resigned invigilators.
+
+\subsection{Models}
+\label{subsec:accounts:models}
+
+\begin{longtable}{p{0.30\textwidth}p{0.64\textwidth}}
+\toprule
+\textbf{Model} & \textbf{Purpose} \\
+\midrule
+\texttt{CustomUser} & Extends \texttt{AbstractUser} with phone, avatar, and senior-admin flag. \\
+\texttt{UserSession} & Per-login token model for multiple concurrent sessions per user. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Authentication flow}
+\label{subsec:accounts:authflow}
+
+\begin{itemize}
+  \item \texttt{ObtainAuthTokenView} issues a DRF token and records a \texttt{UserSession} row.
+  \item \texttt{UserSessionAuthentication} validates session tokens and updates \texttt{last\_seen}.
+  \item \texttt{CurrentUserView} exposes profile data and supports PATCH updates (username/email/password/phone/avatar).
+\end{itemize}
+
+\subsection{Session management endpoints}
+\label{subsec:accounts:sessions}
+
+\begin{itemize}
+  \item \texttt{GET /api/auth/sessions/}: list sessions for the current user.
+  \item \texttt{POST /api/auth/sessions/revoke/}: revoke a specific session.
+  \item \texttt{POST /api/auth/sessions/revoke-others/}: revoke all other sessions.
+  \item \texttt{POST /api/auth/logout/}: revoke the current session.
+\end{itemize}
+
+\subsection{Login restrictions}
+\label{subsec:accounts:restrictions}
+
+\texttt{AccountAdapter.is\_login\_allowed} optionally blocks login for resigned invigilators when \texttt{BLOCK\_RESIGNED\_INVIGILATORS} is enabled in settings.
+
+\subsection{Admin integration}
+\label{subsec:accounts:admin}
+
+The Django admin exposes \texttt{CustomUser} with profile fields and a \texttt{UserSession} admin for inspecting session activity.
+
+\subsection{Password policy}
+\label{subsec:accounts:passwords}
+
+\texttt{ComplexityPasswordValidator} enforces a lower/upper/digit/symbol requirement and is referenced in the settings validators list.
