@@ -1,0 +1,65 @@
+\section{API serializer reference}
+\label{sec:api:serializers:ref}
+
+This section summarizes \texttt{timetabling\_system/api/serializers.py} and the purpose of each serializer.
+
+\subsection{Exam and venue serializers}
+\label{subsec:api:serializers:examvenue}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Serializer} & \textbf{Purpose} \\
+\midrule
+\texttt{ExamVenueSerializer} & Read serializer for \texttt{ExamVenue}; includes derived fields like venue name and student counts. \\
+\texttt{ExamVenueWriteSerializer} & Write serializer for \texttt{ExamVenue}; validates separate-room clashes. \\
+\texttt{ExamSerializer} & Exam payload with nested \texttt{ExamVenue} rows. \\
+\texttt{VenueSerializer} & Venue payload with exam links; filters disallowed capabilities. \\
+\texttt{VenueWriteSerializer} & Write serializer for venues; enforces capability cleanup. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Notification and announcement serializers}
+\label{subsec:api:serializers:notifications}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Serializer} & \textbf{Purpose} \\
+\midrule
+\texttt{NotificationSerializer} & Serializes notifications with triggering user and invigilator metadata. \\
+\texttt{AnnouncementSerializer} & Serializes announcements for dashboards. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Invigilator serializers}
+\label{subsec:api:serializers:invigilators}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Serializer} & \textbf{Purpose} \\
+\midrule
+\texttt{InvigilatorAssignmentSerializer} & Includes exam/venue context, provisions, and cover status. \\
+\texttt{InvigilatorQualificationSerializer} & Writes qualification entries. \\
+\texttt{InvigilatorRestrictionSerializer} & Writes diet-specific restriction entries. \\
+\texttt{InvigilatorAvailabilitySerializer} & Serializes per-day availability. \\
+\texttt{InvigilatorSerializer} & Full invigilator payload with nested qualifications/restrictions. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Diet serializer}
+\label{subsec:api:serializers:diets}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Serializer} & \textbf{Purpose} \\
+\midrule
+\texttt{DietSerializer} & CRUD serializer for diet windows (read-only timestamps). \\
+\bottomrule
+\end{longtable}
+
+\subsection{Cross-references}
+\label{subsec:api:serializers:links}
+
+\begin{itemize}
+  \item Endpoint usage: Section~\ref{sec:api:endpoint-table}.
+  \item Model reference: Section~\ref{sec:models}.
+\end{itemize}
