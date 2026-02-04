@@ -1,0 +1,45 @@
+\section{Operations and CI}
+\label{sec:ops}
+
+This section documents how the system is built, started, and tested locally and in CI. The workflows are Docker-first and are designed to keep environments consistent across developers and pipelines.
+
+\subsection{Docker Compose dev stack}
+\label{subsec:ops:compose}
+
+The dev stack is defined in \texttt{ops/compose/docker-compose.dev.yml}. It builds two services:
+
+\begin{itemize}
+  \item \textbf{frontend}: runs the React app on port 3000 and points \texttt{VITE\_API\_URL} to the Django service.
+  \item \textbf{django}: runs the Django app on port 8000 and starts an embedded PostgreSQL cluster under \texttt{services/django/lithium/.postgres-data}.
+\end{itemize}
+
+The Django container runs \texttt{scripts/run-dev-with-postgres.sh}, which bootstraps dependencies, migrations, and the dev server.
+
+\subsection{Makefile targets}
+\label{subsec:ops:make}
+
+The \texttt{Makefile} wraps common workflows. Key targets:
+
+\begin{itemize}
+  \item \texttt{make up}: build services, start containers, run smoke tests.
+  \item \texttt{make test}: run full frontend and Django test suites.
+  \item \texttt{make migrate}: create and apply Django migrations.
+  \item \texttt{make reset-django-db}: wipe local embedded Postgres data.
+\end{itemize}
+
+See \texttt{Makefile} for full command definitions and environment assumptions.
+
+\subsection{Refresh script}
+\label{subsec:ops:refresh}
+
+\texttt{ops/scripts/dev-refresh.sh} performs a full rebuild cycle: tear down containers, rebuild images, start the stack, apply migrations, and execute tests. It is the fastest path to a clean slate when dependencies or migrations drift.
+
+\subsection{Continuous integration}
+\label{subsec:ops:ci}
+
+CI builds Docker images for both services and runs the frontend (Vitest) and backend (Django test runner) suites. The pipeline also expects deterministic dependency locks and committed migrations.
+
+\subsection{Environments and secrets}
+\label{subsec:ops:secrets}
+
+Production environments must override default credentials (e.g., \texttt{DJANGO\_SECRET\_KEY} and \texttt{DJANGO\_DB\_PASSWORD}). The backend will refuse to start with dev defaults in production mode.
