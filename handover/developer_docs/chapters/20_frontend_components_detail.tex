@@ -1,0 +1,96 @@
+\section{Frontend component reference (detailed)}
+\label{sec:frontend:components:detail}
+
+This section lists each frontend page and component with a brief purpose statement.
+
+\subsection{Pages}
+\label{subsec:frontend:components:detail:pages}
+
+\begin{longtable}{p{0.48\textwidth}p{0.46\textwidth}}
+\toprule
+\textbf{File} & \textbf{Purpose} \\
+\midrule
+\texttt{src/pages/Login.tsx} & Login screen and authentication entry. \\
+\texttt{src/pages/NotFound.tsx} & 404 page for unknown routes. \\
+\texttt{src/pages/admin/Dashboard.tsx} & Admin dashboard and summary metrics. \\
+\texttt{src/pages/admin/Calendar.tsx} & Calendar schedule visualization and filters. \\
+\texttt{src/pages/admin/Exams.tsx} & Exam list and admin operations. \\
+\texttt{src/pages/admin/Exam.tsx} & Single exam details and allocations. \\
+\texttt{src/pages/admin/Venues.tsx} & Venue list and management tools. \\
+\texttt{src/pages/admin/Venue.tsx} & Venue detail view and availability. \\
+\texttt{src/pages/admin/Invigilators.tsx} & Invigilator list and bulk actions. \\
+\texttt{src/pages/admin/Invigilator.tsx} & Invigilator profile and assignments. \\
+\texttt{src/pages/admin/Students.tsx} & Student/provision management and reallocations. \\
+\texttt{src/pages/admin/Profile.tsx} & Admin profile and auth settings. \\
+\texttt{src/pages/invigilator/Dashboard.tsx} & Invigilator summary dashboard. \\
+\texttt{src/pages/invigilator/Timetable.tsx} & Invigilator timetable and assignments. \\
+\texttt{src/pages/invigilator/Shifts.tsx} & Shift pickup/cancellation workflow. \\
+\texttt{src/pages/invigilator/Restrictions.tsx} & Availability and restriction editor. \\
+\texttt{src/pages/invigilator/Profile.tsx} & Invigilator profile editor. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Shared components}
+\label{subsec:frontend:components:detail:shared}
+
+\begin{longtable}{p{0.48\textwidth}p{0.46\textwidth}}
+\toprule
+\textbf{File} & \textbf{Purpose} \\
+\midrule
+\texttt{src/components/RequireAuth.tsx} & Auth gate for protected routes. \\
+\texttt{src/components/RequireRole.tsx} & Role-based gate for admin/invigilator routes. \\
+\texttt{src/components/Panel.tsx} & Shared panel layout and styling. \\
+\texttt{src/components/PillButton.tsx} & Reusable pill-style button. \\
+\texttt{src/components/BooleanCheckboxRow.tsx} & Boolean checkbox row helper. \\
+\texttt{src/components/CollapsibleSection.tsx} & Expand/collapse container for dense forms. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Admin components}
+\label{subsec:frontend:components:detail:admin}
+
+\begin{longtable}{p{0.48\textwidth}p{0.46\textwidth}}
+\toprule
+\textbf{File} & \textbf{Purpose} \\
+\midrule
+\texttt{src/components/admin/Layout.tsx} & Admin layout shell and nav. \\
+\texttt{src/components/admin/UploadFile.tsx} & Upload widget for Excel ingestion. \\
+\texttt{src/components/admin/AssignInvigilatorDialog.tsx} & Assign invigilators to shifts. \\
+\texttt{src/components/admin/AddInvigilatorDialog.tsx} & Create invigilator entries. \\
+\texttt{src/components/admin/EditInvigilatorDialog.tsx} & Edit invigilator profiles and restrictions. \\
+\texttt{src/components/admin/InvigilatorAvailabilityModal.tsx} & View/edit invigilator availability. \\
+\texttt{src/components/admin/ContractedHoursReport.tsx} & Report on contracted hours. \\
+\texttt{src/components/admin/ExportInvigilatorTimetablesDialog.tsx} & Export invigilator timetable CSVs. \\
+\texttt{src/components/admin/ExportProgressDialog.tsx} & Export progress indicator. \\
+\texttt{src/components/admin/EditExamDialog.tsx} & Edit exam metadata. \\
+\texttt{src/components/admin/AddExamDialog.tsx} & Create exams. \\
+\texttt{src/components/admin/ExamDetailsPopup.tsx} & Exam details quick view. \\
+\texttt{src/components/admin/EditVenueDialog.tsx} & Edit venue metadata and capabilities. \\
+\texttt{src/components/admin/AddVenueDialog.tsx} & Create venues. \\
+\texttt{src/components/admin/DeleteConfirmationDialog.tsx} & Confirmation for destructive actions. \\
+\texttt{src/components/admin/DietManager.tsx} & Create/edit diets. \\
+\texttt{src/components/admin/NotificationsPanel.tsx} & Admin notifications feed. \\
+\texttt{src/components/admin/NotifyDialog.tsx} & Mail merge/message tool. \\
+\texttt{src/components/admin/AddAnnouncementDialog.tsx} & Create announcements. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Invigilator components}
+\label{subsec:frontend:components:detail:invigilator}
+
+\begin{longtable}{p{0.48\textwidth}p{0.46\textwidth}}
+\toprule
+\textbf{File} & \textbf{Purpose} \\
+\midrule
+\texttt{src/components/invigilator/Layout.tsx} & Invigilator layout shell and nav. \\
+\texttt{src/components/invigilator/ShiftPickupDialog.tsx} & Shift pickup action UI. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Cross-references}
+\label{subsec:frontend:components:detail:links}
+
+\begin{itemize}
+  \item Routes and role gates: Section~\ref{sec:frontend}.
+  \item API usage: Section~\ref{sec:api:endpoint-table}.
+\end{itemize}
