@@ -1,0 +1,59 @@
+\section{Django views, URLs, and throttling}
+\label{sec:backend:views}
+
+This section documents the remaining Django views and routing that are not part of the REST API.
+
+\subsection{timetabling\_system views}
+\label{subsec:backend:views:timetabling}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{View/Function} & \textbf{Purpose} \\
+\midrule
+\texttt{HomePageView} & Static landing page for the timetabling system. \\
+\texttt{AboutPageView} & Static about page for the timetabling system. \\
+\texttt{healthz\_view} & Health check endpoint that verifies DB connectivity. \\
+\texttt{upload\_timetable\_file} & Form-based upload endpoint for authenticated users (legacy). \\
+\bottomrule
+\end{longtable}
+
+\subsection{pages app views}
+\label{subsec:backend:views:pages}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{View/Function} & \textbf{Purpose} \\
+\midrule
+\texttt{pages.HomePageView} & Static home page for the pages app. \\
+\texttt{pages.AboutPageView} & Static about page for the pages app. \\
+\texttt{pages.healthz\_view} & Health check endpoint (pages app). \\
+\bottomrule
+\end{longtable}
+
+\subsection{URL routing}
+\label{subsec:backend:views:urls}
+
+\begin{itemize}
+  \item \texttt{timetabling\_system/urls.py} wires home/about/healthz/upload views.
+  \item \texttt{pages/urls.py} wires pages app home/about/healthz views.
+  \item \texttt{django\_project/urls.py} mounts both and the REST API.
+\end{itemize}
+
+\subsection{Throttling}
+\label{subsec:backend:views:throttling}
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Class} & \textbf{Purpose} \\
+\midrule
+\texttt{AdminBypassUserRateThrottle} & Skips user throttling for staff/superusers. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Cross-references}
+\label{subsec:backend:views:links}
+
+\begin{itemize}
+  \item API endpoints: Section~\ref{sec:api:endpoint-table}.
+  \item Health endpoint: Section~\ref{sec:ops}.
+\end{itemize}

@@ -1,0 +1,34 @@
+\section{Frontend utilities and state}
+\label{sec:frontend:utils}
+
+This section documents utility modules and state setup used across the frontend.
+
+\subsection{Utilities}
+\label{subsec:frontend:utils:modules}
+
+\begin{longtable}{p{0.40\textwidth}p{0.54\textwidth}}
+\toprule
+\textbf{Module} & \textbf{Purpose} \\
+\midrule
+\texttt{src/utils/api.ts} & API base URL resolution, auth token storage, and fetch helpers. \\
+\texttt{src/utils/dates.ts} & Date/time formatting helpers for UI. \\
+\texttt{src/utils/globalStyles.tsx} & Shared global styling configuration. \\
+\texttt{src/theme.ts} & MUI theme definitions and overrides. \\
+\bottomrule
+\end{longtable}
+
+\subsection{State management}
+\label{subsec:frontend:utils:state}
+
+\begin{itemize}
+  \item \texttt{src/state/store.ts} defines the central store (Redux or context-based, depending on current implementation).
+  \item Page-level state is typically local to the component and refreshed after mutations.
+\end{itemize}
+
+\subsection{Cross-references}
+\label{subsec:frontend:utils:links}
+
+\begin{itemize}
+  \item Auth flow: Section~\ref{sec:frontend:state}.
+  \item API endpoints: Section~\ref{sec:api:endpoint-table}.
+\end{itemize}
