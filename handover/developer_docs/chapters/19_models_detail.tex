@@ -1,0 +1,69 @@
+\section{Model detail reference}
+\label{sec:models:detail}
+
+This section expands on Section~\ref{sec:models} with per-class notes and behavioral constraints for \texttt{timetabling\_system/models.py}.
+
+\subsection{Choice types}
+\label{subsec:models:detail:choices}
+
+All choice classes are \texttt{models.TextChoices} used for validation and UI selection. Key types:
+
+\begin{itemize}
+  \item \texttt{ProvisionType}: normalized provision labels used in ingestion and matching.
+  \item \texttt{ExamVenueProvisionType}: capability labels stored on venues and exam venues.
+  \item \texttt{VenueType}, \texttt{ExamTypeChoices}, \texttt{DietChoices}, \texttt{SlotChoices}.
+  \item \texttt{InvigilatorQualificationChoices}, \texttt{InvigilatorRestrictionType}, \texttt{AccessibilityFeatures}.
+\end{itemize}
+
+\subsection{Core tables}
+\label{subsec:models:detail:core}
+
+\begin{longtable}{p{0.30\textwidth}p{0.64\textwidth}}
+\toprule
+\textbf{Model} & \textbf{Notes} \\
+\midrule
+\texttt{Exam} & Core exam metadata; \texttt{exam\_id} is the primary key. \\
+\texttt{Venue} & Primary key is \texttt{venue\_name}; capabilities and availability are stored in arrays. \\
+\texttt{ExamVenue} & Join model between exam and venue; \texttt{core} marks primary allocations. \\
+\texttt{Student} & Primary key is \texttt{student\_id}; minimal identity data. \\
+\texttt{StudentExam} & Unique per (student, exam). On save, validates separate-room exclusivity. \\
+\texttt{Provisions} & Stores normalized provision list, notes, and optional extra-time details. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Notifications and uploads}
+\label{subsec:models:detail:notifications}
+
+\begin{longtable}{p{0.30\textwidth}p{0.64\textwidth}}
+\toprule
+\textbf{Model} & \textbf{Notes} \\
+\midrule
+\texttt{Notification} & Stores admin/invigilator messages; ordered newest-first. \\
+\texttt{Announcement} & Admin-authored messages with audience and expiry controls. \\
+\texttt{UploadLog} & Records file ingest history (created/updated counts). \\
+\bottomrule
+\end{longtable}
+
+\subsection{Invigilator management}
+\label{subsec:models:detail:invigilators}
+
+\begin{longtable}{p{0.30\textwidth}p{0.64\textwidth}}
+\toprule
+\textbf{Model} & \textbf{Notes} \\
+\midrule
+\texttt{Invigilator} & Profile linked to auth user (optional). \texttt{preferred\_name} used in display. \\
+\texttt{InvigilatorQualification} & Unique per invigilator/qualification. \\
+\texttt{InvigilatorRestriction} & Diet-scoped restrictions per invigilator. \\
+\texttt{InvigilatorAvailability} & Availability by date and slot; unique on (invigilator, date, slot). \\
+\texttt{InvigilatorAssignment} & Shift record with timing, role, cancellation, and cover tracking. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Behavioral hooks}
+\label{subsec:models:detail:hooks}
+
+\begin{itemize}
+  \item \texttt{StudentExam.clean()} enforces separate-room exclusivity per \texttt{ExamVenue}.
+  \item \texttt{StudentExam.save()} calls \texttt{full\_clean()} to ensure validation.
+  \item Venue-related behaviors are augmented by signals (see Section~\ref{sec:signals}).
+\end{itemize}
