@@ -1,0 +1,107 @@
+\section{API endpoint table}
+\label{sec:api:endpoint-table}
+
+This section lists the primary API endpoints, their handlers, and access requirements. It complements the high-level overview in Section~\ref{sec:api}.
+
+\subsection{Authentication}
+\label{subsec:api:endpoints:auth}
+
+\begin{longtable}{p{0.30\textwidth}p{0.26\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{Endpoint} & \textbf{Access} & \textbf{Handler} \\
+\midrule
+\texttt{POST /api/auth/token/login/} & Public & \texttt{ObtainAuthTokenView} \\
+\texttt{GET /api/auth/me/} & Authenticated & \texttt{CurrentUserView} \\
+\texttt{PATCH /api/auth/me/} & Authenticated & \texttt{CurrentUserView} \\
+\texttt{DELETE /api/auth/me/} & Admin only & \texttt{CurrentUserView} \\
+\texttt{GET /api/auth/sessions/} & Authenticated & \texttt{SessionListView} \\
+\texttt{POST /api/auth/sessions/revoke/} & Authenticated & \texttt{SessionRevokeView} \\
+\texttt{POST /api/auth/sessions/revoke-others/} & Authenticated & \texttt{SessionRevokeOthersView} \\
+\texttt{POST /api/auth/logout/} & Authenticated & \texttt{SessionLogoutView} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Admin CRUD viewsets}
+\label{subsec:api:endpoints:crud}
+
+\begin{longtable}{p{0.30\textwidth}p{0.26\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{Endpoint} & \textbf{Access} & \textbf{Handler} \\
+\midrule
+\texttt{/api/exams/} & Admin & \texttt{ExamViewSet} \\
+\texttt{/api/exams/bulk-delete/} & Admin & \texttt{ExamViewSet.bulk\_delete} \\
+\texttt{/api/venues/} & Admin & \texttt{VenueViewSet} \\
+\texttt{/api/venues/bulk-delete/} & Admin & \texttt{VenueViewSet.bulk\_delete} \\
+\texttt{/api/exam-venues/} & Admin & \texttt{ExamVenueViewSet} \\
+\texttt{/api/invigilators/} & Admin & \texttt{InvigilatorViewSet} \\
+\texttt{/api/invigilators/bulk-delete/} & Admin & \texttt{InvigilatorViewSet.bulk\_delete} \\
+\texttt{/api/announcements/} & Admin write, invigilator read & \texttt{AnnouncementViewSet} \\
+\texttt{/api/diets/} & Admin & \texttt{DietViewSet} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Uploads and exports}
+\label{subsec:api:endpoints:uploads}
+
+\begin{longtable}{p{0.30\textwidth}p{0.26\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{Endpoint} & \textbf{Access} & \textbf{Handler} \\
+\midrule
+\texttt{POST /api/exams-upload} & Admin & \texttt{TimetableUploadView} \\
+\texttt{GET /api/provisions/export/} & Admin & \texttt{ProvisionExportView} \\
+\texttt{POST /api/invigilators/timetables/export/} & Admin & \texttt{InvigilatorTimetableExportView} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Notifications and messaging}
+\label{subsec:api:endpoints:notifications}
+
+\begin{longtable}{p{0.30\textwidth}p{0.26\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{Endpoint} & \textbf{Access} & \textbf{Handler} \\
+\midrule
+\texttt{GET /api/notifications/} & Admin & \texttt{NotificationsView} \\
+\texttt{POST /api/notifications/} & Admin & \texttt{NotificationsView} \\
+\texttt{GET /api/invigilator/notifications/} & Authenticated & \texttt{InvigilatorNotificationsView} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Invigilator self-service}
+\label{subsec:api:endpoints:invigilator}
+
+\begin{longtable}{p{0.30\textwidth}p{0.26\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{Endpoint} & \textbf{Access} & \textbf{Handler} \\
+\midrule
+\texttt{GET /api/invigilator/stats/} & Authenticated & \texttt{InvigilatorStatsView} \\
+\texttt{GET /api/invigilator/availability/} & Authenticated & \texttt{InvigilatorAvailabilityView} \\
+\texttt{PUT /api/invigilator/availability/} & Authenticated & \texttt{InvigilatorAvailabilityView} \\
+\texttt{GET /api/invigilator/assignments/} & Authenticated & \texttt{InvigilatorAssignmentsView} \\
+\texttt{GET /api/invigilator-assignments/} & Authenticated & \texttt{InvigilatorAssignmentViewSet.list} \\
+\texttt{POST /api/invigilator-assignments/<id>/pickup/} & Authenticated & \texttt{InvigilatorAssignmentViewSet.pickup} \\
+\texttt{POST /api/invigilator-assignments/<id>/request-cancel/} & Authenticated & \texttt{InvigilatorAssignmentViewSet.request\_cancel} \\
+\texttt{POST /api/invigilator-assignments/<id>/undo-cancel/} & Authenticated & \texttt{InvigilatorAssignmentViewSet.undo\_cancel} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Student/provision management}
+\label{subsec:api:endpoints:students}
+
+\begin{longtable}{p{0.30\textwidth}p{0.26\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{Endpoint} & \textbf{Access} & \textbf{Handler} \\
+\midrule
+\texttt{GET /api/students/provisions/} & Admin & \texttt{StudentProvisionListView} \\
+\texttt{PATCH /api/students/provisions/} & Admin & \texttt{StudentProvisionListView} \\
+\texttt{DELETE /api/students/provisions/} & Admin & \texttt{StudentProvisionListView} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Cross-references}
+\label{subsec:api:endpoints:links}
+
+\begin{itemize}
+  \item Serializer details: Section~\ref{subsec:api:serializers}.
+  \item Auth/session behavior: Section~\ref{sec:accounts}.
+  \item Frontend consumers: Section~\ref{sec:frontend:components}.
+\end{itemize}
