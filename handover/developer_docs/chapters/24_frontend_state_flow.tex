@@ -1,0 +1,52 @@
+\section{Frontend state and data flow}
+\label{sec:frontend:state}
+
+This section summarizes how the frontend retrieves data, stores auth state, and coordinates admin workflows. It does not document every hook or state variable, but highlights the most important flows.
+
+\subsection{Auth state}
+\label{subsec:frontend:state:auth}
+
+\begin{itemize}
+  \item Auth tokens and user payloads are stored via \texttt{src/utils/api.ts} using \texttt{sessionStorage} when available (with legacy migration from \texttt{localStorage}).
+  \item \texttt{RequireAuth} and \texttt{RequireRole} gate route access.
+  \item Logout clears stored auth keys and returns to \texttt{/login}.
+\end{itemize}
+
+\subsection{Admin data flow (common patterns)}
+\label{subsec:frontend:state:admin}
+
+Admin pages generally follow a request-refresh pattern:
+
+\begin{itemize}
+  \item Fetch list data from \texttt{/api/*} endpoints on mount.
+  \item Use modal dialogs (add/edit/delete) to submit mutations.
+  \item On success, re-fetch the list or update local state.
+\end{itemize}
+
+Key workflows:
+
+\begin{itemize}
+  \item \textbf{Uploads}: \texttt{UploadFile} posts to \texttt{/api/exams-upload} and displays ingestion summaries.
+  \item \textbf{Invigilator assignments}: dialogs post to assignment endpoints and refresh the invigilator list.
+  \item \textbf{Student provisions}: \texttt{AdminStudents} calls \texttt{/api/students/provisions} and updates allocations with PATCH/DELETE.
+  \item \textbf{Exports}: export dialogs call CSV endpoints and show progress feedback.
+\end{itemize}
+
+\subsection{Invigilator data flow}
+\label{subsec:frontend:state:invigilator}
+
+Invigilator pages focus on a single user profile:
+
+\begin{itemize}
+  \item Timetable and shifts load assignments from \texttt{/api/invigilator-assignments}.
+  \item Availability reads and writes \texttt{/api/invigilator/availability}.
+  \item Notifications poll \texttt{/api/invigilator/notifications}.
+\end{itemize}
+
+\subsection{Cross-references}
+\label{subsec:frontend:state:links}
+
+\begin{itemize}
+  \item API endpoints: Section~\ref{sec:api:endpoint-table}.
+  \item Auth details: Section~\ref{sec:accounts}.
+\end{itemize}
