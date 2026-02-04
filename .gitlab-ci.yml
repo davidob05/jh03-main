@@ -161,15 +161,3 @@ build_developer_docs:
     paths:
       - developer_docs.pdf
     expire_in: 30 days
-
-pages:
-  stage: docs
-  image: texlive/texlive:latest
-  script:
-    - set -eu
-    - ./generate-docs-pdf.sh
-    - mkdir -p public
-    - cp developer_docs.pdf public/index.pdf
-  artifacts:
-    paths:
-      - public
