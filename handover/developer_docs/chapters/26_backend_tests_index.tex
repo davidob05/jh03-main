@@ -1,0 +1,35 @@
+\section{Backend test index}
+\label{sec:tests:backend:index}
+
+This section lists Django test files and their primary focus. Use this as a guide when modifying behavior.
+
+\begin{longtable}{p{0.36\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Test file} & \textbf{Coverage focus} \\
+\midrule
+\texttt{test\_announcements\_api.py} & Announcement API behaviors. \\
+\texttt{test\_api\_bulk\_delete.py} & Bulk delete endpoints for admin CRUD. \\
+\texttt{test\_api\_crud.py} & Core CRUD behaviors for major models. \\
+\texttt{test\_api\_notifications.py} & Notification API and mail merge behaviors. \\
+\texttt{test\_api\_serializers\_views.py} & Serializer and view integration checks. \\
+\texttt{test\_api\_views.py} & General API view behavior. \\
+\texttt{test\_api\_views\_permissions.py} & Role/permission enforcement in views. \\
+\texttt{test\_auth\_api.py} & Auth API edge cases and login behavior. \\
+\texttt{test\_diets\_api.py} & Diet CRUD and availability logic. \\
+\texttt{test\_excel\_parser\_errors.py} & Parser error handling for invalid files. \\
+\texttt{test\_file\_classifier\_and\_venue\_parser.py} & File classification + venue parsing. \\
+\texttt{test\_invigilator\_stats.py} & Invigilator stats endpoint logic. \\
+\texttt{test\_models\_misc.py} & Misc model behaviors and enums. \\
+\texttt{test\_models\_repr.py} & Model \texttt{__str__} representations. \\
+\texttt{test\_settings\_helpers.py} & Settings utilities and toggles. \\
+\texttt{test\_signals.py} & Signal behaviors for venues. \\
+\texttt{test\_upload\_processor.py} & End-to-end ingestion from parsed rows. \\
+\texttt{test\_upload\_processor\_branches.py} & Branch coverage for ingestion paths. \\
+\texttt{test\_upload\_processor\_edges.py} & Edge cases in ingestion/matching. \\
+\texttt{test\_upload\_processor\_utils.py} & Helper functions in upload processor. \\
+\texttt{test\_upload\_view.py} & Upload endpoint behavior. \\
+\texttt{test\_utils.py} & Misc utility helpers. \\
+\texttt{test\_venue\_ingest.py} & Venue upsert behaviors. \\
+\texttt{test\_venue\_matching\_and\_stats.py} & Matching and stats computations. \\
+\bottomrule
+\end{longtable}
