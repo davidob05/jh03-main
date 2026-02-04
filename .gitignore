@@ -65,3 +65,4 @@ Thumbs.db
 .git.backup.*/
 
 *.sqlite3
+*.pdf
