@@ -1,4 +1,4 @@
-stages: [build, test]
+stages: [build, test, docs]
 
 variables:
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
@@ -149,3 +149,15 @@ test_django:
   needs: ["build_with_kaniko"]
   variables:
     SERVICE_PATH: services/django/lithium
+
+build_developer_docs:
+  stage: docs
+  image: texlive/texlive:latest
+  script:
+    - set -eu
+    - ./generate-docs-pdf.sh
+  artifacts:
+    name: "developer-docs-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - developer_docs.pdf
+    expire_in: 30 days
