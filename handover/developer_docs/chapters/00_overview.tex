@@ -1,0 +1,30 @@
+\section{Overview}
+\label{sec:overview}
+
+This document is a developer-focused guide to the jh03-main codebase. It explains how the system is structured, how data flows, and where to make changes safely. It is organized into small, linkable sections with references between related components.
+
+\subsection{What this system does}
+\label{subsec:overview:problem}
+
+The application ingests large Excel exports that describe exam schedules, venues, and student provisions. It normalizes and stores those records in a database, then provides administrative and invigilator views for managing assignments, availability, and notifications. The frontend is a React application; the backend is a Django API.
+
+\subsection{High-level goals for maintainers}
+\label{subsec:overview:maintainer_goals}
+
+\begin{itemize}
+  \item Keep ingestion rules stable; it is the core business logic.
+  \item Preserve referential integrity between exams, venues, and students.
+  \item Ensure admin and invigilator permissions are enforced consistently.
+  \item Keep Docker-driven local dev and CI flows reliable.
+\end{itemize}
+
+\subsection{How to navigate this document}
+\label{subsec:overview:navigation}
+
+\begin{itemize}
+  \item Architecture and data flow: see Section~\ref{sec:architecture}.
+  \item Django backend details: see Section~\ref{sec:backend} (to be added).
+  \item Ingestion pipeline details: see Section~\ref{sec:ingestion} (to be added).
+  \item Frontend details: see Section~\ref{sec:frontend} (to be added).
+  \item Operations and CI: see Section~\ref{sec:ops} (to be added).
+\end{itemize}

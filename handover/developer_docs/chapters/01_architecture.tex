@@ -1,0 +1,39 @@
+\section{Architecture}
+\label{sec:architecture}
+
+The system is a two-service stack: a Django backend and a React frontend. Both are run locally via Docker Compose and in CI with container builds. The backend owns data ingestion, persistence, and API endpoints. The frontend owns UI workflows for admins and invigilators.
+
+\subsection{Repository layout}
+\label{subsec:architecture:layout}
+
+\begin{longtable}{p{0.28\textwidth}p{0.68\textwidth}}
+\toprule
+\textbf{Path} & \textbf{Purpose} \\
+\midrule
+\texttt{services/django/lithium} & Django project and apps, including ingestion and API logic. \\
+\texttt{services/frontend/app} & React frontend, routes, and UI state. \\
+\texttt{ops/compose} & Docker Compose files for development. \\
+\texttt{ops/scripts} & Helper scripts for environment refreshes. \\
+\texttt{handover/developer\_docs} & This documentation. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Runtime boundaries}
+\label{subsec:architecture:boundaries}
+
+\begin{itemize}
+  \item The Django service exposes HTTP endpoints, manages the database, and contains ingestion and matching logic.
+  \item The frontend consumes API endpoints and enforces UI-level access rules for roles.
+  \item Docker Compose wires the services together locally; CI builds and tests both.
+\end{itemize}
+
+\subsection{Key data flows (summary)}
+\label{subsec:architecture:dataflows}
+
+\begin{itemize}
+  \item Venue upload data creates or updates venue records and their provision capabilities.
+  \item Exam timetable uploads create exams and exam-venue links.
+  \item Provision uploads map student data and allocate students to suitable venues.
+\end{itemize}
+
+Further details are provided in Section~\ref{sec:ingestion} and Section~\ref{sec:backend}.
