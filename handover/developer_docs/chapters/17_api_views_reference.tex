@@ -1,0 +1,103 @@
+\section{API views reference}
+\label{sec:api:views}
+
+This section provides a high-level reference to \texttt{timetabling\_system/api/views.py}. It lists key helpers and view classes with their responsibilities.
+
+\subsection{Helper functions}
+\label{subsec:api:views:helpers}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Helper} & \textbf{Purpose} \\
+\midrule
+\texttt{log\_notification} & Writes a \texttt{Notification} row for admin/invigilator events. \\
+\texttt{\_get\_request\_user} & Resolves a request user, including serializer context. \\
+\texttt{\_resolve\_invigilator\_for\_user} & Maps a user to an \texttt{Invigilator} profile if present. \\
+\texttt{\_has\_time\_conflict} & Detects time overlaps between assignments. \\
+\texttt{\_format\_dt}, \texttt{\_csv\_for} & CSV formatting helpers for exports. \\
+\texttt{\_provision\_row} & Builds a provision allocation row for the student/provision API. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Permission helpers}
+\label{subsec:api:views:permissions}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Permission} & \textbf{Purpose} \\
+\midrule
+\texttt{IsInvigilatorOrAdmin} & Allows admin users or authenticated invigilators. \\
+\texttt{IsSeniorAdmin} & Restricts access to senior admins. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Export and upload views}
+\label{subsec:api:views:exports}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{View} & \textbf{Purpose} \\
+\midrule
+\texttt{ProvisionExportView} & CSV export of provision allocations (admin-only). \\
+\texttt{InvigilatorTimetableExportView} & CSV export of invigilator timetables (admin-only). \\
+\texttt{TimetableUploadView} & Accepts Excel uploads and triggers ingestion. \\
+\bottomrule
+\end{longtable}
+
+\subsection{CRUD viewsets}
+\label{subsec:api:views:crud}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{Viewset} & \textbf{Purpose} \\
+\midrule
+\texttt{ExamViewSet} & Admin CRUD for exams with bulk-delete. \\
+\texttt{VenueViewSet} & Admin CRUD for venues with bulk-delete and write serializer. \\
+\texttt{ExamVenueViewSet} & Admin CRUD for exam-venue links (core rows are protected). \\
+\texttt{InvigilatorViewSet} & Admin CRUD for invigilators plus admin promotion actions. \\
+\texttt{InvigilatorAssignmentViewSet} & Admin CRUD and invigilator self-service actions for shifts. \\
+\texttt{AnnouncementViewSet} & Admin CRUD for announcements; read for invigilators. \\
+\texttt{DietViewSet} & Admin CRUD for diets with cleanup on delete. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Notifications and messaging}
+\label{subsec:api:views:notifications}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{View} & \textbf{Purpose} \\
+\midrule
+\texttt{NotificationsView} & Admin list + mail-merge delivery for notifications. \\
+\texttt{InvigilatorNotificationsView} & Invigilator-facing notification feed. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Invigilator self-service}
+\label{subsec:api:views:invigilator}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{View} & \textbf{Purpose} \\
+\midrule
+\texttt{InvigilatorAvailabilityView} & Read/update invigilator availability for a diet. \\
+\texttt{InvigilatorStatsView} & Summary stats for the authenticated invigilator. \\
+\texttt{InvigilatorAssignmentsView} & List assignments for the authenticated invigilator. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Student/provision management}
+\label{subsec:api:views:students}
+
+\begin{longtable}{p{0.34\textwidth}p{0.60\textwidth}}
+\toprule
+\textbf{View} & \textbf{Purpose} \\
+\midrule
+\texttt{StudentProvisionListView} & List, update, and delete student provisions/allocation rows. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Notes}
+\label{subsec:api:views:notes}
+
+The views module currently contains duplicated definitions for \texttt{DietViewSet} and \texttt{\_provision\_row}. If you modify one, ensure both copies remain consistent or refactor to a single source.
