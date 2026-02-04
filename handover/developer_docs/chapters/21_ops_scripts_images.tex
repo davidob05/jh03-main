@@ -1,0 +1,50 @@
+\section{Ops scripts and container images}
+\label{sec:ops:scripts}
+
+This section documents the operational scripts and Dockerfiles used to run the system locally and in CI.
+
+\subsection{Docker Compose (dev)}
+\label{subsec:ops:scripts:compose}
+
+\texttt{ops/compose/docker-compose.dev.yml} defines the two service stack. The frontend binds port 3000, and Django binds port 8000. The Django service runs \texttt{scripts/run-dev-with-postgres.sh} as its command.
+
+\subsection{Django Dockerfile}
+\label{subsec:ops:scripts:djangoimage}
+
+\texttt{services/django/lithium/Dockerfile} is a two-stage build:
+
+\begin{itemize}
+  \item Builder uses \texttt{uv} to sync dependencies into \texttt{/app}.
+  \item Final image installs system build tooling and PostgreSQL 15 packages.
+  \item Default \texttt{CMD} runs Gunicorn on port 8000.
+\end{itemize}
+
+\subsection{Frontend Dockerfile}
+\label{subsec:ops:scripts:frontendimage}
+
+\texttt{services/frontend/Dockerfile} builds a Node 20 slim image, installs build tooling, copies the app skeleton, and runs a small entrypoint script. The container defaults to an idle command until overridden by Compose.
+
+\subsection{Django runtime scripts}
+\label{subsec:ops:scripts:django}
+
+\begin{itemize}
+  \item \texttt{scripts/run-dev-with-postgres.sh}: boots embedded Postgres, prepares venv, runs migrations, and starts \texttt{runserver}.
+  \item \texttt{scripts/manage.sh}: local helper to create/reuse a venv and run management commands.
+  \item \texttt{scripts/create-timetabling-app.sh}: bootstrap utility for creating the app scaffold inside containers.
+\end{itemize}
+
+\subsection{Frontend runtime scripts}
+\label{subsec:ops:scripts:frontend}
+
+\begin{itemize}
+  \item \texttt{app/bin/start.sh}: installs dependencies if missing and runs the Vite dev server.
+  \item \texttt{app/bin/test.sh}: installs deps if needed and runs the npm test script.
+\end{itemize}
+
+\subsection{Cross-references}
+\label{subsec:ops:scripts:links}
+
+\begin{itemize}
+  \item Dev workflows: Section~\ref{sec:ops}.
+  \item Make targets: Section~\ref{subsec:ops:make}.
+\end{itemize}
