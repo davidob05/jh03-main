@@ -1,0 +1,41 @@
+\section{Testing strategy}
+\label{sec:tests}
+
+The codebase uses Django's test runner for backend logic and Vitest for frontend UI/state behavior. Tests are grouped by subsystem and focus on ingestion correctness, API permissions, and UI workflows.
+
+\subsection{Backend tests (Django)}
+\label{subsec:tests:django}
+
+Django tests live under \texttt{services/django/lithium/tests/django}. Major areas:
+
+\begin{itemize}
+  \item Upload pipeline coverage: \texttt{test\_upload\_processor*.py}, \texttt{test\_excel\_parser\_errors.py}.
+  \item File classification + venue parsing: \texttt{test\_file\_classifier\_and\_venue\_parser.py}.
+  \item API behaviors and permissions: \texttt{test\_api\_views*.py}, \texttt{test\_api\_crud.py}, \texttt{test\_api\_bulk\_delete.py}, \texttt{test\_api\_notifications.py}.
+  \item Models and signals: \texttt{test\_models\_repr.py}, \texttt{test\_models\_misc.py}, \texttt{test\_signals.py}.
+  \item Matching and stats: \texttt{test\_venue\_matching\_and\_stats.py}, \texttt{test\_venue\_ingest.py}.
+  \item Auth and roles: \texttt{test\_auth\_api.py}, \texttt{test\_api\_views\_permissions.py}.
+\end{itemize}
+
+Account-specific tests live under \texttt{services/django/lithium/accounts} (see \texttt{tests.py}, \texttt{tests\_ext.py}, \texttt{tests\_validators.py}).
+
+\subsection{Frontend tests (Vitest)}
+\label{subsec:tests:frontend}
+
+Frontend tests live under \texttt{services/frontend/app/tests}. They cover key pages, dialogs, and role gates:
+
+\begin{itemize}
+  \item Admin UI flows: \texttt{tests/pages/admin/*.test.tsx} and \texttt{tests/components/admin/*.test.tsx}.
+  \item Invigilator UI flows: \texttt{tests/pages/invigilator/*.test.tsx} and \texttt{tests/components/invigilator/*.test.tsx}.
+  \item Role gating: \texttt{tests/components/RequireRole.test.tsx}.
+\end{itemize}
+
+\subsection{Running tests}
+\label{subsec:tests:running}
+
+Use \texttt{make test} to run both suites inside containers. See Section~\ref{sec:ops} for Make targets and Compose context.
+
+\subsection{Coverage}
+\label{subsec:tests:coverage}
+
+Coverage workflows are provided via \texttt{make coverage} and \texttt{make coverage-summary} (see \texttt{Makefile}). Backend coverage is reported per-file, and frontend coverage uses Vitest output.
